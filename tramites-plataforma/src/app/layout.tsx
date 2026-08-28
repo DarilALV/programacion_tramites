@@ -18,7 +18,11 @@ export const metadata: Metadata = {
     "Plataforma para programar trámites por usuario, publicarlos en una vista general y hacer seguimiento por roles.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <html
       lang="es"
