@@ -33,7 +33,7 @@ export default function Home() {
   return (
     <AppShell
       title="Plataforma de trámites "
-      description="La experiencia está organizada en páginas distintas efender."
+      description=""
       eyebrow="Mi Casa Segura"
     >
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">

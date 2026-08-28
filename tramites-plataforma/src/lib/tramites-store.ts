@@ -37,6 +37,21 @@ export type Entry = {
   observations: string;
   status: EntryStatus;
   createdAt: string;
+   // NUEVOS CAMPOS:
+  scheduledTime?: string;  // Hora programada (ej: "10:00")
+  scheduledEndTime?: string; //Hora fin estimada
+  // Datos de seguimiento:
+  followUp?: {
+    clientName?: string;        // Nombre del cliente que vino
+    arrivalTime?: string;       // Hora que llegó (ej: "10:15")
+    //attendanceTime?: string;    // Hora que empezó atención (ej: "10:20")
+    //completedTime?: string;     // Hora que terminó (ej: "11:00")
+    //actualTechnician?: string;  // ID del técnico que atendió
+    attended?: boolean; 
+    attendedTime?: string; // Hora que se atendió (ej: "10:20")
+    observations?: string;      // Notas del seguimiento
+    createdAt?: string;         // Cuándo se registró el seguimiento
+  };
 };
 
 export type EntryFormValues = {
@@ -97,6 +112,29 @@ export const initialForm: EntryFormValues = {
   observations: "",
 };
 
+export const DURACION_TRAMITE = 15; // minutos
+export const HORA_INICIO_ATENCION = 8; // 08:00
+export const HORA_FIN_ATENCION = 12;
+
+export function calcularHoraProgramada(
+  indexEnFila: number,
+  horaInicio: number = HORA_INICIO_ATENCION
+): { time: string; endTime: string } {
+  const DURACION = DURACION_TRAMITE;
+  
+  const minutosDesdeInicio = indexEnFila * DURACION;
+  const horaCalculada = horaInicio + Math.floor(minutosDesdeInicio / 60);
+  const minutosCalculados = minutosDesdeInicio % 60;
+  
+  const horaFin = horaInicio + Math.floor((minutosDesdeInicio + DURACION) / 60);
+  const minutosFin = (minutosDesdeInicio + DURACION) % 60;
+  
+  const time = `${String(horaCalculada).padStart(2, '0')}:${String(minutosCalculados).padStart(2, '0')}`;
+  const endTime = `${String(horaFin).padStart(2, '0')}:${String(minutosFin).padStart(2, '0')}`;
+  
+  return { time, endTime };
+}
+
 export const statusOptions: EntryStatus[] = ["Registrado", "En revisión", "Aprobado"];
 
 function createRegistrationNumber(index: number) {
@@ -130,7 +168,7 @@ function normalizeStoredStatus(rawStatus: unknown): EntryStatus {
 }
 
 function normalizeStoredEntry(rawEntry: Record<string, unknown>, index: number): Entry {
-  const fallbackDate = "2026-08-11";
+  const fallbackDate = "2026-08-27";
   const technicianFromRecord =
     typeof rawEntry.technicianId === "string" && rawEntry.technicianId.trim().length > 0
       ? technicians.find((item) => item.id === rawEntry.technicianId)
@@ -189,6 +227,40 @@ function normalizeStoredEntry(rawEntry: Record<string, unknown>, index: number):
       typeof rawEntry.createdAt === "string" && rawEntry.createdAt.trim().length > 0
         ? rawEntry.createdAt
         : new Date(`${registrationDate}T08:00:00.000Z`).toISOString(),
+    
+   // NUEVO: Procesar scheduledTime
+scheduledTime: typeof rawEntry.scheduledTime === "string" 
+  ? rawEntry.scheduledTime 
+  : undefined,
+
+// NUEVO: Procesar scheduledEndTime ← AGREGAR ESTA LÍNEA
+scheduledEndTime: typeof rawEntry.scheduledEndTime === "string" 
+  ? rawEntry.scheduledEndTime 
+  : undefined,
+
+// NUEVO: Procesar followUp
+followUp: rawEntry.followUp && typeof rawEntry.followUp === "object"
+  ? {
+      clientName: typeof (rawEntry.followUp as any).clientName === "string"
+        ? (rawEntry.followUp as any).clientName
+        : undefined,
+      arrivalTime: typeof (rawEntry.followUp as any).arrivalTime === "string"
+        ? (rawEntry.followUp as any).arrivalTime
+        : undefined,
+      attended: typeof (rawEntry.followUp as any).attended === "boolean"
+        ? (rawEntry.followUp as any).attended
+        : undefined,
+      attendedTime: typeof (rawEntry.followUp as any).attendedTime === "string"
+        ? (rawEntry.followUp as any).attendedTime
+        : undefined,
+      observations: typeof (rawEntry.followUp as any).observations === "string"
+        ? (rawEntry.followUp as any).observations
+        : undefined,
+      createdAt: typeof (rawEntry.followUp as any).createdAt === "string"
+        ? (rawEntry.followUp as any).createdAt
+        : undefined,
+    }
+  : undefined,
   };
 }
 
@@ -220,7 +292,201 @@ function makeSeedEntry(params: {
   } satisfies Entry;
 }
 
+// Obtener HOY
+const today = new Date();
+const todayString = today.toISOString().slice(0, 10);
+const tomorrowString = new Date(today.getTime() + 86400000).toISOString().slice(0, 10);
+
+// Seed data con pruebas para HOY y MAÑANA
 const seedEntries: Entry[] = [
+  // HOY - VANESA C. (RUAT)
+  {
+    id: "entry-today-1",
+    createdBy: "wayra",
+    createdByName: "WAYRA",
+    registrationNumber: "REG-0001",
+    tramiteCode: "2026016618",
+    technicianId: "vanesa-c",
+    technicianName: "VANESA C.",
+    technicianArea: "Ruat",
+    scheduleDate: todayString,
+    registrationDate: todayString,
+    observations: "Documento importante, cliente VIP",
+    status: "Registrado",
+    createdAt: new Date().toISOString(),
+    scheduledTime: "08:00",
+    scheduledEndTime: "08:15",
+  },
+  {
+    id: "entry-today-2",
+    createdBy: "wayra",
+    createdByName: "WAYRA",
+    registrationNumber: "REG-0002",
+    tramiteCode: "2026016619",
+    technicianId: "vanesa-c",
+    technicianName: "VANESA C.",
+    technicianArea: "Ruat",
+    scheduleDate: todayString,
+    registrationDate: todayString,
+    observations: "Revisión de expediente",
+    status: "Registrado",
+    createdAt: new Date().toISOString(),
+    scheduledTime: "08:15",
+    scheduledEndTime: "08:30",
+    followUp: {
+      clientName: "Juan Pérez",
+      arrivalTime: "08:15",
+      attended: false,
+      observations: "Cliente llegó",
+      createdAt: new Date().toISOString(),
+    },
+  },
+  {
+    id: "entry-today-3",
+    createdBy: "wayra",
+    createdByName: "WAYRA",
+    registrationNumber: "REG-0003",
+    tramiteCode: "2026016620",
+    technicianId: "vanesa-c",
+    technicianName: "VANESA C.",
+    technicianArea: "Ruat",
+    scheduleDate: todayString,
+    registrationDate: todayString,
+    observations: "Trámite urgente",
+    status: "Registrado",
+    createdAt: new Date().toISOString(),
+    scheduledTime: "08:30",
+    scheduledEndTime: "08:45",
+    followUp: {
+      clientName: "María García",
+      arrivalTime: "08:28",
+      attended: true,
+      attendedTime: "08:35",
+      observations: "Ya fue atendido",
+      createdAt: new Date().toISOString(),
+    },
+  },
+  {
+    id: "entry-today-4",
+    createdBy: "wayra",
+    createdByName: "WAYRA",
+    registrationNumber: "REG-0004",
+    tramiteCode: "2026016621",
+    technicianId: "vanesa-c",
+    technicianName: "VANESA C.",
+    technicianArea: "Ruat",
+    scheduleDate: todayString,
+    registrationDate: todayString,
+    observations: "Revisión de planos",
+    status: "Registrado",
+    createdAt: new Date().toISOString(),
+    scheduledTime: "08:45",
+    scheduledEndTime: "09:00",
+  },
+  {
+    id: "entry-today-5",
+    createdBy: "jaqueline",
+    createdByName: "JAQUELINE",
+    registrationNumber: "REG-0005",
+    tramiteCode: "2026016622",
+    technicianId: "ignacio-g",
+    technicianName: "IGNACIO G.",
+    technicianArea: "Ruat",
+    scheduleDate: todayString,
+    registrationDate: todayString,
+    observations: "Revisión de documentos",
+    status: "Registrado",
+    createdAt: new Date().toISOString(),
+    scheduledTime: "08:00",
+    scheduledEndTime: "08:15",
+    followUp: {
+      clientName: "Carlos López",
+      arrivalTime: "08:02",
+      attended: false,
+      observations: "Llegó hace poco",
+      createdAt: new Date().toISOString(),
+    },
+  },
+  {
+    id: "entry-today-6",
+    createdBy: "jaqueline",
+    createdByName: "JAQUELINE",
+    registrationNumber: "REG-0006",
+    tramiteCode: "2026016623",
+    technicianId: "ignacio-g",
+    technicianName: "IGNACIO G.",
+    technicianArea: "Ruat",
+    scheduleDate: todayString,
+    registrationDate: todayString,
+    observations: "Trámite normal",
+    status: "Registrado",
+    createdAt: new Date().toISOString(),
+    scheduledTime: "08:15",
+    scheduledEndTime: "08:30",
+  },
+  {
+    id: "entry-today-7",
+    createdBy: "wayra",
+    createdByName: "WAYRA",
+    registrationNumber: "REG-0007",
+    tramiteCode: "2026016624",
+    technicianId: "alex-v",
+    technicianName: "ALEX V.",
+    technicianArea: "Ruat",
+    scheduleDate: todayString,
+    registrationDate: todayString,
+    observations: "Revisión de carpeta",
+    status: "Registrado",
+    createdAt: new Date().toISOString(),
+    scheduledTime: "08:00",
+    scheduledEndTime: "08:15",
+  },
+  {
+    id: "entry-today-8",
+    createdBy: "wayra",
+    createdByName: "WAYRA",
+    registrationNumber: "REG-0008",
+    tramiteCode: "2026016625",
+    technicianId: "alex-v",
+    technicianName: "ALEX V.",
+    technicianArea: "Ruat",
+    scheduleDate: todayString,
+    registrationDate: todayString,
+    observations: "Documento incompleto",
+    status: "Registrado",
+    createdAt: new Date().toISOString(),
+    scheduledTime: "08:15",
+    scheduledEndTime: "08:30",
+    followUp: {
+      clientName: "Ana Rodríguez",
+      arrivalTime: "08:14",
+      attended: false,
+      observations: "Cliente esperando",
+      createdAt: new Date().toISOString(),
+    },
+  },
+
+  // MAÑANA - Algunos datos para prueba futura
+  {
+    id: "entry-tomorrow-1",
+    createdBy: "wayra",
+    createdByName: "WAYRA",
+    registrationNumber: "REG-0009",
+    tramiteCode: "2026016626",
+    technicianId: "vanesa-c",
+    technicianName: "VANESA C.",
+    technicianArea: "Ruat",
+    scheduleDate: tomorrowString,
+    registrationDate: tomorrowString,
+    observations: "Mañana",
+    status: "Registrado",
+    createdAt: new Date().toISOString(),
+    scheduledTime: "08:00",
+    scheduledEndTime: "08:15",
+  },
+];
+
+/*const seedEntries: Entry[] = [
   makeSeedEntry({
     createdBy: "wayra",
     tramiteCode: "2026016618",
@@ -237,7 +503,7 @@ const seedEntries: Entry[] = [
     observations: "Registro inicial de ejemplo.",
     index: 1,
   }),
-];
+]; */
 
 export function formatDate(dateString: string) {
   const normalized = normalizeDateInput(dateString, "2026-08-11");
@@ -403,28 +669,40 @@ export function useTramitesStore() {
     setCurrentUserId(nextUserId);
   }
 
-  function createEntry(form: EntryFormValues) {
-    const technician = technicians.find((item) => item.id === form.technicianId) ?? technicians[0];
-    const creator = plannerUsers.find((user) => user.id === currentUserId) ?? plannerUsers[0];
-
-    const nextEntry: Entry = {
-      id: `entry-${Date.now()}`,
-      createdBy: creator.id,
-      createdByName: creator.name,
-      registrationNumber: getNextRegistrationNumber(entries),
-      tramiteCode: form.tramiteCode.trim(),
-      technicianId: technician.id,
-      technicianName: technician.name,
-      technicianArea: technician.areaLabel,
-      scheduleDate: form.scheduleDate,
-      registrationDate: new Date().toISOString().slice(0, 10),
-      observations: form.observations.trim(),
-      status: "Registrado",
-      createdAt: new Date().toISOString(),
-    };
-
-    persistState([nextEntry, ...entries]);
+  function createEntry(form: EntryFormValues | Partial<Entry>) {
+  // Si ya tiene los campos principales de Entry, es un entry completo
+  if ('id' in form && form.id) {
+    persistState([form as Entry, ...entries]);
+    return;
   }
+
+  // Si es EntryFormValues, construir Entry completo
+  const formData = form as EntryFormValues;
+  const technician = technicians.find((item) => item.id === formData.technicianId) ?? technicians[0];
+  const creator = plannerUsers.find((user) => user.id === currentUserId) ?? plannerUsers[0];
+
+  const nextEntry: Entry = {
+    id: `entry-${Date.now()}`,
+    createdBy: creator.id,
+    createdByName: creator.name,
+    registrationNumber: getNextRegistrationNumber(entries),
+    tramiteCode: formData.tramiteCode.trim(),
+    technicianId: technician.id,
+    technicianName: technician.name,
+    technicianArea: technician.areaLabel,
+    scheduleDate: formData.scheduleDate,
+    registrationDate: new Date().toISOString().slice(0, 10),
+    observations: formData.observations.trim(),
+    status: "Registrado",
+    createdAt: new Date().toISOString(),
+    
+    // NUEVOS CAMPOS:
+    scheduledTime: 'scheduledTime' in form ? (form as any).scheduledTime : undefined,
+    scheduledEndTime: 'scheduledEndTime' in form ? (form as any).scheduledEndTime : undefined,
+  };
+
+  persistState([nextEntry, ...entries]);
+}
 
   function updateEntryStatus(entryId: string, nextStatus: EntryStatus) {
     const nextEntries = entries.map((entry) =>
@@ -432,10 +710,18 @@ export function useTramitesStore() {
     );
     persistState(nextEntries);
   }
-
+  //const updateEntry = (id: string, updatedEntry: Entry) => {
+  //setEntries(entries.map((e) => (e.id === id ? updatedEntry : e)));
+  //};
   function removeEntry(entryId: string) {
     const nextEntries = entries.filter((entry) => entry.id !== entryId);
     persistState(nextEntries);
+  }
+  function updateEntry(entryId: string, updatedEntry: Entry) {  // ← NUEVA FUNCIÓN
+  const nextEntries = entries.map((entry) =>
+    entry.id === entryId ? updatedEntry : entry
+  );
+  persistState(nextEntries);
   }
 
   function resetDemo() {
@@ -443,6 +729,8 @@ export function useTramitesStore() {
     setEntries(seedEntries);
     setCurrentUserId(plannerUsers[0].id);
   }
+
+  
 
   return {
     hydrated,
@@ -464,6 +752,7 @@ export function useTramitesStore() {
     groupEntriesByDateAndTechnician: () => groupEntriesByDateAndTechnician(entries),
     createEntry,
     updateEntryStatus,
+    updateEntry,
     removeEntry,
     resetDemo,
   };

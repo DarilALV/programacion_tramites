@@ -1,8 +1,22 @@
 @import "tailwindcss";
 
 :root {
+  /* Colores originales - mantén estos */
   --background: #f4f0e8;
   --foreground: #121212;
+  
+  /* NUEVOS COLORES - AGREGA ESTOS */
+  --pink-light: #FCE4EC;
+  --pink-main: #E91E63;
+  --pink-dark: #C2185B;
+  --purple-light: #F3E5F5;
+  --purple-main: #9C27B0;
+  --purple-dark: #6A1B9A;
+  --coral: #FF5252;
+  --success: #4CAF50;
+  --error: #F44336;
+  --warning: #FF9800;
+  --info: #2196F3;
 }
 
 @theme inline {
@@ -23,9 +37,9 @@ html {
 body {
   min-height: 100vh;
   background:
-    radial-gradient(circle at top left, rgba(198, 164, 90, 0.22), transparent 28%),
-    radial-gradient(circle at top right, rgba(31, 41, 55, 0.08), transparent 24%),
-    linear-gradient(180deg, #f8f4ec 0%, #efe7da 100%);
+    radial-gradient(circle at top left, rgba(233, 30, 99, 0.1), transparent 28%),
+    radial-gradient(circle at top right, rgba(156, 39, 176, 0.08), transparent 24%),
+    linear-gradient(180deg, #FCE4EC 0%, #F3E5F5 100%);
   color: var(--foreground);
   font-family: var(--font-space-grotesk), sans-serif;
 }
