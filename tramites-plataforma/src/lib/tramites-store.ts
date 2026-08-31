@@ -609,28 +609,38 @@ export function useTramitesStore() {
   const [entries, setEntries] = useState<Entry[]>(seedEntries);
   const [currentUserId, setCurrentUserId] = useState(plannerUsers[0].id);
 
-  useEffect(() => {
-    const rawState = window.localStorage.getItem(storageKey);
-
-    if (rawState) {
-      try {
-        const parsed = JSON.parse(rawState) as PersistedState;
-        if (Array.isArray(parsed.entries) && parsed.entries.length > 0) {
-          const normalizedEntries = parsed.entries.map((entry, index) =>
-            normalizeStoredEntry(entry as unknown as Record<string, unknown>, index),
-          );
-          setEntries(normalizedEntries);
-        }
-        if (parsed.currentUserId && plannerUsers.some((user) => user.id === parsed.currentUserId)) {
-          setCurrentUserId(parsed.currentUserId);
-        }
-      } catch {
-        window.localStorage.removeItem(storageKey);
+useEffect(() => {
+  const loadEntries = async () => {
+    try {
+      // Cargar usuario guardado
+      const savedUserId = localStorage.getItem('currentUserId');
+      if (savedUserId && plannerUsers.some(u => u.id === savedUserId)) {
+        setCurrentUserId(savedUserId);
       }
-    }
 
+      const { firestore } = await import('@/lib/firebase');
+      const { collection, getDocs } = await import('firebase/firestore');
+      
+      const querySnapshot = await getDocs(collection(firestore, 'entries'));
+      const firestoreEntries = querySnapshot.docs.map((doc) => ({
+        ...doc.data(),
+        id: doc.id,
+      })) as Entry[];
+
+      if (firestoreEntries.length > 0) {
+        setEntries(firestoreEntries);
+      } else {
+        setEntries(seedEntries);
+      }
+    } catch (error) {
+      console.warn('Error loading:', error);
+      setEntries(seedEntries);
+    }
     setHydrated(true);
-  }, []);
+  };
+
+  loadEntries();
+}, []);
 
   useEffect(() => {
     if (!hydrated) {
@@ -664,19 +674,20 @@ export function useTramitesStore() {
     ] as const;
   }, [entries]);
 
-  function persistState(nextEntries: Entry[], nextUserId = currentUserId) {
-    setEntries(nextEntries);
+function persistState(nextEntries: Entry[], nextUserId?: string) {
+  setEntries(nextEntries);
+  if (nextUserId) {
     setCurrentUserId(nextUserId);
+    localStorage.setItem('currentUserId', nextUserId);
   }
+}
 
-  function createEntry(form: EntryFormValues | Partial<Entry>) {
-  // Si ya tiene los campos principales de Entry, es un entry completo
+ function createEntry(form: EntryFormValues | Partial<Entry>) {
   if ('id' in form && form.id) {
     persistState([form as Entry, ...entries]);
     return;
   }
 
-  // Si es EntryFormValues, construir Entry completo
   const formData = form as EntryFormValues;
   const technician = technicians.find((item) => item.id === formData.technicianId) ?? technicians[0];
   const creator = plannerUsers.find((user) => user.id === currentUserId) ?? plannerUsers[0];
@@ -695,13 +706,24 @@ export function useTramitesStore() {
     observations: formData.observations.trim(),
     status: "Registrado",
     createdAt: new Date().toISOString(),
-    
-    // NUEVOS CAMPOS:
     scheduledTime: 'scheduledTime' in form ? (form as any).scheduledTime : undefined,
     scheduledEndTime: 'scheduledEndTime' in form ? (form as any).scheduledEndTime : undefined,
   };
 
-  persistState([nextEntry, ...entries]);
+// Guardar LOCALMENTE primero
+persistState([nextEntry, ...entries], currentUserId);
+
+  // Guardar en Firestore (sin esperar)
+  (async () => {
+    try {
+      const { firestore } = await import('@/lib/firebase');
+      const { addDoc, collection } = await import('firebase/firestore');
+      await addDoc(collection(firestore, 'entries'), nextEntry);
+      console.log('✅ Entry guardado en Firestore:', nextEntry.registrationNumber);
+    } catch (error) {
+      console.error('Error guardando en Firestore:', error);
+    }
+  })();
 }
 
   function updateEntryStatus(entryId: string, nextStatus: EntryStatus) {

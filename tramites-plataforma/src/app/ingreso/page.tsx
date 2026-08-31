@@ -32,6 +32,7 @@ export default function IngresoPage() {
                   type="button"
                   onClick={() => {
                     setCurrentUserId(user.id);
+                    localStorage.setItem('currentUserId', user.id);
                     setMessage(`Sesión cambiada a ${user.name}.`);
                   }}
                   className={`rounded-2xl border px-4 py-3 text-left transition hover:-translate-y-0.5 ${
