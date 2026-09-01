@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-export type AreaId = "supervisor" | "ruat" | "legal" | "revision-plano";
+export type AreaId = "supervisor" | "ruat" | "legal" | "revision-plano" | "tunari";
 export type EntryStatus = "Registrado" | "En revisión" | "Aprobado";
 
 export type Area = {
@@ -42,15 +42,16 @@ export type Entry = {
   scheduledEndTime?: string; //Hora fin estimada
   // Datos de seguimiento:
   followUp?: {
-    clientName?: string;        // Nombre del cliente que vino
-    arrivalTime?: string;       // Hora que llegó (ej: "10:15")
-    //attendanceTime?: string;    // Hora que empezó atención (ej: "10:20")
-    //completedTime?: string;     // Hora que terminó (ej: "11:00")
-    //actualTechnician?: string;  // ID del técnico que atendió
-    attended?: boolean; 
-    attendedTime?: string; // Hora que se atendió (ej: "10:20")
-    observations?: string;      // Notas del seguimiento
-    createdAt?: string;         // Cuándo se registró el seguimiento
+    clientName?: string;
+    arrivalTime?: string;
+    attendedTime?: string;
+    completedTime?: string;
+    actualTechnicianId?: string;
+    actualTechnicianName?: string;
+    attended?: boolean;
+    observations?: string;
+    createdAt?: string;
+    isUnscheduled?: boolean;
   };
 };
 
@@ -91,6 +92,11 @@ export const areas: Area[] = [
     id: "revision-plano",
     label: "Revision plano",
     people: ["CHRISTIAN D.", "MARTHA M.", "ROGER M.", "ELSA R.", "MERCEDES C.", "LAVINIA L."],
+  },
+  {
+    id: "tunari",
+    label: "Tunari",
+    people: ["KARLA VARGAS", "MARIA RENNEE F.", "JORGE SOLIZ", "KAREN S.", "ROYER M.", "ALFREDO V.", "KARLA A."],
   },
 ];
 
@@ -238,27 +244,18 @@ scheduledEndTime: typeof rawEntry.scheduledEndTime === "string"
   ? rawEntry.scheduledEndTime 
   : undefined,
 
-// NUEVO: Procesar followUp
 followUp: rawEntry.followUp && typeof rawEntry.followUp === "object"
   ? {
-      clientName: typeof (rawEntry.followUp as any).clientName === "string"
-        ? (rawEntry.followUp as any).clientName
-        : undefined,
-      arrivalTime: typeof (rawEntry.followUp as any).arrivalTime === "string"
-        ? (rawEntry.followUp as any).arrivalTime
-        : undefined,
-      attended: typeof (rawEntry.followUp as any).attended === "boolean"
-        ? (rawEntry.followUp as any).attended
-        : undefined,
-      attendedTime: typeof (rawEntry.followUp as any).attendedTime === "string"
-        ? (rawEntry.followUp as any).attendedTime
-        : undefined,
-      observations: typeof (rawEntry.followUp as any).observations === "string"
-        ? (rawEntry.followUp as any).observations
-        : undefined,
-      createdAt: typeof (rawEntry.followUp as any).createdAt === "string"
-        ? (rawEntry.followUp as any).createdAt
-        : undefined,
+      clientName: typeof (rawEntry.followUp as any).clientName === "string" ? (rawEntry.followUp as any).clientName : undefined,
+      arrivalTime: typeof (rawEntry.followUp as any).arrivalTime === "string" ? (rawEntry.followUp as any).arrivalTime : undefined,
+      attended: typeof (rawEntry.followUp as any).attended === "boolean" ? (rawEntry.followUp as any).attended : undefined,
+      attendedTime: typeof (rawEntry.followUp as any).attendedTime === "string" ? (rawEntry.followUp as any).attendedTime : undefined,
+      completedTime: typeof (rawEntry.followUp as any).completedTime === "string" ? (rawEntry.followUp as any).completedTime : undefined,
+      actualTechnicianId: typeof (rawEntry.followUp as any).actualTechnicianId === "string" ? (rawEntry.followUp as any).actualTechnicianId : undefined,
+      actualTechnicianName: typeof (rawEntry.followUp as any).actualTechnicianName === "string" ? (rawEntry.followUp as any).actualTechnicianName : undefined,
+      observations: typeof (rawEntry.followUp as any).observations === "string" ? (rawEntry.followUp as any).observations : undefined,
+      createdAt: typeof (rawEntry.followUp as any).createdAt === "string" ? (rawEntry.followUp as any).createdAt : undefined,
+      isUnscheduled: typeof (rawEntry.followUp as any).isUnscheduled === "boolean" ? (rawEntry.followUp as any).isUnscheduled : undefined,
     }
   : undefined,
   };
@@ -610,36 +607,45 @@ export function useTramitesStore() {
   const [currentUserId, setCurrentUserId] = useState(plannerUsers[0].id);
 
 useEffect(() => {
-  const loadEntries = async () => {
+  const savedUserId = localStorage.getItem('currentUserId');
+  if (savedUserId && plannerUsers.some(u => u.id === savedUserId)) {
+    setCurrentUserId(savedUserId);
+  }
+
+  let unsubscribe: (() => void) | undefined;
+
+  (async () => {
     try {
-      // Cargar usuario guardado
-      const savedUserId = localStorage.getItem('currentUserId');
-      if (savedUserId && plannerUsers.some(u => u.id === savedUserId)) {
-        setCurrentUserId(savedUserId);
-      }
-
       const { firestore } = await import('@/lib/firebase');
-      const { collection, getDocs } = await import('firebase/firestore');
-      
-      const querySnapshot = await getDocs(collection(firestore, 'entries'));
-      const firestoreEntries = querySnapshot.docs.map((doc) => ({
-        ...doc.data(),
-        id: doc.id,
-      })) as Entry[];
+      const { collection, onSnapshot } = await import('firebase/firestore');
 
-      if (firestoreEntries.length > 0) {
-        setEntries(firestoreEntries);
-      } else {
-        setEntries(seedEntries);
-      }
+      unsubscribe = onSnapshot(
+        collection(firestore, 'entries'),
+        (snapshot) => {
+          if (!snapshot.empty) {
+            const firestoreEntries = snapshot.docs.map((docSnap, i) =>
+              normalizeStoredEntry({ ...docSnap.data(), id: docSnap.id } as Record<string, unknown>, i)
+            );
+            setEntries(firestoreEntries);
+          } else {
+            setEntries(seedEntries);
+          }
+          setHydrated(true);
+        },
+        (error) => {
+          console.warn('Firestore listener error:', error);
+          setEntries(seedEntries);
+          setHydrated(true);
+        }
+      );
     } catch (error) {
-      console.warn('Error loading:', error);
+      console.warn('Error setting up Firestore listener:', error);
       setEntries(seedEntries);
+      setHydrated(true);
     }
-    setHydrated(true);
-  };
+  })();
 
-  loadEntries();
+  return () => { if (unsubscribe) unsubscribe(); };
 }, []);
 
   useEffect(() => {
@@ -682,68 +688,93 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
   }
 }
 
- function createEntry(form: EntryFormValues | Partial<Entry>) {
-  if ('id' in form && form.id) {
-    persistState([form as Entry, ...entries]);
-    return;
+  function stripUndefined(obj: unknown): unknown {
+    if (Array.isArray(obj)) return obj.map(stripUndefined);
+    if (obj !== null && typeof obj === "object") {
+      return Object.fromEntries(
+        Object.entries(obj as Record<string, unknown>)
+          .filter(([, v]) => v !== undefined)
+          .map(([k, v]) => [k, stripUndefined(v)])
+      );
+    }
+    return obj;
   }
 
-  const formData = form as EntryFormValues;
-  const technician = technicians.find((item) => item.id === formData.technicianId) ?? technicians[0];
-  const creator = plannerUsers.find((user) => user.id === currentUserId) ?? plannerUsers[0];
+  function firestoreSet(entryId: string, data: Entry) {
+    (async () => {
+      try {
+        const { firestore } = await import('@/lib/firebase');
+        const { doc, setDoc } = await import('firebase/firestore');
+        await setDoc(doc(firestore, 'entries', entryId), stripUndefined(data));
+      } catch (error) {
+        console.error('Error escribiendo en Firestore:', error);
+      }
+    })();
+  }
 
-  const nextEntry: Entry = {
-    id: `entry-${Date.now()}`,
-    createdBy: creator.id,
-    createdByName: creator.name,
-    registrationNumber: getNextRegistrationNumber(entries),
-    tramiteCode: formData.tramiteCode.trim(),
-    technicianId: technician.id,
-    technicianName: technician.name,
-    technicianArea: technician.areaLabel,
-    scheduleDate: formData.scheduleDate,
-    registrationDate: new Date().toISOString().slice(0, 10),
-    observations: formData.observations.trim(),
-    status: "Registrado",
-    createdAt: new Date().toISOString(),
-    scheduledTime: 'scheduledTime' in form ? (form as any).scheduledTime : undefined,
-    scheduledEndTime: 'scheduledEndTime' in form ? (form as any).scheduledEndTime : undefined,
-  };
+  function firestoreDelete(entryId: string) {
+    (async () => {
+      try {
+        const { firestore } = await import('@/lib/firebase');
+        const { doc, deleteDoc } = await import('firebase/firestore');
+        await deleteDoc(doc(firestore, 'entries', entryId));
+      } catch (error) {
+        console.error('Error eliminando de Firestore:', error);
+      }
+    })();
+  }
 
-// Guardar LOCALMENTE primero
-persistState([nextEntry, ...entries], currentUserId);
-
-  // Guardar en Firestore (sin esperar)
-  (async () => {
-    try {
-      const { firestore } = await import('@/lib/firebase');
-      const { addDoc, collection } = await import('firebase/firestore');
-      await addDoc(collection(firestore, 'entries'), nextEntry);
-      console.log('✅ Entry guardado en Firestore:', nextEntry.registrationNumber);
-    } catch (error) {
-      console.error('Error guardando en Firestore:', error);
+  function createEntry(form: EntryFormValues | Partial<Entry>) {
+    if ('id' in form && form.id) {
+      persistState([form as Entry, ...entries]);
+      firestoreSet(form.id, form as Entry);
+      return;
     }
-  })();
-}
 
-  function updateEntryStatus(entryId: string, nextStatus: EntryStatus) {
+    const formData = form as EntryFormValues;
+    const technician = technicians.find((item) => item.id === formData.technicianId) ?? technicians[0];
+    const creator = plannerUsers.find((user) => user.id === currentUserId) ?? plannerUsers[0];
+
+    const nextEntry: Entry = {
+      id: `entry-${Date.now()}`,
+      createdBy: creator.id,
+      createdByName: creator.name,
+      registrationNumber: getNextRegistrationNumber(entries),
+      tramiteCode: formData.tramiteCode.trim(),
+      technicianId: technician.id,
+      technicianName: technician.name,
+      technicianArea: technician.areaLabel,
+      scheduleDate: formData.scheduleDate,
+      registrationDate: new Date().toISOString().slice(0, 10),
+      observations: formData.observations.trim(),
+      status: "Registrado",
+      createdAt: new Date().toISOString(),
+      scheduledTime: 'scheduledTime' in form ? (form as any).scheduledTime : undefined,
+      scheduledEndTime: 'scheduledEndTime' in form ? (form as any).scheduledEndTime : undefined,
+    };
+
+    persistState([nextEntry, ...entries], currentUserId);
+    firestoreSet(nextEntry.id, nextEntry);
+  }
+
+  function updateEntry(entryId: string, updatedEntry: Entry) {
     const nextEntries = entries.map((entry) =>
-      entry.id === entryId ? { ...entry, status: nextStatus } : entry,
+      entry.id === entryId ? updatedEntry : entry
     );
     persistState(nextEntries);
+    firestoreSet(entryId, updatedEntry);
   }
-  //const updateEntry = (id: string, updatedEntry: Entry) => {
-  //setEntries(entries.map((e) => (e.id === id ? updatedEntry : e)));
-  //};
+
+  function updateEntryStatus(entryId: string, nextStatus: EntryStatus) {
+    const entry = entries.find((e) => e.id === entryId);
+    if (!entry) return;
+    updateEntry(entryId, { ...entry, status: nextStatus });
+  }
+
   function removeEntry(entryId: string) {
     const nextEntries = entries.filter((entry) => entry.id !== entryId);
     persistState(nextEntries);
-  }
-  function updateEntry(entryId: string, updatedEntry: Entry) {  // ← NUEVA FUNCIÓN
-  const nextEntries = entries.map((entry) =>
-    entry.id === entryId ? updatedEntry : entry
-  );
-  persistState(nextEntries);
+    firestoreDelete(entryId);
   }
 
   function resetDemo() {

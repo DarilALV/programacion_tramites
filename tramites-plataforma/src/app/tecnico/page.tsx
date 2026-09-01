@@ -11,117 +11,147 @@ type TramiteAgenda = {
   scheduledTime: string;
   scheduledEndTime: string;
   clientName?: string;
-  arrivalTime?: string;           // ← YA ESTABA
-  attendedTime?: string;          // ← AGREGAR ESTA LÍNEA
-  status: "pending" | "arrived" | "attended";
+  arrivalTime?: string;
+  attendedTime?: string;
+  completedTime?: string;
+  isUnscheduled?: boolean;
   observations?: string;
+  status: "pending" | "arrived" | "attending" | "completed";
 };
+
+function nowTime() {
+  const n = new Date();
+  return `${String(n.getHours()).padStart(2, "0")}:${String(n.getMinutes()).padStart(2, "0")}`;
+}
+
+function minDiff(from: string, to: string) {
+  const [fh, fm] = from.split(":").map(Number);
+  const [th, tm] = to.split(":").map(Number);
+  return (th * 60 + tm) - (fh * 60 + fm);
+}
+
+function fmtMin(mins: number) {
+  if (mins <= 0) return "< 1 min";
+  if (mins < 60) return `${mins} min`;
+  return `${Math.floor(mins / 60)}h ${mins % 60}m`;
+}
 
 export default function AgendaTecnicoPage() {
   const { entries, updateEntry } = useTramitesStore();
-  const [selectedDate, setSelectedDate] = useState(
-    new Date().toISOString().slice(0, 10)
-  );
-  
-  // NUEVO: Selector de técnico
-  const [selectedTechnicianId, setSelectedTechnicianId] = useState(
-    technicians[0].id // Primer técnico por defecto
-  );
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
+  const [selectedTechnicianId, setSelectedTechnicianId] = useState(technicians[0].id);
 
-  // Obtener técnico seleccionado
-  const selectedTechnician = technicians.find(
-    (t) => t.id === selectedTechnicianId
-  ) ?? technicians[0];
+  const selectedTechnician = technicians.find((t) => t.id === selectedTechnicianId) ?? technicians[0];
 
-  // Obtener agenda del técnico para la fecha seleccionada
   const agendaHoy = useMemo(() => {
     return entries
-      .filter(
-        (e) =>
-          e.scheduleDate === selectedDate &&
-          e.technicianId === selectedTechnicianId
-      )
-      .sort((a, b) => {
-        const timeA = a.scheduledTime || "00:00";
-        const timeB = b.scheduledTime || "00:00";
-        return timeA.localeCompare(timeB);
+      .filter((e) => {
+        const isThisDate = e.scheduleDate === selectedDate;
+        const isThisTech = e.technicianId === selectedTechnicianId;
+        // Seguimiento sin programación asignado a este técnico hoy
+        const isActualTech =
+          e.followUp?.actualTechnicianId === selectedTechnicianId &&
+          e.followUp?.createdAt?.startsWith(selectedDate);
+        return (isThisDate && isThisTech) || isActualTech;
       })
-      .map((entry) => {
-  let status: "pending" | "arrived" | "attended" = "pending";
+      .sort((a, b) => {
+        const ta = a.scheduledTime || a.followUp?.arrivalTime || "00:00";
+        const tb = b.scheduledTime || b.followUp?.arrivalTime || "00:00";
+        return ta.localeCompare(tb);
+      })
+      .map((entry): TramiteAgenda => {
+        const fu = entry.followUp;
+        let status: TramiteAgenda["status"] = "pending";
+        if (fu?.completedTime) status = "completed";
+        else if (fu?.attendedTime) status = "attending";
+        else if (fu?.arrivalTime) status = "arrived";
 
-  if (entry.followUp?.attended) {
-    status = "attended";
-  } else if (entry.followUp?.arrivalTime) {
-    status = "arrived";
-  }
-
-  return {
-    id: entry.id,
-    tramiteCode: entry.tramiteCode,
-    registrationNumber: entry.registrationNumber,
-    scheduledTime: entry.scheduledTime || "--:--",
-    scheduledEndTime: entry.scheduledEndTime || "--:--",
-    clientName: entry.followUp?.clientName,
-    arrivalTime: entry.followUp?.arrivalTime,
-    attendedTime: entry.followUp?.attendedTime,  // ← AGREGAR ESTA LÍNEA
-    status,
-    observations: entry.observations,
-  } as TramiteAgenda;
-})  
+        return {
+          id: entry.id,
+          tramiteCode: entry.tramiteCode,
+          registrationNumber: entry.registrationNumber,
+          scheduledTime: entry.scheduledTime || fu?.arrivalTime || "--:--",
+          scheduledEndTime: entry.scheduledEndTime || "--:--",
+          clientName: fu?.clientName,
+          arrivalTime: fu?.arrivalTime,
+          attendedTime: fu?.attendedTime,
+          completedTime: fu?.completedTime,
+          isUnscheduled: fu?.isUnscheduled,
+          observations: entry.observations,
+          status,
+        };
+      });
   }, [entries, selectedDate, selectedTechnicianId]);
 
-  // Estadísticas
-  const stats = useMemo(() => {
-    return {
-      total: agendaHoy.length,
-      pending: agendaHoy.filter((t) => t.status === "pending").length,
-      arrived: agendaHoy.filter((t) => t.status === "arrived").length,
-      attended: agendaHoy.filter((t) => t.status === "attended").length,
-    };
-  }, [agendaHoy]);
+  const stats = useMemo(() => ({
+    total: agendaHoy.length,
+    pending: agendaHoy.filter((t) => t.status === "pending").length,
+    arrived: agendaHoy.filter((t) => t.status === "arrived").length,
+    attending: agendaHoy.filter((t) => t.status === "attending").length,
+    completed: agendaHoy.filter((t) => t.status === "completed").length,
+  }), [agendaHoy]);
 
-  // Próximo a atender
-  const proximoAAtender = useMemo(() => {
-    return agendaHoy.find((t) => t.status === "arrived");
-  }, [agendaHoy]);
+  const clienteEsperando = useMemo(
+    () => agendaHoy.find((t) => t.status === "arrived"),
+    [agendaHoy]
+  );
 
-  // NUEVO: Función para marcar como atendido
-  const handleMarkAsAttended = (entryId: string) => {
+  function handleMarkAttending(entryId: string) {
     const entry = entries.find((e) => e.id === entryId);
-    if (!entry || !entry.followUp) return;
-
-    const currentTime = new Date();
-    const hours = String(currentTime.getHours()).padStart(2, "0");
-    const minutes = String(currentTime.getMinutes()).padStart(2, "0");
-    const attendedTime = `${hours}:${minutes}`;
-
+    if (!entry?.followUp) return;
     updateEntry(entryId, {
       ...entry,
-      followUp: {
-        ...entry.followUp,
-        attended: true,
-        attendedTime,
-      },
+      followUp: { ...entry.followUp, attended: true, attendedTime: nowTime() },
     });
-  };
+  }
+
+  function handleMarkCompleted(entryId: string) {
+    const entry = entries.find((e) => e.id === entryId);
+    if (!entry?.followUp) return;
+    updateEntry(entryId, {
+      ...entry,
+      followUp: { ...entry.followUp, completedTime: nowTime() },
+    });
+  }
+
+  async function exportarReporte() {
+    const XLSX = await import("xlsx");
+    const rows = agendaHoy.map((t) => ({
+      Fecha: selectedDate,
+      Técnico: selectedTechnician.name,
+      "Código Trámite": t.tramiteCode,
+      "N° Registro": t.registrationNumber,
+      "Sin programación": t.isUnscheduled ? "Sí" : "No",
+      "Cliente": t.clientName ?? "",
+      "Horario programado": `${t.scheduledTime} - ${t.scheduledEndTime}`,
+      "Hora Llegada": t.arrivalTime ?? "",
+      "Salió a atender": t.attendedTime ?? "",
+      "Regresó": t.completedTime ?? "",
+      "Espera (min)": t.arrivalTime && t.attendedTime ? minDiff(t.arrivalTime, t.attendedTime) : "",
+      "Duración atención (min)": t.attendedTime && t.completedTime ? minDiff(t.attendedTime, t.completedTime) : "",
+      "Estado": t.status === "completed" ? "Completado" : t.status === "attending" ? "Atendiendo" : t.status === "arrived" ? "Esperando" : "Pendiente",
+      "Observaciones": t.observations ?? "",
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Agenda");
+    XLSX.writeFile(wb, `agenda-${selectedTechnician.name.replace(/\s/g, "_")}-${selectedDate}.xlsx`);
+  }
 
   return (
     <AppShell
       title="Mi Agenda de Atención"
-      description="Ver trámites programados para hoy y clientes que llegan"
+      description="Ver trámites programados y clientes en espera"
       eyebrow="TÉCNICO"
     >
       <div className="space-y-6">
-        {/* SELECTOR DE FECHA Y TÉCNICO */}
+        {/* FILTROS */}
         <section className="rounded-4xl border-2 border-pink-200 bg-pink-50 p-6 space-y-4">
           <h3 className="text-lg font-bold text-gray-800">Filtros</h3>
-
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Selector de Técnico */}
             <label className="grid gap-2">
-              <span className="text-sm font-semibold text-gray-700">
-                Seleccionar Técnico
-              </span>
+              <span className="text-sm font-semibold text-gray-700">Técnico</span>
               <select
                 value={selectedTechnicianId}
                 onChange={(e) => setSelectedTechnicianId(e.target.value)}
@@ -133,16 +163,9 @@ export default function AgendaTecnicoPage() {
                   </option>
                 ))}
               </select>
-              <p className="text-xs text-gray-600">
-                Viendo agenda de: <strong>{selectedTechnician.name}</strong>
-              </p>
             </label>
-
-            {/* Selector de Fecha */}
             <label className="grid gap-2">
-              <span className="text-sm font-semibold text-gray-700">
-                Seleccionar Fecha
-              </span>
+              <span className="text-sm font-semibold text-gray-700">Fecha</span>
               <input
                 type="date"
                 value={selectedDate}
@@ -154,217 +177,206 @@ export default function AgendaTecnicoPage() {
         </section>
 
         {/* ESTADÍSTICAS */}
-        <section className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="rounded-lg border-2 border-blue-200 bg-blue-50 p-4">
-            <p className="text-xs text-gray-600 uppercase">Total Programados</p>
-            <p className="text-3xl font-bold text-blue-900 mt-2">{stats.total}</p>
-          </div>
-
-          <div className="rounded-lg border-2 border-amber-200 bg-amber-50 p-4">
-            <p className="text-xs text-gray-600 uppercase">Pendientes</p>
-            <p className="text-3xl font-bold text-amber-900 mt-2">{stats.pending}</p>
-          </div>
-
-          <div className="rounded-lg border-2 border-orange-200 bg-orange-50 p-4">
-            <p className="text-xs text-gray-600 uppercase">Llegaron</p>
-            <p className="text-3xl font-bold text-orange-900 mt-2">{stats.arrived}</p>
-            {proximoAAtender && (
-              <p className="text-xs text-orange-600 mt-2">
-                ⏰ {proximoAAtender.tramiteCode} esperando
-              </p>
-            )}
-          </div>
-
-          <div className="rounded-lg border-2 border-green-200 bg-green-50 p-4">
-            <p className="text-xs text-gray-600 uppercase">Atendidos</p>
-            <p className="text-3xl font-bold text-green-900 mt-2">{stats.attended}</p>
-          </div>
+        <section className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          {[
+            { label: "Programados", value: stats.total, color: "blue" },
+            { label: "Pendientes", value: stats.pending, color: "gray" },
+            { label: "En espera", value: stats.arrived, color: "orange" },
+            { label: "Atendiendo", value: stats.attending, color: "purple" },
+            { label: "Completados", value: stats.completed, color: "green" },
+          ].map(({ label, value, color }) => (
+            <div
+              key={label}
+              className={`rounded-lg border-2 border-${color}-200 bg-${color}-50 p-4`}
+            >
+              <p className="text-xs text-gray-600 uppercase">{label}</p>
+              <p className={`text-3xl font-bold text-${color}-900 mt-1`}>{value}</p>
+            </div>
+          ))}
         </section>
 
-        {/* PRÓXIMO A ATENDER - DESTACADO */}
-        {proximoAAtender && (
+        {/* ALERTA: CLIENTE ESPERANDO */}
+        {clienteEsperando && (
           <section className="rounded-4xl border-4 border-red-400 bg-gradient-to-r from-red-50 to-orange-50 p-6 animate-pulse">
-            <p className="text-sm font-semibold text-red-700 uppercase">
-              ⚠️ CLIENTE EN ESPERA
-            </p>
+            <p className="text-sm font-semibold text-red-700 uppercase">⚠️ CLIENTE EN ESPERA</p>
             <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <p className="text-xs text-gray-600">Código Trámite</p>
-                <p className="text-2xl font-bold text-red-900 mt-1">
-                  {proximoAAtender.tramiteCode}
-                </p>
+                <p className="text-2xl font-bold text-red-900 mt-1">{clienteEsperando.tramiteCode}</p>
               </div>
               <div>
                 <p className="text-xs text-gray-600">Cliente</p>
-                <p className="text-2xl font-bold text-red-900 mt-1">
-                  {proximoAAtender.clientName || "—"}
-                </p>
+                <p className="text-2xl font-bold text-red-900 mt-1">{clienteEsperando.clientName || "—"}</p>
               </div>
               <div>
                 <p className="text-xs text-gray-600">Llegó a las</p>
-                <p className="text-2xl font-bold text-red-900 mt-1">
-                  {proximoAAtender.arrivalTime}
-                </p>
+                <p className="text-2xl font-bold text-red-900 mt-1">{clienteEsperando.arrivalTime}</p>
               </div>
             </div>
             <button
-              onClick={() => handleMarkAsAttended(proximoAAtender.id)}
-              className="mt-4 w-full bg-red-600 text-white font-bold py-3 rounded-lg hover:bg-red-700 transition"
+              onClick={() => handleMarkAttending(clienteEsperando.id)}
+              className="mt-4 w-full bg-red-600 text-white font-bold py-3 rounded-lg hover:bg-red-700 transition cursor-pointer"
             >
-              ✓ ATENDER A CLIENTE
+              👤 SALIR A ATENDER AL CLIENTE
             </button>
           </section>
         )}
 
-        {/* AGENDA DEL DÍA */}
+        {/* AGENDA */}
         <section className="rounded-4xl border-2 border-pink-200 overflow-hidden">
-          <div className="bg-gradient-to-r from-pink-600 to-purple-600 text-white px-6 py-4">
-            <h2 className="text-2xl font-bold">
-              Agenda del Día - {selectedTechnician.name}
-            </h2>
+          <div className="bg-gradient-to-r from-pink-600 to-purple-600 text-white px-6 py-4 flex items-center justify-between gap-4 flex-wrap">
+            <h2 className="text-2xl font-bold">Agenda — {selectedTechnician.name}</h2>
+            {agendaHoy.length > 0 && (
+              <button
+                onClick={exportarReporte}
+                className="bg-white text-pink-700 font-semibold text-sm px-4 py-1.5 rounded-lg hover:bg-pink-50 transition cursor-pointer"
+              >
+                📥 Exportar Excel
+              </button>
+            )}
           </div>
 
           {agendaHoy.length === 0 ? (
             <div className="px-6 py-8 text-center text-gray-500">
-              <p>No hay trámites programados para esta fecha</p>
+              No hay trámites programados para esta fecha
             </div>
           ) : (
             <div className="divide-y-2 divide-pink-100">
-              {agendaHoy.map((tramite, index) => (
-                <div
-                  key={tramite.id}
-                  className={`p-4 border-l-4 ${
-                    tramite.status === "attended"
-                      ? "bg-green-50 border-green-500"
-                      : tramite.status === "arrived"
-                      ? "bg-orange-50 border-orange-500"
-                      : "bg-white border-gray-300"
-                  }`}
-                >
-                  <div className="grid grid-cols-1 md:grid-cols-7 gap-4 items-center">
-  {/* COLUMNA 1: Horario */}
-  <div>
-    <p className="text-xs text-gray-600 uppercase">Horario</p>
-    <p className="text-lg font-bold text-gray-900">
-      {tramite.scheduledTime} - {tramite.scheduledEndTime}
-    </p>
-  </div>
+              {agendaHoy.map((tramite) => {
+                const rowBg =
+                  tramite.status === "completed"
+                    ? "bg-green-50 border-green-500"
+                    : tramite.status === "attending"
+                    ? "bg-purple-50 border-purple-500"
+                    : tramite.status === "arrived"
+                    ? "bg-orange-50 border-orange-500"
+                    : "bg-white border-gray-200";
 
-  {/* COLUMNA 2: Trámite */}
-  <div>
-    <p className="text-xs text-gray-600 uppercase">Trámite</p>
-    <p className="text-lg font-mono font-bold text-gray-900">
-      {tramite.tramiteCode}
-    </p>
-  </div>
+                const waitMins =
+                  tramite.arrivalTime && tramite.attendedTime
+                    ? minDiff(tramite.arrivalTime, tramite.attendedTime)
+                    : tramite.arrivalTime && !tramite.attendedTime
+                    ? minDiff(tramite.arrivalTime, nowTime())
+                    : null;
 
-  {/* COLUMNA 3: Cliente */}
-  <div>
-    <p className="text-xs text-gray-600 uppercase">Cliente</p>
-    <p className="text-lg font-bold text-gray-900">
-      {tramite.clientName || "—"}
-    </p>
-  </div>
+                const attnMins =
+                  tramite.attendedTime && tramite.completedTime
+                    ? minDiff(tramite.attendedTime, tramite.completedTime)
+                    : null;
 
-  {/* COLUMNA 4: Llegó a - NUEVA */}
-  <div>
-    <p className="text-xs text-gray-600 uppercase">Llegó a</p>
-    <p className="text-lg font-bold text-gray-900">
-      {tramite.arrivalTime || "—"}
-    </p>
-  </div>
+                return (
+                  <div key={tramite.id} className={`p-4 border-l-4 ${rowBg}`}>
+                    <div className="grid grid-cols-2 md:grid-cols-8 gap-3 items-start">
 
-  {/* COLUMNA 5: Atendido a - NUEVA */}
-  <div>
-    <p className="text-xs text-gray-600 uppercase">Atendido a</p>
-    <p className="text-lg font-bold text-gray-900">
-      {tramite.attendedTime || "—"}
-    </p>
-  </div>
+                      {/* Horario */}
+                      <div className="md:col-span-1">
+                        <p className="text-xs text-gray-500 uppercase">Horario</p>
+                        <p className="font-bold text-gray-900 text-sm">
+                          {tramite.scheduledTime}
+                          {tramite.scheduledEndTime !== "--:--" && (
+                            <span className="text-gray-500"> – {tramite.scheduledEndTime}</span>
+                          )}
+                        </p>
+                        {tramite.isUnscheduled && (
+                          <span className="text-xs bg-amber-100 text-amber-700 px-1 rounded">sin prog.</span>
+                        )}
+                      </div>
 
-  {/* COLUMNA 6: Estado */}
-  <div>
-    <p className="text-xs text-gray-600 uppercase">Estado</p>
-    <p
-      className={`text-sm font-bold mt-1 ${
-        tramite.status === "attended"
-          ? "text-green-700"
-          : tramite.status === "arrived"
-          ? "text-orange-700"
-          : "text-gray-600"
-      }`}
-    >
-      {tramite.status === "attended"
-        ? `✓ Atendido a las ${tramite.attendedTime || "--:--"}`
-        : tramite.status === "arrived"
-        ? "⏳ Cliente esperando"
-        : "🕐 Pendiente"}
-    </p>
-  </div>
+                      {/* Trámite */}
+                      <div className="md:col-span-1">
+                        <p className="text-xs text-gray-500 uppercase">Trámite</p>
+                        <p className="font-mono font-bold text-sm">{tramite.tramiteCode}</p>
+                        <p className="text-xs text-gray-400">{tramite.registrationNumber}</p>
+                      </div>
 
-  {/* COLUMNA 7: Acción */}
-  <div className="text-right">
-    <p className="text-xs text-gray-600 uppercase">Acción</p>
-    {tramite.status === "arrived" && (
-      <button
-        onClick={() => handleMarkAsAttended(tramite.id)}
-        className="mt-1 px-3 py-1 bg-orange-500 text-white text-xs font-bold rounded hover:bg-orange-600 transition"
-      >
-        Atender
-      </button>
-    )}
-    {tramite.status === "attended" && (
-      <span className="text-xs text-green-700 font-bold">
-        Completado
-      </span>
-    )}
-    {tramite.status === "pending" && (
-      <span className="text-xs text-gray-500">Esperando</span>
-    )}
-  </div>
-</div>
+                      {/* Cliente */}
+                      <div className="md:col-span-1">
+                        <p className="text-xs text-gray-500 uppercase">Cliente</p>
+                        <p className="font-semibold text-sm">{tramite.clientName || "—"}</p>
+                      </div>
 
-                  {tramite.observations && (
-                    <p className="text-xs text-gray-600 mt-3 pt-3 border-t">
-                      📌 {tramite.observations}
-                    </p>
-                  )}
-                </div>
-              ))}
+                      {/* Llegó */}
+                      <div className="md:col-span-1">
+                        <p className="text-xs text-gray-500 uppercase">Llegó</p>
+                        <p className="font-bold text-pink-700 text-sm">{tramite.arrivalTime || "—"}</p>
+                        {waitMins !== null && !tramite.attendedTime && (
+                          <p className={`text-xs font-semibold ${waitMins > 30 ? "text-red-600" : "text-amber-600"}`}>
+                            {fmtMin(waitMins)} esperando
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Salió a atender */}
+                      <div className="md:col-span-1">
+                        <p className="text-xs text-gray-500 uppercase">Salió a atender</p>
+                        <p className="font-bold text-purple-700 text-sm">{tramite.attendedTime || "—"}</p>
+                        {waitMins !== null && tramite.attendedTime && (
+                          <p className="text-xs text-gray-500">Espera: {fmtMin(waitMins)}</p>
+                        )}
+                      </div>
+
+                      {/* Regresó */}
+                      <div className="md:col-span-1">
+                        <p className="text-xs text-gray-500 uppercase">Regresó</p>
+                        <p className="font-bold text-green-700 text-sm">{tramite.completedTime || "—"}</p>
+                        {attnMins !== null && (
+                          <p className="text-xs text-gray-500">Atención: {fmtMin(attnMins)}</p>
+                        )}
+                      </div>
+
+                      {/* Estado */}
+                      <div className="md:col-span-1">
+                        <p className="text-xs text-gray-500 uppercase">Estado</p>
+                        <p className={`text-sm font-bold mt-0.5 ${
+                          tramite.status === "completed" ? "text-green-700" :
+                          tramite.status === "attending" ? "text-purple-700" :
+                          tramite.status === "arrived" ? "text-orange-700" :
+                          "text-gray-500"
+                        }`}>
+                          {tramite.status === "completed" ? "✅ Completado" :
+                           tramite.status === "attending" ? "👤 Atendiendo" :
+                           tramite.status === "arrived" ? "⏳ Esperando" :
+                           "🕐 Pendiente"}
+                        </p>
+                      </div>
+
+                      {/* Acción */}
+                      <div className="md:col-span-1 flex flex-col gap-1">
+                        {tramite.status === "arrived" && (
+                          <button
+                            onClick={() => handleMarkAttending(tramite.id)}
+                            className="px-3 py-1.5 bg-orange-500 text-white text-xs font-bold rounded hover:bg-orange-600 transition cursor-pointer"
+                          >
+                            👤 Salir a atender
+                          </button>
+                        )}
+                        {tramite.status === "attending" && (
+                          <button
+                            onClick={() => handleMarkCompleted(tramite.id)}
+                            className="px-3 py-1.5 bg-green-600 text-white text-xs font-bold rounded hover:bg-green-700 transition cursor-pointer"
+                          >
+                            ✅ Regresé
+                          </button>
+                        )}
+                        {tramite.status === "completed" && (
+                          <span className="text-xs text-green-700 font-bold">✓ Listo</span>
+                        )}
+                        {tramite.status === "pending" && (
+                          <span className="text-xs text-gray-400">Esperando llegada</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {tramite.observations && (
+                      <p className="text-xs text-gray-500 mt-3 pt-3 border-t border-gray-200">
+                        📌 {tramite.observations}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
-        </section>
-
-        {/* INFORMACIÓN ÚTIL */}
-        <section className="rounded-4xl border-2 border-blue-200 bg-blue-50 p-6">
-          <h3 className="text-lg font-bold text-blue-900 mb-3">
-            ℹ️ Información Útil
-          </h3>
-          <ul className="space-y-2 text-sm text-blue-800">
-            <li>
-              ✓ <strong>Selecciona un técnico:</strong> Para ver su agenda
-              personalizada
-            </li>
-            <li>
-              ✓ <strong>Horarios calculados:</strong> Automáticos, 15 min por
-              trámite
-            </li>
-            <li>
-              ✓ <strong>Estado en tiempo real:</strong> Se actualiza cuando
-              cliente llega
-            </li>
-            <li>
-              ✓ <strong>Próximo a atender:</strong> Aparece destacado en rojo
-            </li>
-            <li>
-              ✓ <strong>Observaciones:</strong> Información importante del
-              cliente
-            </li>
-            <li>
-              💡 <strong>Tiempo entre trámites:</strong> Calcula tu tiempo para
-              alistar carpetas
-            </li>
-          </ul>
         </section>
       </div>
     </AppShell>
