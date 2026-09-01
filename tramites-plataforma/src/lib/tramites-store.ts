@@ -46,9 +46,12 @@ export type Entry = {
     arrivalTime?: string;
     attendedTime?: string;
     completedTime?: string;
+    calledTime?: string;
+    returnedTime?: string;
     actualTechnicianId?: string;
     actualTechnicianName?: string;
     attended?: boolean;
+    followUpStatus?: "esperando" | "en-revision" | "llamado" | "no-escucho" | "regreso" | "atendiendo" | "completado";
     observations?: string;
     createdAt?: string;
     isUnscheduled?: boolean;
@@ -251,6 +254,9 @@ followUp: rawEntry.followUp && typeof rawEntry.followUp === "object"
       attended: typeof (rawEntry.followUp as any).attended === "boolean" ? (rawEntry.followUp as any).attended : undefined,
       attendedTime: typeof (rawEntry.followUp as any).attendedTime === "string" ? (rawEntry.followUp as any).attendedTime : undefined,
       completedTime: typeof (rawEntry.followUp as any).completedTime === "string" ? (rawEntry.followUp as any).completedTime : undefined,
+      calledTime: typeof (rawEntry.followUp as any).calledTime === "string" ? (rawEntry.followUp as any).calledTime : undefined,
+      returnedTime: typeof (rawEntry.followUp as any).returnedTime === "string" ? (rawEntry.followUp as any).returnedTime : undefined,
+      followUpStatus: typeof (rawEntry.followUp as any).followUpStatus === "string" ? (rawEntry.followUp as any).followUpStatus : undefined,
       actualTechnicianId: typeof (rawEntry.followUp as any).actualTechnicianId === "string" ? (rawEntry.followUp as any).actualTechnicianId : undefined,
       actualTechnicianName: typeof (rawEntry.followUp as any).actualTechnicianName === "string" ? (rawEntry.followUp as any).actualTechnicianName : undefined,
       observations: typeof (rawEntry.followUp as any).observations === "string" ? (rawEntry.followUp as any).observations : undefined,
