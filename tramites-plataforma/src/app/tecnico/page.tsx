@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect, useRef } from "react";
 import { AppShell } from "@/components/app-shell";
-import { technicians, useTramitesStore, type Entry } from "@/lib/tramites-store";
+import { technicians, useTramitesStore } from "@/lib/tramites-store";
 import { getServerNow } from "@/lib/server-time";
 
 type FollowUpStatus = "esperando" | "en-revision" | "llamado" | "no-escucho" | "regreso" | "atendiendo" | "completado";
@@ -61,10 +61,14 @@ export default function AgendaTecnicoPage() {
   // Request notification permission on mount
   useEffect(() => {
     if (typeof window === "undefined" || !("Notification" in window)) return;
-    if (Notification.permission === "granted") { setNotifAllowed(true); return; }
-    if (Notification.permission !== "denied") {
-      Notification.requestPermission().then((p) => setNotifAllowed(p === "granted"));
-    }
+    const checkAndRequest = async () => {
+      if (Notification.permission === "granted") { setNotifAllowed(true); return; }
+      if (Notification.permission !== "denied") {
+        const p = await Notification.requestPermission();
+        setNotifAllowed(p === "granted");
+      }
+    };
+    void checkAndRequest();
   }, []);
 
   // Track known follow-up IDs to detect new arrivals
@@ -147,7 +151,23 @@ export default function AgendaTecnicoPage() {
     };
   }, [reportEntries]);
 
-  async function transition(entryId: string, newStatus: FollowUpStatus, timeField?: "calledTime" | "attendedTime" | "completedTime" | "returnedTime") {
+  // El técnico solo marca 3 momentos clave desde su despacho
+  async function marcarRevisando(entryId: string) {
+    const entry = entries.find((e) => e.id === entryId);
+    if (!entry?.followUp) return;
+    updateEntry(entryId, { ...entry, followUp: { ...entry.followUp, followUpStatus: "en-revision" } });
+  }
+
+  async function marcarSaliALlamar(entryId: string) {
+    const entry = entries.find((e) => e.id === entryId);
+    if (!entry?.followUp) return;
+    const { time } = await getServerNow();
+    updateEntry(entryId, { ...entry, followUp: { ...entry.followUp, followUpStatus: "llamado", calledTime: time } });
+  }
+
+  async function marcarLeAtendi(entryId: string) {
+    // Técnico regresó al despacho habiendo atendido al cliente
+    // attendedTime = calledTime (salió a llamar), completedTime = ahora
     const entry = entries.find((e) => e.id === entryId);
     if (!entry?.followUp) return;
     const { time } = await getServerNow();
@@ -155,10 +175,31 @@ export default function AgendaTecnicoPage() {
       ...entry,
       followUp: {
         ...entry.followUp,
-        followUpStatus: newStatus,
-        ...(timeField ? { [timeField]: time } : {}),
-        ...(newStatus === "atendiendo" && !entry.followUp.attendedTime ? { attendedTime: time } : {}),
-        ...(newStatus === "completado" && !entry.followUp.completedTime ? { completedTime: time } : {}),
+        followUpStatus: "completado",
+        attendedTime: entry.followUp.calledTime ?? entry.followUp.returnedTime ?? time,
+        completedTime: time,
+      },
+    });
+  }
+
+  async function marcarNoRespondio(entryId: string) {
+    const entry = entries.find((e) => e.id === entryId);
+    if (!entry?.followUp) return;
+    updateEntry(entryId, { ...entry, followUp: { ...entry.followUp, followUpStatus: "no-escucho" } });
+  }
+
+  async function marcarTermineDeAtender(entryId: string) {
+    // Para el caso regreso: técnico fue a atenderlo y terminó
+    const entry = entries.find((e) => e.id === entryId);
+    if (!entry?.followUp) return;
+    const { time } = await getServerNow();
+    updateEntry(entryId, {
+      ...entry,
+      followUp: {
+        ...entry.followUp,
+        followUpStatus: "completado",
+        attendedTime: entry.followUp.returnedTime ?? time,
+        completedTime: time,
       },
     });
   }
@@ -268,101 +309,125 @@ export default function AgendaTecnicoPage() {
                 const st = (fu?.followUpStatus ?? (fu ? "esperando" : undefined)) as FollowUpStatus | undefined;
 
                 const rowBg =
-                  st === "completado" ? "bg-green-50 border-green-400" :
-                  st === "atendiendo" ? "bg-blue-50 border-blue-400" :
-                  st === "regreso" ? "bg-yellow-50 border-yellow-400" :
-                  st === "no-escucho" ? "bg-orange-50 border-orange-300" :
-                  st === "llamado" ? "bg-purple-50 border-purple-300" :
-                  st === "en-revision" ? "bg-indigo-50 border-indigo-300" :
-                  st === "esperando" ? "bg-red-50 border-red-300" :
+                  st === "completado"   ? "bg-green-50 border-green-400" :
+                  st === "llamado"      ? "bg-purple-50 border-purple-400" :
+                  st === "regreso"      ? "bg-yellow-50 border-yellow-400" :
+                  st === "no-escucho"   ? "bg-orange-50 border-orange-300" :
+                  st === "en-revision"  ? "bg-indigo-50 border-indigo-300" :
+                  st === "esperando"    ? "bg-red-50 border-red-400" :
                   "bg-white border-gray-200";
 
-                const waitMins = fu?.arrivalTime ? minDiff(fu.arrivalTime, fu.attendedTime) : null;
-                const attnMins = fu?.attendedTime && fu?.completedTime ? minDiff(fu.attendedTime, fu.completedTime) : null;
+                const esperaMinutos = fu?.arrivalTime ? minDiff(fu.arrivalTime, fu.completedTime) : null;
+                const atencionMinutos = fu?.attendedTime && fu?.completedTime ? minDiff(fu.attendedTime, fu.completedTime) : null;
+                const llamadoHaceMin = st === "llamado" && fu?.calledTime ? minDiff(fu.calledTime) : null;
 
                 return (
                   <div key={entry.id} className={`p-5 border-l-4 ${rowBg}`}>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-                      {/* Trámite / horario */}
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
+
+                      {/* Trámite */}
                       <div>
-                        <p className="text-xs text-gray-500 uppercase">Trámite</p>
+                        <p className="text-xs text-gray-500 uppercase mb-1">Trámite</p>
                         <p className="font-mono font-bold text-base">{entry.tramiteCode}</p>
                         <p className="text-xs text-gray-400">{entry.registrationNumber}</p>
-                        {entry.scheduledTime && <p className="text-xs text-blue-700 mt-0.5">{entry.scheduledTime}{entry.scheduledEndTime ? ` – ${entry.scheduledEndTime}` : ""}</p>}
-                        {fu?.isUnscheduled && <span className="text-xs bg-amber-100 text-amber-700 px-1 rounded">sin prog.</span>}
+                        {entry.scheduledTime && (
+                          <p className="text-xs text-blue-700 mt-1">{entry.scheduledTime}{entry.scheduledEndTime ? ` – ${entry.scheduledEndTime}` : ""}</p>
+                        )}
+                        {fu?.isUnscheduled && <span className="text-xs bg-amber-100 text-amber-700 px-1 rounded mt-1 inline-block">sin prog.</span>}
                       </div>
-                      {/* Cliente */}
+
+                      {/* Cliente + tiempos */}
                       <div>
-                        <p className="text-xs text-gray-500 uppercase">Cliente</p>
+                        <p className="text-xs text-gray-500 uppercase mb-1">Cliente</p>
                         <p className="font-semibold">{fu?.clientName ?? "—"}</p>
-                        {fu?.arrivalTime && <p className="text-xs text-pink-700 font-semibold mt-1">Llegó: {fu.arrivalTime}</p>}
-                        {fu?.calledTime && <p className="text-xs text-purple-700">Llamado: {fu.calledTime}</p>}
-                        {fu?.returnedTime && <p className="text-xs text-yellow-700">Regresó: {fu.returnedTime}</p>}
-                        {fu?.attendedTime && <p className="text-xs text-blue-700">Atendiendo: {fu.attendedTime}{waitMins !== null ? ` (espera: ${fmtMin(waitMins)})` : ""}</p>}
-                        {fu?.completedTime && <p className="text-xs text-green-700">Completado: {fu.completedTime}{attnMins !== null ? ` (atención: ${fmtMin(attnMins)})` : ""}</p>}
+                        {fu?.arrivalTime && <p className="text-xs text-pink-700 font-semibold mt-1">📍 Llegó: {fu.arrivalTime}</p>}
+                        {fu?.calledTime && <p className="text-xs text-purple-700">📣 Salió a llamar: {fu.calledTime}</p>}
+                        {fu?.returnedTime && <p className="text-xs text-yellow-700">↩️ Cliente regresó: {fu.returnedTime}</p>}
+                        {fu?.attendedTime && <p className="text-xs text-blue-700">👤 Atendido: {fu.attendedTime}</p>}
+                        {fu?.completedTime && <p className="text-xs text-green-700 font-semibold">✅ Terminó: {fu.completedTime}</p>}
                       </div>
-                      {/* Estado */}
+
+                      {/* Estado + métricas */}
                       <div>
-                        <p className="text-xs text-gray-500 uppercase">Estado</p>
-                        <p className="font-bold mt-1">{st ? STATUS_LABEL[st] : "🕐 Sin llegada"}</p>
+                        <p className="text-xs text-gray-500 uppercase mb-1">Estado</p>
+                        <p className="font-bold">{st ? STATUS_LABEL[st] : "🕐 Sin llegada"}</p>
+                        {llamadoHaceMin !== null && llamadoHaceMin >= 0 && (
+                          <p className={`text-xs mt-1 font-semibold ${llamadoHaceMin > 10 ? "text-red-600" : "text-purple-700"}`}>
+                            Salió hace {fmtMin(llamadoHaceMin)}
+                          </p>
+                        )}
+                        {st === "completado" && esperaMinutos !== null && (
+                          <div className="mt-1 space-y-0.5">
+                            <p className="text-xs text-gray-500">Espera total: <strong>{fmtMin(esperaMinutos)}</strong></p>
+                            {atencionMinutos !== null && <p className="text-xs text-gray-500">Atención: <strong>{fmtMin(atencionMinutos)}</strong></p>}
+                          </div>
+                        )}
                       </div>
-                      {/* Acciones */}
+
+                      {/* ── ACCIONES (solo 2-3 botones clave) ── */}
                       <div className="flex flex-col gap-2">
-                        {!fu && <p className="text-xs text-gray-400 italic">Esperando llegada en seguimientos</p>}
-                        {st === "esperando" && (
+                        {!fu && (
+                          <p className="text-xs text-gray-400 italic">Sin llegada registrada en seguimientos</p>
+                        )}
+
+                        {/* DESPACHO: llegó aviso → puede revisar o salir directo */}
+                        {(st === "esperando" || st === "en-revision") && (
                           <>
-                            <button onClick={() => transition(entry.id, "en-revision")}
-                              className="px-3 py-1.5 bg-indigo-500 text-white text-xs font-bold rounded hover:bg-indigo-600 cursor-pointer">
-                              📋 En Revisión
-                            </button>
-                            <button onClick={() => transition(entry.id, "llamado", "calledTime")}
-                              className="px-3 py-1.5 bg-purple-500 text-white text-xs font-bold rounded hover:bg-purple-600 cursor-pointer">
-                              📣 Llamar
+                            {st === "esperando" && (
+                              <button onClick={() => marcarRevisando(entry.id)}
+                                className="px-3 py-2 bg-indigo-100 text-indigo-800 text-xs font-bold rounded-lg hover:bg-indigo-200 cursor-pointer border border-indigo-300">
+                                📋 Revisando expediente
+                              </button>
+                            )}
+                            <button onClick={() => marcarSaliALlamar(entry.id)}
+                              className="px-3 py-2 bg-purple-600 text-white text-sm font-bold rounded-lg hover:bg-purple-700 cursor-pointer shadow">
+                              🚶 Salgo a llamar
                             </button>
                           </>
                         )}
-                        {st === "en-revision" && (
-                          <>
-                            <button onClick={() => transition(entry.id, "llamado", "calledTime")}
-                              className="px-3 py-1.5 bg-purple-500 text-white text-xs font-bold rounded hover:bg-purple-600 cursor-pointer">
-                              📣 Llamar
-                            </button>
-                            <button onClick={() => transition(entry.id, "completado")}
-                              className="px-3 py-1.5 bg-green-600 text-white text-xs font-bold rounded hover:bg-green-700 cursor-pointer">
-                              ✅ Completado
-                            </button>
-                          </>
-                        )}
+
+                        {/* REGRESÓ AL DESPACHO: ¿lo atendió o no respondió? */}
                         {st === "llamado" && (
-                          <>
-                            <button onClick={() => transition(entry.id, "no-escucho")}
-                              className="px-3 py-1.5 bg-orange-500 text-white text-xs font-bold rounded hover:bg-orange-600 cursor-pointer">
-                              🔇 No escuchó
+                          <div className="space-y-2">
+                            <p className="text-xs text-gray-500 font-semibold uppercase">Al regresar al despacho:</p>
+                            <button onClick={() => marcarLeAtendi(entry.id)}
+                              className="w-full px-3 py-2 bg-green-600 text-white text-sm font-bold rounded-lg hover:bg-green-700 cursor-pointer shadow">
+                              ✅ Lo atendí — terminé
                             </button>
-                            <button onClick={() => transition(entry.id, "atendiendo", "attendedTime")}
-                              className="px-3 py-1.5 bg-blue-600 text-white text-xs font-bold rounded hover:bg-blue-700 cursor-pointer">
-                              👤 Atendiendo
+                            <button onClick={() => marcarNoRespondio(entry.id)}
+                              className="w-full px-3 py-2 bg-orange-500 text-white text-sm font-bold rounded-lg hover:bg-orange-600 cursor-pointer shadow">
+                              ↩️ No respondió
                             </button>
-                          </>
+                          </div>
                         )}
+
+                        {/* NO ESCUCHÓ: esperar que seguimientos marque regreso */}
                         {st === "no-escucho" && (
-                          <p className="text-xs text-orange-700 font-semibold italic">Esperando que el cliente regrese…</p>
+                          <div className="rounded-lg bg-orange-50 border border-orange-200 p-3">
+                            <p className="text-xs text-orange-800 font-semibold">⏳ Esperando que el cliente regrese</p>
+                            <p className="text-xs text-orange-600 mt-1">Ventanilla notificará cuando llegue</p>
+                          </div>
                         )}
+
+                        {/* CLIENTE REGRESÓ: el técnico va y atiende — solo marca cuando termina */}
                         {st === "regreso" && (
-                          <button onClick={() => transition(entry.id, "atendiendo", "attendedTime")}
-                            className="px-3 py-1.5 bg-blue-600 text-white text-xs font-bold rounded hover:bg-blue-700 cursor-pointer">
-                            👤 Atendiendo
-                          </button>
+                          <div className="space-y-2">
+                            <div className="rounded-lg bg-yellow-50 border border-yellow-300 p-2">
+                              <p className="text-xs text-yellow-800 font-semibold">↩️ Cliente regresó a ventanilla</p>
+                            </div>
+                            <button onClick={() => marcarTermineDeAtender(entry.id)}
+                              className="w-full px-3 py-2 bg-green-600 text-white text-sm font-bold rounded-lg hover:bg-green-700 cursor-pointer shadow">
+                              ✅ Terminé de atender
+                            </button>
+                          </div>
                         )}
-                        {st === "atendiendo" && (
-                          <button onClick={() => transition(entry.id, "completado")}
-                            className="px-3 py-1.5 bg-green-600 text-white text-xs font-bold rounded hover:bg-green-700 cursor-pointer">
-                            ✅ Completado
-                          </button>
+
+                        {st === "completado" && (
+                          <span className="text-sm text-green-700 font-bold">✓ Atención finalizada</span>
                         )}
-                        {st === "completado" && <span className="text-xs text-green-700 font-bold">✓ Listo</span>}
                       </div>
                     </div>
+
                     {entry.observations && (
                       <p className="text-xs text-gray-500 mt-3 pt-2 border-t border-gray-100">📌 {entry.observations}</p>
                     )}

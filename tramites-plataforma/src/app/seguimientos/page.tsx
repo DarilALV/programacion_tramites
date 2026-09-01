@@ -526,8 +526,15 @@ export default function SeguimientosPage() {
                         <td className="px-3 py-3 font-semibold text-pink-700">{fu.arrivalTime ?? "—"}</td>
                         <td className="px-3 py-3">
                           <span className="text-xs font-semibold">{statusLabel[st] ?? st}</span>
-                          {fu.calledTime && <p className="text-xs text-gray-400">Llamado: {fu.calledTime}</p>}
-                          {fu.returnedTime && <p className="text-xs text-yellow-700">Regresó: {fu.returnedTime}</p>}
+                          {fu.calledTime && st === "llamado" && (
+                            <p className="text-xs text-purple-700 font-semibold">
+                              📣 Técnico salió a las {fu.calledTime}
+                              {(() => { const m = minutesDiff(fu.calledTime!); return m >= 0 ? ` (hace ${fmtMin(m)})` : ""; })()}
+                            </p>
+                          )}
+                          {fu.calledTime && st !== "llamado" && <p className="text-xs text-gray-400">Llamado: {fu.calledTime}</p>}
+                          {fu.returnedTime && <p className="text-xs text-yellow-700">↩️ Regresó: {fu.returnedTime}</p>}
+                          {st === "no-escucho" && <p className="text-xs text-orange-600 font-semibold">⏳ Pendiente volver</p>}
                         </td>
                         <td className="px-3 py-3 text-xs">
                           {wait !== null && <span className={wait > 30 ? "text-red-600 font-semibold" : "text-gray-600"}>{fmtMin(wait)}</span>}
