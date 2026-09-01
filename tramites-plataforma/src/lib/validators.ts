@@ -17,7 +17,8 @@ export const EntryFormSchema = z.object({
   tramiteCode: z
     .string()
     .min(1, "El código de trámite es requerido")
-    .regex(/^\d{6,10}$/, "El código debe ser entre 6 y 10 dígitos"),
+    .regex(/^\d{6,10}$/, "El código debe tener entre 6 y 10 dígitos")
+    .refine((v) => v.startsWith("2"), "El código debe empezar con el año (ej: 2026...)"),
 
   technicianId: z
     .string()

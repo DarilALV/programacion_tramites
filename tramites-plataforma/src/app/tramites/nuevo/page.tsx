@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { AppShell } from "@/components/app-shell";
 import {
   countEntriesForTechnicianOnDate,
@@ -13,6 +13,7 @@ import {
   useTramitesStore,
 } from "@/lib/tramites-store";
 import { validateEntryForm, type FormErrors } from "@/lib/validators";
+import { getServerNow } from "@/lib/server-time";
 
 // Feriados Bolivia 2026-2027 (nacionales + Cochabamba)
 const FERIADOS = new Set([
@@ -69,7 +70,19 @@ export default function NuevoTramitePage() {
   const [errors, setErrors] = useState<FormErrors>({});
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState<"success" | "error" | "info">("info");
-  const [registroTime, setRegistroTime] = useState<string>("");
+  const [registroTime, setRegistroTime] = useState<string>("--:--");
+
+  // Hora en vivo del servidor, actualizada cada minuto
+  useEffect(() => {
+    let cancelled = false;
+    const fetch = async () => {
+      const { time } = await getServerNow();
+      if (!cancelled) setRegistroTime(time);
+    };
+    fetch();
+    const id = setInterval(fetch, 60_000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, []);
 
   const technician = technicians.find((item) => item.id === form.technicianId) ?? technicians[0];
   const registrationNumber = useMemo(() => getNextRegistrationNumber(entries), [entries]);
@@ -181,10 +194,9 @@ export default function NuevoTramitePage() {
               <div className="mt-2 text-base font-semibold text-[#151515]">{formatDate(todayStr)}</div>
             </div>
             <div className="rounded-3xl border border-black/10 bg-[#f7f4ee] p-4">
-              <div className="text-xs uppercase tracking-[0.2em] text-black/45">Hora de registro</div>
-              <div className="mt-2 text-base font-semibold text-[#151515]">
-                {registroTime || <span className="text-black/40 text-sm">Se registra al guardar</span>}
-              </div>
+              <div className="text-xs uppercase tracking-[0.2em] text-black/45">Hora actual</div>
+              <div className="mt-2 text-lg font-semibold text-[#151515]">{registroTime}</div>
+              <div className="text-xs text-black/40 mt-0.5">se guarda al registrar</div>
             </div>
           </div>
 
@@ -195,7 +207,13 @@ export default function NuevoTramitePage() {
               </span>
               <input
                 value={form.tramiteCode}
-                onChange={(e) => setForm({ ...form, tramiteCode: e.target.value })}
+                onChange={(e) => {
+                  const onlyDigits = e.target.value.replace(/\D/g, "").slice(0, 10);
+                  setForm({ ...form, tramiteCode: onlyDigits });
+                  if (errors.tramiteCode) setErrors({ ...errors, tramiteCode: undefined });
+                }}
+                inputMode="numeric"
+                maxLength={10}
                 className={`rounded-2xl border-2 px-4 py-3 focus:outline-none transition ${
                   errors.tramiteCode
                     ? "border-red-300 bg-red-50"
