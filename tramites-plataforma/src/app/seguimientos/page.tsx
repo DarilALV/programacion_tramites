@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { AppShell } from "@/components/app-shell";
 import { useTramitesStore, type Entry } from "@/lib/tramites-store";
 import { getServerNow } from "@/lib/server-time";
@@ -50,10 +50,6 @@ export default function SeguimientosPage() {
     if (!tramiteCode.trim()) return null;
     return entries.find((e) => e.tramiteCode === tramiteCode.trim()) ?? null;
   }, [tramiteCode, entries]);
-
-  useEffect(() => {
-    if (foundEntry) setSelectedTechnicianId(foundEntry.technicianId);
-  }, [foundEntry?.id]);
 
   const effectiveTechnician = technicians.find((t) => t.id === selectedTechnicianId);
 
@@ -204,7 +200,7 @@ export default function SeguimientosPage() {
     if (entry.followUp?.isUnscheduled) {
       removeEntry(entry.id);
     } else {
-      const { followUp: _f, ...rest } = entry;
+      const { followUp: _followUp, ...rest } = entry; // eslint-disable-line @typescript-eslint/no-unused-vars
       updateEntry(entry.id, rest as Entry);
     }
     setConfirmDeleteId(null);
@@ -261,7 +257,12 @@ export default function SeguimientosPage() {
               <span className="text-sm font-semibold text-gray-700">Número de Trámite *</span>
               <input
                 type="text" value={tramiteCode} autoFocus
-                onChange={(e) => setTramiteCode(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, "").slice(0, 10);
+                  setTramiteCode(val);
+                  const match = entries.find((en) => en.tramiteCode === val);
+                  if (match) setSelectedTechnicianId(match.technicianId);
+                }}
                 onKeyDown={(e) => e.key === "Enter" && handleRegisterArrival()}
                 inputMode="numeric" placeholder="Ej: 2026016618"
                 className={`rounded-lg border-2 px-4 py-3 text-lg font-semibold focus:outline-none ${codeValidationError ? "border-red-400 bg-red-50" : "border-pink-300 bg-white focus:border-pink-500"}`}
