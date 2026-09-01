@@ -3,13 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { AppShell } from "@/components/app-shell";
 import { useTramitesStore, type Entry } from "@/lib/tramites-store";
-
-const LIMITE_SEGUIMIENTOS = 12;
-
-function nowTime() {
-  const n = new Date();
-  return `${String(n.getHours()).padStart(2, "0")}:${String(n.getMinutes()).padStart(2, "0")}`;
-}
+import { getServerNow } from "@/lib/server-time";
 
 function minutesDiff(from: string, to?: string) {
   const [fh, fm] = from.split(":").map(Number);
@@ -35,6 +29,7 @@ export default function SeguimientosPage() {
   const [observations, setObservations] = useState("");
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState<"success" | "error">("success");
+  const [programadosExpanded, setProgramadosExpanded] = useState(false);
 
   const { entries, updateEntry, createEntry, technicians, currentUser, getNextRegistrationNumber } =
     useTramitesStore();
@@ -69,7 +64,20 @@ export default function SeguimientosPage() {
       });
   }, [entries, today]);
 
-  // Contador de seguimientos por técnico hoy
+  // Programados de hoy por técnico (para la sección de referencia)
+  const programadosHoy = useMemo(() => {
+    const byTech: Record<string, { name: string; area: string; entries: Entry[] }> = {};
+    entries
+      .filter((e) => e.scheduleDate === today)
+      .forEach((e) => {
+        if (!byTech[e.technicianId])
+          byTech[e.technicianId] = { name: e.technicianName, area: e.technicianArea, entries: [] };
+        byTech[e.technicianId].entries.push(e);
+      });
+    return byTech;
+  }, [entries, today]);
+
+  // Contador de seguimientos por técnico hoy (solo visual)
   const techCountToday = useMemo(() => {
     const counts: Record<string, number> = {};
     todayFollowUps.forEach((e) => {
@@ -103,18 +111,12 @@ export default function SeguimientosPage() {
     setTimeout(() => setMessage(""), 4000);
   }
 
-  function handleRegisterArrival() {
+  async function handleRegisterArrival() {
     if (!tramiteCode.trim()) return showMsg("⚠️ Ingresa el número de trámite", "error");
     if (!clientName.trim()) return showMsg("⚠️ Ingresa el nombre de la persona", "error");
     if (!selectedTechnicianId) return showMsg("⚠️ Selecciona el técnico que atenderá", "error");
 
-    const count = techCountToday[selectedTechnicianId] ?? 0;
-    if (count >= LIMITE_SEGUIMIENTOS) {
-      return showMsg(`⛔ ${effectiveTechnician?.name} ya alcanzó el límite de ${LIMITE_SEGUIMIENTOS} seguimientos hoy`, "error");
-    }
-
-    const arrival = nowTime();
-    const now = new Date();
+    const { time: arrival, iso: isoNow } = await getServerNow();
 
     if (foundEntry) {
       const techChanged = selectedTechnicianId !== foundEntry.technicianId;
@@ -126,10 +128,10 @@ export default function SeguimientosPage() {
           actualTechnicianId: techChanged ? selectedTechnicianId : undefined,
           actualTechnicianName: techChanged ? effectiveTechnician?.name : undefined,
           observations: observations.trim() || undefined,
-          createdAt: now.toISOString(),
+          createdAt: isoNow,
         },
       });
-      showMsg(`✅ Llegada registrada — ${effectiveTechnician?.name}`, "success");
+      showMsg(`✅ Llegada registrada a las ${arrival} — ${effectiveTechnician?.name}`, "success");
     } else {
       const newEntry: Entry = {
         id: `unsched-${Date.now()}`,
@@ -144,17 +146,17 @@ export default function SeguimientosPage() {
         registrationDate: today,
         observations: "",
         status: "Registrado",
-        createdAt: now.toISOString(),
+        createdAt: isoNow,
         followUp: {
           clientName: clientName.trim(),
           arrivalTime: arrival,
           observations: observations.trim() || undefined,
-          createdAt: now.toISOString(),
+          createdAt: isoNow,
           isUnscheduled: true,
         },
       };
       createEntry(newEntry);
-      showMsg(`✅ Seguimiento sin programación registrado — ${effectiveTechnician?.name}`, "success");
+      showMsg(`✅ Sin programación registrado a las ${arrival} — ${effectiveTechnician?.name}`, "success");
     }
 
     setTramiteCode("");
@@ -163,17 +165,19 @@ export default function SeguimientosPage() {
     setObservations("");
   }
 
-  function handleMarkAttended(entry: Entry) {
+  async function handleMarkAttended(entry: Entry) {
+    const { time } = await getServerNow();
     updateEntry(entry.id, {
       ...entry,
-      followUp: { ...entry.followUp, attended: true, attendedTime: nowTime() },
+      followUp: { ...entry.followUp, attended: true, attendedTime: time },
     });
   }
 
-  function handleMarkCompleted(entry: Entry) {
+  async function handleMarkCompleted(entry: Entry) {
+    const { time } = await getServerNow();
     updateEntry(entry.id, {
       ...entry,
-      followUp: { ...entry.followUp, completedTime: nowTime() },
+      followUp: { ...entry.followUp, completedTime: time },
     });
   }
 
@@ -211,7 +215,6 @@ export default function SeguimientosPage() {
 
   const canSubmit = tramiteCode.trim() && clientName.trim() && selectedTechnicianId;
   const selectedTechCount = techCountToday[selectedTechnicianId] ?? 0;
-  const selectedTechOverLimit = selectedTechCount >= LIMITE_SEGUIMIENTOS;
 
   return (
     <AppShell
@@ -291,39 +294,19 @@ export default function SeguimientosPage() {
                 <option value="">— Selecciona técnico —</option>
                 {technicians.map((t) => {
                   const cnt = techCountToday[t.id] ?? 0;
-                  const over = cnt >= LIMITE_SEGUIMIENTOS;
                   return (
                     <option key={t.id} value={t.id}>
-                      {t.name} — {t.areaLabel} {over ? `⛔ (${cnt}/${LIMITE_SEGUIMIENTOS})` : cnt > 0 ? `(${cnt}/${LIMITE_SEGUIMIENTOS})` : ""}
+                      {t.name} — {t.areaLabel}{cnt > 0 ? ` (${cnt} hoy)` : ""}
                     </option>
                   );
                 })}
               </select>
 
               {/* Barra de progreso del técnico seleccionado */}
-              {selectedTechnicianId && (
-                <div className="mt-1">
-                  <div className="flex justify-between text-xs mb-1">
-                    <span className="text-gray-600">
-                      {effectiveTechnician?.name}: {selectedTechCount} / {LIMITE_SEGUIMIENTOS} seguimientos hoy
-                    </span>
-                    {selectedTechOverLimit && (
-                      <span className="text-red-600 font-semibold">⛔ Límite alcanzado</span>
-                    )}
-                    {!selectedTechOverLimit && selectedTechCount >= LIMITE_SEGUIMIENTOS - 3 && (
-                      <span className="text-amber-600 font-semibold">⚠️ Casi al límite</span>
-                    )}
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div
-                      className={`h-2 rounded-full transition-all ${
-                        selectedTechOverLimit ? "bg-red-500" :
-                        selectedTechCount >= LIMITE_SEGUIMIENTOS - 3 ? "bg-amber-500" : "bg-green-500"
-                      }`}
-                      style={{ width: `${Math.min((selectedTechCount / LIMITE_SEGUIMIENTOS) * 100, 100)}%` }}
-                    />
-                  </div>
-                </div>
+              {selectedTechnicianId && selectedTechCount > 0 && (
+                <p className="text-xs text-gray-600 mt-1">
+                  {effectiveTechnician?.name} ya tiene <strong>{selectedTechCount}</strong> seguimiento{selectedTechCount !== 1 ? "s" : ""} registrado{selectedTechCount !== 1 ? "s" : ""} hoy.
+                </p>
               )}
             </label>
 
@@ -341,9 +324,9 @@ export default function SeguimientosPage() {
 
           <button
             onClick={handleRegisterArrival}
-            disabled={!canSubmit || selectedTechOverLimit}
+            disabled={!canSubmit}
             className={`w-full rounded-lg px-6 py-3 font-semibold text-white text-lg transition shadow-md ${
-              canSubmit && !selectedTechOverLimit ? "bg-pink-600 hover:bg-pink-700 cursor-pointer" : "bg-gray-400 cursor-not-allowed"
+              canSubmit ? "bg-pink-600 hover:bg-pink-700 cursor-pointer" : "bg-gray-400 cursor-not-allowed"
             }`}
           >
             ✅ Registrar Llegada — Hora Actual
@@ -449,6 +432,67 @@ export default function SeguimientosPage() {
           )}
         </section>
 
+        {/* PROGRAMADOS DE HOY — Referencia para ventanilla */}
+        <section className="rounded-4xl border-2 border-purple-200 overflow-hidden">
+          <button
+            onClick={() => setProgramadosExpanded(!programadosExpanded)}
+            className="w-full flex items-center justify-between px-6 py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white cursor-pointer"
+          >
+            <div className="flex items-center gap-3">
+              <h2 className="text-xl font-bold">Programaciones de Hoy</h2>
+              <span className="text-sm font-normal bg-white/20 px-2 py-0.5 rounded-full">
+                {Object.values(programadosHoy).reduce((s, v) => s + v.entries.length, 0)} trámites
+              </span>
+            </div>
+            <span className="text-sm">{programadosExpanded ? "▲ Ocultar" : "▼ Ver lista"}</span>
+          </button>
+
+          {programadosExpanded && (
+            <div className="p-6 space-y-4">
+              {Object.keys(programadosHoy).length === 0 ? (
+                <p className="text-gray-500">No hay trámites programados para hoy.</p>
+              ) : (
+                Object.entries(programadosHoy).map(([tid, data]) => {
+                  const seguimientosCount = techCountToday[tid] ?? 0;
+                  return (
+                    <div key={tid} className="rounded-xl border-2 border-purple-100 bg-purple-50 p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <div>
+                          <p className="font-bold text-purple-900">{data.name}</p>
+                          <p className="text-xs text-purple-600">{data.area}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-2xl font-bold text-purple-900">{data.entries.length}</p>
+                          <p className="text-xs text-purple-600">programados</p>
+                          {seguimientosCount > 0 && (
+                            <p className="text-xs font-semibold text-pink-700 mt-1">{seguimientosCount} con seguimiento</p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="grid gap-1">
+                        {data.entries
+                          .sort((a, b) => (a.scheduledTime ?? "").localeCompare(b.scheduledTime ?? ""))
+                          .map((e) => (
+                            <div
+                              key={e.id}
+                              className={`flex items-center justify-between text-xs px-3 py-1.5 rounded-lg ${
+                                e.followUp ? "bg-green-100 text-green-800" : "bg-white text-gray-700 border border-gray-200"
+                              }`}
+                            >
+                              <span className="font-mono font-semibold">{e.tramiteCode}</span>
+                              <span>{e.scheduledTime ?? "--:--"}</span>
+                              <span>{e.followUp ? `✓ ${e.followUp.clientName ?? "llegó"}` : "⏳ pendiente"}</span>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          )}
+        </section>
+
         {/* CARGA POR TÉCNICO */}
         <section className="rounded-4xl border-2 border-pink-200 p-6">
           <h2 className="text-2xl font-bold mb-4">Técnicos — Resumen del Día</h2>
@@ -458,31 +502,17 @@ export default function SeguimientosPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {Object.entries(technicianLoad).map(([tid, data]) => {
                 const count = techCountToday[tid] ?? 0;
-                const pct = Math.min(Math.round((count / LIMITE_SEGUIMIENTOS) * 100), 100);
-                const over = count >= LIMITE_SEGUIMIENTOS;
                 return (
-                  <div key={tid} className={`rounded-xl border-2 p-4 space-y-3 ${over ? "border-red-300 bg-red-50" : "border-pink-200 bg-white"}`}>
-                    <div className="flex justify-between items-start">
-                      <p className="font-bold text-gray-900">{data.name}</p>
-                      {over && <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-semibold">⛔ Lleno</span>}
-                    </div>
+                  <div key={tid} className="rounded-xl border-2 border-pink-200 bg-white p-4 space-y-3">
+                    <p className="font-bold text-gray-900">{data.name}</p>
                     <div className="grid grid-cols-2 gap-1 text-sm">
                       <span className="text-gray-500">Programados:</span><span className="font-semibold">{data.programados}</span>
                       <span className="text-gray-500">Llegadas:</span><span className="font-semibold text-pink-700">{data.llegadas}</span>
                       <span className="text-gray-500">Atendidos:</span><span className="font-semibold text-blue-700">{data.atendidos}</span>
                       <span className="text-gray-500">Completados:</span><span className="font-semibold text-green-700">{data.completados}</span>
                     </div>
-                    <div>
-                      <div className="flex justify-between text-xs mb-1">
-                        <span className="text-gray-500">Seguimientos: {count}/{LIMITE_SEGUIMIENTOS}</span>
-                        <span className={over ? "text-red-600 font-semibold" : "text-gray-500"}>{pct}%</span>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div
-                          className={`h-2 rounded-full ${over ? "bg-red-500" : count >= LIMITE_SEGUIMIENTOS - 3 ? "bg-amber-500" : "bg-green-500"}`}
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
+                    <div className="text-xs text-gray-500 font-semibold">
+                      Total seguimientos hoy: <span className="text-gray-900 text-sm">{count}</span>
                     </div>
                   </div>
                 );

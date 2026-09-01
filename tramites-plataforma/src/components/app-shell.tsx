@@ -7,10 +7,10 @@ import type { ReactNode } from "react";
 const navigation = [
   { href: "/", label: "Inicio" },
   { href: "/ingreso", label: "Ingreso" },
-  { href: "/tramites/nuevo", label: "Nuevo trámite" },
-  { href: "/tramites/mis-tramites", label: "Mis trámites" },
+  { href: "/tramites/nuevo", label: "Programaciones" },
+  { href: "/tramites/mis-tramites", label: "Mis Programaciones" },
   { href: "/seguimientos", label: "Seguimientos" },
-  { href: "/tecnico", label: "Agenda" }, 
+  { href: "/tecnico", label: "Agenda Técnico" },
   { href: "/reportes", label: "Reportes" },
   { href: "/supervision", label: "Supervisión" },
 ];

@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import { AppShell } from "@/components/app-shell";
 import { technicians, useTramitesStore } from "@/lib/tramites-store";
+import { getServerNow } from "@/lib/server-time";
 
 type TramiteAgenda = {
   id: string;
@@ -18,11 +19,6 @@ type TramiteAgenda = {
   observations?: string;
   status: "pending" | "arrived" | "attending" | "completed";
 };
-
-function nowTime() {
-  const n = new Date();
-  return `${String(n.getHours()).padStart(2, "0")}:${String(n.getMinutes()).padStart(2, "0")}`;
-}
 
 function minDiff(from: string, to: string) {
   const [fh, fm] = from.split(":").map(Number);
@@ -96,21 +92,23 @@ export default function AgendaTecnicoPage() {
     [agendaHoy]
   );
 
-  function handleMarkAttending(entryId: string) {
+  async function handleMarkAttending(entryId: string) {
     const entry = entries.find((e) => e.id === entryId);
     if (!entry?.followUp) return;
+    const { time } = await getServerNow();
     updateEntry(entryId, {
       ...entry,
-      followUp: { ...entry.followUp, attended: true, attendedTime: nowTime() },
+      followUp: { ...entry.followUp, attended: true, attendedTime: time },
     });
   }
 
-  function handleMarkCompleted(entryId: string) {
+  async function handleMarkCompleted(entryId: string) {
     const entry = entries.find((e) => e.id === entryId);
     if (!entry?.followUp) return;
+    const { time } = await getServerNow();
     updateEntry(entryId, {
       ...entry,
-      followUp: { ...entry.followUp, completedTime: nowTime() },
+      followUp: { ...entry.followUp, completedTime: time },
     });
   }
 
@@ -256,7 +254,7 @@ export default function AgendaTecnicoPage() {
                   tramite.arrivalTime && tramite.attendedTime
                     ? minDiff(tramite.arrivalTime, tramite.attendedTime)
                     : tramite.arrivalTime && !tramite.attendedTime
-                    ? minDiff(tramite.arrivalTime, nowTime())
+                    ? minDiff(tramite.arrivalTime, new Date().toTimeString().slice(0, 5))
                     : null;
 
                 const attnMins =
