@@ -12,7 +12,7 @@ export default function IngresoPage() {
   return (
     <AppShell
       title="Ingreso de usuarias registradoras"
-      description="Solo Wayra y Jaqueline registran programaciones. Desde aquí se elige la usuaria que está trabajando."
+      description="Wayra, Jaqueline y Tunari registran programaciones y seguimientos. Selecciona la usuaria que está trabajando."
       eyebrow="Acceso"
     >
       <section className="grid gap-6 lg:grid-cols-[380px_minmax(0,1fr)]">
@@ -72,7 +72,7 @@ export default function IngresoPage() {
         <article className="rounded-4xl border border-black/10 bg-[#151515] p-6 text-white shadow-[0_16px_40px_rgba(17,17,17,0.16)]">
           <h2 className="font-serif text-3xl text-white">Flujo simplificado</h2>
           <ul className="mt-4 space-y-3 text-sm leading-6 text-white/75">
-            <li>Wayra o Jaqueline ingresan y registran el trámite.</li>
+            <li>Wayra, Jaqueline o Tunari ingresan y registran el trámite.</li>
             <li>El registro se guarda directamente, sin borrador.</li>
             <li>Se ve de inmediato en Mis trámites, Supervisión y Reportes.</li>
           </ul>

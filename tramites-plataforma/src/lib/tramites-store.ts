@@ -37,6 +37,7 @@ export type Entry = {
   observations: string;
   status: EntryStatus;
   createdAt: string;
+  deleted?: boolean;     // borrado suave — visible solo en Firestore Console
    // NUEVOS CAMPOS:
   scheduledTime?: string;  // Hora programada (ej: "10:00")
   scheduledEndTime?: string; //Hora fin estimada
@@ -73,6 +74,7 @@ type PersistedState = {
 export const plannerUsers: PlannerUser[] = [
   { id: "wayra", name: "WAYRA" },
   { id: "jaqueline", name: "JAQUELINE" },
+  { id: "tunari", name: "TUNARI" },
 ];
 
 export const areas: Area[] = [
@@ -178,13 +180,17 @@ function normalizeStoredStatus(rawStatus: unknown): EntryStatus {
 
 function normalizeStoredEntry(rawEntry: Record<string, unknown>, index: number): Entry {
   const fallbackDate = "2026-08-27";
+  // Gestión interna tiene IDs especiales como "__ram__" — preservar sin buscar en lista de técnicos
+  const rawTechId = typeof rawEntry.technicianId === "string" ? rawEntry.technicianId : "";
+  const isGestionInterna = rawTechId.startsWith("__") || rawEntry.technicianArea === "Gestión Interna";
+
   const technicianFromRecord =
-    typeof rawEntry.technicianId === "string" && rawEntry.technicianId.trim().length > 0
-      ? technicians.find((item) => item.id === rawEntry.technicianId)
+    !isGestionInterna && rawTechId.trim().length > 0
+      ? technicians.find((item) => item.id === rawTechId)
       : null;
 
   const technicianFromName =
-    typeof rawEntry.technicianName === "string" && rawEntry.technicianName.trim().length > 0
+    !isGestionInterna && typeof rawEntry.technicianName === "string" && rawEntry.technicianName.trim().length > 0
       ? technicians.find((item) => item.name === rawEntry.technicianName)
       : null;
 
@@ -220,9 +226,11 @@ function normalizeStoredEntry(rawEntry: Record<string, unknown>, index: number):
         : typeof rawEntry.expediente === "string"
           ? rawEntry.expediente
           : "",
-    technicianId: technician.id,
-    technicianName: technician.name,
-    technicianArea: technician.areaLabel,
+    technicianId: isGestionInterna ? rawTechId : technician.id,
+    technicianName: isGestionInterna
+      ? (typeof rawEntry.technicianName === "string" ? rawEntry.technicianName : rawTechId)
+      : technician.name,
+    technicianArea: isGestionInterna ? "Gestión Interna" : technician.areaLabel,
     scheduleDate,
     registrationDate,
     observations:
@@ -232,6 +240,7 @@ function normalizeStoredEntry(rawEntry: Record<string, unknown>, index: number):
           ? rawEntry.observacion
           : "",
     status: normalizeStoredStatus(rawEntry.status),
+    deleted: rawEntry.deleted === true ? true : undefined,
     createdAt:
       typeof rawEntry.createdAt === "string" && rawEntry.createdAt.trim().length > 0
         ? rawEntry.createdAt
@@ -629,9 +638,11 @@ useEffect(() => {
         collection(firestore, 'entries'),
         (snapshot) => {
           if (!snapshot.empty) {
-            const firestoreEntries = snapshot.docs.map((docSnap, i) =>
-              normalizeStoredEntry({ ...docSnap.data(), id: docSnap.id } as Record<string, unknown>, i)
-            );
+            const firestoreEntries = snapshot.docs
+              .map((docSnap, i) =>
+                normalizeStoredEntry({ ...docSnap.data(), id: docSnap.id } as Record<string, unknown>, i)
+              )
+              .filter((e) => !e.deleted);   // ocultar borrados suaves
             setEntries(firestoreEntries);
           } else {
             setEntries(seedEntries);
@@ -778,9 +789,14 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
   }
 
   function removeEntry(entryId: string) {
-    const nextEntries = entries.filter((entry) => entry.id !== entryId);
+    // Borrado suave: marca deleted=true en Firestore, filtra en UI
+    // Para recuperar: ir a Firestore Console y cambiar deleted a false
+    const entry = entries.find((e) => e.id === entryId);
+    if (!entry) return;
+    const softDeleted = { ...entry, deleted: true };
+    const nextEntries = entries.filter((e) => e.id !== entryId);
     persistState(nextEntries);
-    firestoreDelete(entryId);
+    firestoreSet(entryId, softDeleted);
   }
 
   function resetDemo() {
