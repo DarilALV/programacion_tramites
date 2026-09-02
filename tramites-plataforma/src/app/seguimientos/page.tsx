@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { AppShell } from "@/components/app-shell";
-import { useTramitesStore, type Entry } from "@/lib/tramites-store";
+import { useTramitesStore, areas, type Entry } from "@/lib/tramites-store";
 import { getServerNow } from "@/lib/server-time";
 import { Search } from "lucide-react";
 
@@ -27,11 +27,23 @@ function techColor(count: number): { dot: string; bar: string; label: string } {
 }
 
 type EditState = { clientName: string; technicianId: string; observations: string };
+type FormMode = "tecnico" | "interna";
+type GestionInterna = "RAM" | "Firma de Jefatura" | "Firma Secretaria";
+
+const GESTIONES_INTERNAS: GestionInterna[] = ["RAM", "Firma de Jefatura", "Firma Secretaria"];
+
+const GESTION_COLOR: Record<GestionInterna, { bg: string; badge: string; dot: string }> = {
+  "RAM":                 { bg: "bg-blue-50 border-blue-300",   badge: "bg-blue-100 text-blue-800",   dot: "🗂️" },
+  "Firma de Jefatura":   { bg: "bg-violet-50 border-violet-300", badge: "bg-violet-100 text-violet-800", dot: "✍️" },
+  "Firma Secretaria":    { bg: "bg-teal-50 border-teal-300",   badge: "bg-teal-100 text-teal-800",   dot: "📝" },
+};
 
 export default function SeguimientosPage() {
+  const [formMode, setFormMode] = useState<FormMode>("tecnico");
   const [tramiteCode, setTramiteCode] = useState("");
   const [clientName, setClientName] = useState("");
   const [selectedTechnicianId, setSelectedTechnicianId] = useState("");
+  const [selectedGestion, setSelectedGestion] = useState<GestionInterna | "">("");
   const [observations, setObservations] = useState("");
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState<"success" | "error">("success");
@@ -160,6 +172,54 @@ export default function SeguimientosPage() {
     setTramiteCode(""); setClientName(""); setSelectedTechnicianId(""); setObservations("");
   }
 
+  async function handleRegisterGestionInterna() {
+    const codeErr = validateCode(tramiteCode);
+    if (codeErr) return showMsg(`⚠️ ${codeErr}`, "error");
+    if (!clientName.trim()) return showMsg("⚠️ Ingresa el nombre de la persona", "error");
+    if (!selectedGestion) return showMsg("⚠️ Selecciona el tipo de gestión", "error");
+
+    const { time: arrival, iso } = await getServerNow();
+    const gestionId = selectedGestion.toLowerCase().replace(/\s+/g, "-");
+
+    // Si existe el trámite en el sistema, lo actualiza; si no, crea entrada nueva
+    if (foundEntry) {
+      updateEntry(foundEntry.id, {
+        ...foundEntry,
+        followUp: {
+          clientName: clientName.trim(),
+          arrivalTime: arrival,
+          followUpStatus: "completado",
+          observations: (observations.trim() ? `[${selectedGestion}] ${observations.trim()}` : `[${selectedGestion}]`),
+          createdAt: iso,
+          isUnscheduled: false,
+        },
+      });
+    } else {
+      const newEntry: Entry = {
+        id: `gestion-${Date.now()}`,
+        createdBy: currentUser.id, createdByName: currentUser.name,
+        registrationNumber: getNextRegistrationNumber(),
+        tramiteCode: tramiteCode.trim(),
+        technicianId: `__${gestionId}__`,
+        technicianName: selectedGestion,
+        technicianArea: "Gestión Interna",
+        scheduleDate: today, registrationDate: today,
+        observations: "", status: "Registrado", createdAt: iso,
+        followUp: {
+          clientName: clientName.trim(),
+          arrivalTime: arrival,
+          followUpStatus: "completado",
+          observations: observations.trim() || undefined,
+          createdAt: iso,
+          isUnscheduled: true,
+        },
+      };
+      createEntry(newEntry);
+    }
+    showMsg(`✅ Gestión registrada: ${selectedGestion} — ${arrival}`, "success");
+    setTramiteCode(""); setClientName(""); setSelectedGestion(""); setObservations("");
+  }
+
   async function handleMarkRegreso(entry: Entry) {
     const { time, iso } = await getServerNow();
     updateEntry(entry.id, {
@@ -231,7 +291,8 @@ export default function SeguimientosPage() {
     XLSX.writeFile(wb, `seguimientos-${today}.xlsx`);
   }
 
-  const canSubmit = tramiteCode.trim() && clientName.trim() && selectedTechnicianId;
+  const canSubmitTecnico = tramiteCode.trim() && clientName.trim() && selectedTechnicianId;
+  const canSubmitInterna = tramiteCode.trim() && clientName.trim() && selectedGestion;
   const selCount = techCountToday[selectedTechnicianId] ?? 0;
   const selOverLimit = selCount >= LIMITE;
   const selColors = selectedTechnicianId ? techColor(selCount) : null;
@@ -241,9 +302,21 @@ export default function SeguimientosPage() {
     <AppShell title="Seguimientos del Día" description="Registra llegadas de clientes y gestiona el estado de cada trámite" eyebrow="SEGUIMIENTOS">
       <div className="space-y-6">
 
-        {/* ── FORMULARIO REGISTRO LLEGADA ── */}
+        {/* ── FORMULARIO REGISTRO ── */}
         <section className="rounded-4xl border-2 border-pink-200 bg-pink-50 p-6 space-y-4">
           <h2 className="text-2xl font-bold">Registrar Llegada</h2>
+
+          {/* Toggle modo */}
+          <div className="flex rounded-xl overflow-hidden border-2 border-pink-300 w-fit">
+            <button onClick={() => { setFormMode("tecnico"); setSelectedGestion(""); }}
+              className={`px-5 py-2 text-sm font-bold transition cursor-pointer ${formMode === "tecnico" ? "bg-pink-600 text-white" : "bg-white text-pink-700 hover:bg-pink-50"}`}>
+              👤 Con Técnico
+            </button>
+            <button onClick={() => { setFormMode("interna"); setSelectedTechnicianId(""); }}
+              className={`px-5 py-2 text-sm font-bold transition cursor-pointer ${formMode === "interna" ? "bg-violet-600 text-white" : "bg-white text-violet-700 hover:bg-violet-50"}`}>
+              📋 Gestión Interna
+            </button>
+          </div>
 
           {message && (
             <div className={`p-4 rounded-lg text-sm font-medium ${messageType === "success" ? "bg-green-100 text-green-800 border border-green-300" : "bg-red-100 text-red-800 border border-red-300"}`}>
@@ -260,17 +333,19 @@ export default function SeguimientosPage() {
                 onChange={(e) => {
                   const val = e.target.value.replace(/\D/g, "").slice(0, 10);
                   setTramiteCode(val);
-                  const match = entries.find((en) => en.tramiteCode === val);
-                  if (match) setSelectedTechnicianId(match.technicianId);
+                  if (formMode === "tecnico") {
+                    const match = entries.find((en) => en.tramiteCode === val);
+                    if (match) setSelectedTechnicianId(match.technicianId);
+                  }
                 }}
-                onKeyDown={(e) => e.key === "Enter" && handleRegisterArrival()}
+                onKeyDown={(e) => e.key === "Enter" && (formMode === "tecnico" ? handleRegisterArrival() : handleRegisterGestionInterna())}
                 inputMode="numeric" placeholder="Ej: 2026016618"
-                className={`rounded-lg border-2 px-4 py-3 text-lg font-semibold focus:outline-none ${codeValidationError ? "border-red-400 bg-red-50" : "border-pink-300 bg-white focus:border-pink-500"}`}
+                className={`rounded-lg border-2 px-4 py-3 text-lg font-semibold focus:outline-none ${codeValidationError ? "border-red-400 bg-red-50" : formMode === "interna" ? "border-violet-300 bg-white focus:border-violet-500" : "border-pink-300 bg-white focus:border-pink-500"}`}
               />
               {codeValidationError && <p className="text-xs text-red-600 font-medium">⚠️ {codeValidationError}</p>}
             </label>
 
-            {/* Trámite encontrado */}
+            {/* Info trámite encontrado */}
             {tramiteCode.trim() && !codeValidationError && foundEntry && (
               <div className="md:col-span-2 rounded-lg bg-blue-50 border-2 border-blue-200 p-4">
                 <p className="text-xs font-semibold text-blue-700 uppercase">✓ Trámite encontrado</p>
@@ -284,7 +359,9 @@ export default function SeguimientosPage() {
             )}
             {tramiteCode.trim() && !codeValidationError && !foundEntry && (
               <div className="md:col-span-2 rounded-lg bg-amber-50 border-2 border-amber-200 p-3">
-                <p className="text-sm font-semibold text-amber-800">⚠️ Trámite no encontrado — selecciona técnico manualmente</p>
+                <p className="text-sm font-semibold text-amber-800">
+                  {formMode === "tecnico" ? "⚠️ Trámite no encontrado — selecciona técnico manualmente" : "⚠️ Trámite no encontrado — se registrará como gestión sin programación"}
+                </p>
               </div>
             )}
 
@@ -293,63 +370,101 @@ export default function SeguimientosPage() {
               <span className="text-sm font-semibold text-gray-700">Nombre de Quién Viene *</span>
               <input type="text" value={clientName}
                 onChange={(e) => setClientName(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleRegisterArrival()}
+                onKeyDown={(e) => e.key === "Enter" && (formMode === "tecnico" ? handleRegisterArrival() : handleRegisterGestionInterna())}
                 placeholder="Ej: Juan Pérez"
-                className="rounded-lg border-2 border-pink-300 px-4 py-3 focus:border-pink-500 focus:outline-none"
+                className={`rounded-lg border-2 px-4 py-3 focus:outline-none ${formMode === "interna" ? "border-violet-300 focus:border-violet-500" : "border-pink-300 focus:border-pink-500"}`}
               />
             </label>
 
-            {/* Selector técnico con colores */}
-            <label className="grid gap-2 md:col-span-2">
-              <span className="text-sm font-semibold text-gray-700">
-                Técnico que Atenderá *
-                {foundEntry && <span className="text-xs font-normal text-gray-500 ml-2">(puedes cambiar)</span>}
-              </span>
-              <select value={selectedTechnicianId} onChange={(e) => setSelectedTechnicianId(e.target.value)}
-                className="rounded-lg border-2 border-pink-300 px-4 py-3 focus:border-pink-500 focus:outline-none bg-white">
-                <option value="">— Selecciona técnico —</option>
-                {technicians.map((t) => {
-                  const cnt = techCountToday[t.id] ?? 0;
-                  const { dot } = techColor(cnt);
-                  const full = cnt >= LIMITE;
-                  return (
-                    <option key={t.id} value={t.id} disabled={full}>
-                      {dot} {t.name} — {t.areaLabel}{cnt > 0 ? ` (${cnt}/${LIMITE})` : ""}
-                    </option>
-                  );
-                })}
-              </select>
+            {/* ── MODO TÉCNICO: selector con agrupación por área ── */}
+            {formMode === "tecnico" && (
+              <label className="grid gap-2 md:col-span-2">
+                <span className="text-sm font-semibold text-gray-700">
+                  Técnico que Atenderá *
+                  {foundEntry && <span className="text-xs font-normal text-gray-500 ml-2">(puedes cambiar)</span>}
+                </span>
+                <select value={selectedTechnicianId} onChange={(e) => setSelectedTechnicianId(e.target.value)}
+                  className="rounded-lg border-2 border-pink-300 px-4 py-3 focus:border-pink-500 focus:outline-none bg-white">
+                  <option value="">— Selecciona área y técnico —</option>
+                  {areas.map((area) => {
+                    const techsInArea = technicians.filter((t) => t.areaId === area.id);
+                    return (
+                      <optgroup key={area.id} label={`── ${area.label.toUpperCase()} ──`}>
+                        {techsInArea.map((t) => {
+                          const cnt = techCountToday[t.id] ?? 0;
+                          const { dot } = techColor(cnt);
+                          const full = cnt >= LIMITE;
+                          return (
+                            <option key={t.id} value={t.id} disabled={full}>
+                              {dot} {t.name}{cnt > 0 ? ` (${cnt}/${LIMITE})` : ""}
+                            </option>
+                          );
+                        })}
+                      </optgroup>
+                    );
+                  })}
+                </select>
 
-              {/* Barra de capacidad del técnico seleccionado */}
-              {selColors && (
-                <div className="space-y-1">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-gray-600">{effectiveTechnician?.name}: <strong>{selCount}</strong> de {LIMITE} seguimientos hoy</span>
-                    <span className={`font-semibold ${selOverLimit ? "text-red-600" : selCount >= 12 ? "text-red-500" : selCount >= 7 ? "text-amber-600" : "text-green-700"}`}>
-                      {selColors.label}
-                    </span>
+                {selColors && (
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-gray-600">{effectiveTechnician?.name}: <strong>{selCount}</strong> de {LIMITE} hoy</span>
+                      <span className={`font-semibold ${selOverLimit ? "text-red-600" : selCount >= 12 ? "text-red-500" : selCount >= 7 ? "text-amber-600" : "text-green-700"}`}>
+                        {selColors.label}
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-3">
+                      <div className={`h-3 rounded-full transition-all ${selColors.bar}`}
+                        style={{ width: `${Math.min((selCount / LIMITE) * 100, 100)}%` }} />
+                    </div>
+                    {selOverLimit && <p className="text-xs text-red-600 font-semibold">⛔ Este técnico ya no puede recibir más seguimientos hoy</p>}
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-3">
-                    <div className={`h-3 rounded-full transition-all ${selColors.bar}`}
-                      style={{ width: `${Math.min((selCount / LIMITE) * 100, 100)}%` }} />
-                  </div>
-                  {selOverLimit && <p className="text-xs text-red-600 font-semibold">⛔ Este técnico ya no puede recibir más seguimientos hoy</p>}
+                )}
+              </label>
+            )}
+
+            {/* ── MODO GESTIÓN INTERNA: botones de selección ── */}
+            {formMode === "interna" && (
+              <div className="grid gap-2 md:col-span-2">
+                <span className="text-sm font-semibold text-gray-700">Tipo de Gestión *</span>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {GESTIONES_INTERNAS.map((g) => {
+                    const col = GESTION_COLOR[g];
+                    const selected = selectedGestion === g;
+                    return (
+                      <button key={g} type="button" onClick={() => setSelectedGestion(g)}
+                        className={`rounded-xl border-2 p-4 text-left transition cursor-pointer ${selected ? `${col.bg} border-current ring-2 ring-offset-1 ring-violet-400` : "bg-white border-gray-200 hover:border-violet-300"}`}>
+                        <p className="text-2xl mb-1">{col.dot}</p>
+                        <p className={`text-sm font-bold ${selected ? "" : "text-gray-700"}`}>{g}</p>
+                        {selected && <p className="text-xs text-violet-600 mt-0.5">✓ Seleccionado</p>}
+                      </button>
+                    );
+                  })}
                 </div>
-              )}
-            </label>
+              </div>
+            )}
 
             <label className="grid gap-2 md:col-span-2">
               <span className="text-sm font-semibold text-gray-700">Observaciones (opcional)</span>
               <textarea value={observations} onChange={(e) => setObservations(e.target.value)}
-                placeholder="Ej: cliente pidió urgencia, documento incompleto…" rows={2}
-                className="rounded-lg border-2 border-pink-300 px-4 py-3 focus:border-pink-500 focus:outline-none" />
+                placeholder="Ej: documento incompleto, urgente…" rows={2}
+                className={`rounded-lg border-2 px-4 py-3 focus:outline-none ${formMode === "interna" ? "border-violet-300 focus:border-violet-500" : "border-pink-300 focus:border-pink-500"}`} />
             </label>
           </div>
 
-          <button onClick={handleRegisterArrival} disabled={!canSubmit || selOverLimit || !!codeValidationError}
-            className={`w-full rounded-lg px-6 py-3 font-semibold text-white text-lg transition shadow-md ${canSubmit && !selOverLimit && !codeValidationError ? "bg-pink-600 hover:bg-pink-700 cursor-pointer" : "bg-gray-400 cursor-not-allowed"}`}>
-            ✅ Registrar Llegada — Hora Automática del Servidor
-          </button>
+          {formMode === "tecnico" ? (
+            <button onClick={handleRegisterArrival}
+              disabled={!canSubmitTecnico || selOverLimit || !!codeValidationError}
+              className={`w-full rounded-lg px-6 py-3 font-semibold text-white text-lg transition shadow-md ${canSubmitTecnico && !selOverLimit && !codeValidationError ? "bg-pink-600 hover:bg-pink-700 cursor-pointer" : "bg-gray-400 cursor-not-allowed"}`}>
+              ✅ Registrar Llegada con Técnico
+            </button>
+          ) : (
+            <button onClick={handleRegisterGestionInterna}
+              disabled={!canSubmitInterna || !!codeValidationError}
+              className={`w-full rounded-lg px-6 py-3 font-semibold text-white text-lg transition shadow-md ${canSubmitInterna && !codeValidationError ? "bg-violet-600 hover:bg-violet-700 cursor-pointer" : "bg-gray-400 cursor-not-allowed"}`}>
+              📋 Registrar Gestión Interna
+            </button>
+          )}
         </section>
 
         {/* ── PROGRAMADOS DE HOY ── */}
@@ -522,7 +637,15 @@ export default function SeguimientosPage() {
                           {fu.isUnscheduled && <span className="text-xs bg-amber-100 text-amber-700 px-1 rounded">sin prog.</span>}
                         </td>
                         <td className="px-3 py-3">{fu.clientName}</td>
-                        <td className="px-3 py-3 font-semibold text-sm">{tech}</td>
+                        <td className="px-3 py-3 text-sm">
+                          {entry.technicianArea === "Gestión Interna" ? (
+                            <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-bold ${GESTION_COLOR[tech as GestionInterna]?.badge ?? "bg-gray-100 text-gray-700"}`}>
+                              {GESTION_COLOR[tech as GestionInterna]?.dot ?? "📋"} {tech}
+                            </span>
+                          ) : (
+                            <span className="font-semibold">{tech}</span>
+                          )}
+                        </td>
                         <td className="px-3 py-3 font-semibold text-pink-700">{fu.arrivalTime ?? "—"}</td>
                         <td className="px-3 py-3">
                           <span className="text-xs font-semibold">{statusLabel[st] ?? st}</span>
