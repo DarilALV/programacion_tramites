@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
+import { useTramitesStore } from "@/lib/tramites-store";
 
 const navigation = [
   { href: "/", label: "Inicio" },
@@ -24,6 +25,7 @@ type AppShellProps = {
 
 export function AppShell({ title, description, eyebrow, children }: AppShellProps) {
   const pathname = usePathname();
+  const { hydrated } = useTramitesStore();
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
@@ -60,6 +62,19 @@ export function AppShell({ title, description, eyebrow, children }: AppShellProp
           </nav>
         </div>
       </header>
+
+      {/* Pantalla de carga mientras Firebase sincroniza */}
+      {!hydrated && (
+        <div className="fixed inset-0 z-40 flex flex-col items-center justify-center bg-white/90 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-4">
+            <div className="relative w-14 h-14">
+              <div className="absolute inset-0 rounded-full border-4 border-pink-100" />
+              <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-pink-600 animate-spin" />
+            </div>
+            <p className="text-sm font-semibold text-gray-600">Conectando con Firebase…</p>
+          </div>
+        </div>
+      )}
 
       {children}
     </main>
