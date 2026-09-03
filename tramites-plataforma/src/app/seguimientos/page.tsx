@@ -56,6 +56,15 @@ export default function SeguimientosPage() {
   const { entries, updateEntry, createEntry, removeEntry, technicians, currentUser, getNextRegistrationNumber } =
     useTramitesStore();
 
+  const availableTechnicians = useMemo(
+    () => currentUser.areaId ? technicians.filter((t) => t.areaId === currentUser.areaId) : technicians,
+    [currentUser.areaId, technicians],
+  );
+  const availableAreas = useMemo(
+    () => currentUser.areaId ? areas.filter((a) => a.id === currentUser.areaId) : areas,
+    [currentUser.areaId],
+  );
+
   const today = new Date().toISOString().slice(0, 10);
 
   const foundEntry = useMemo(() => {
@@ -386,8 +395,8 @@ export default function SeguimientosPage() {
                 <select value={selectedTechnicianId} onChange={(e) => setSelectedTechnicianId(e.target.value)}
                   className="rounded-lg border-2 border-pink-300 px-4 py-3 focus:border-pink-500 focus:outline-none bg-white">
                   <option value="">— Selecciona área y técnico —</option>
-                  {areas.map((area) => {
-                    const techsInArea = technicians.filter((t) => t.areaId === area.id);
+                  {availableAreas.map((area) => {
+                    const techsInArea = availableTechnicians.filter((t) => t.areaId === area.id);
                     return (
                       <optgroup key={area.id} label={`── ${area.label.toUpperCase()} ──`}>
                         {techsInArea.map((t) => {
@@ -610,7 +619,7 @@ export default function SeguimientosPage() {
                                 <select value={editState.technicianId}
                                   onChange={(e) => setEditState({ ...editState, technicianId: e.target.value })}
                                   className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm bg-white">
-                                  {technicians.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                                  {availableTechnicians.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
                                 </select>
                               </label>
                               <label className="grid gap-1">

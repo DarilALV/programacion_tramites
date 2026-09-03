@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState, useEffect } from "react";
 import { AppShell } from "@/components/app-shell";
 import {
+  areas,
   countEntriesForTechnicianOnDate,
   formatDate,
   getAreaTone,
@@ -84,12 +85,29 @@ export default function NuevoTramitePage() {
     return () => { cancelled = true; clearInterval(id); };
   }, []);
 
-  const technician = technicians.find((item) => item.id === form.technicianId) ?? technicians[0];
+  const availableTechnicians = useMemo(
+    () => currentUser.areaId
+      ? technicians.filter((t) => t.areaId === currentUser.areaId)
+      : technicians,
+    [currentUser.areaId],
+  );
+
+  const technician = availableTechnicians.find((item) => item.id === form.technicianId)
+    ?? availableTechnicians[0]
+    ?? technicians[0];
+
   const registrationNumber = useMemo(() => getNextRegistrationNumber(entries), [entries]);
   const technicianCount = useMemo(
     () => countEntriesForTechnicianOnDate(entries, technician.id, form.scheduleDate),
     [entries, form.scheduleDate, technician.id],
   );
+
+  const reprogramCount = useMemo(() => {
+    if (!form.tramiteCode.trim() || !form.technicianId) return 0;
+    return entries.filter(
+      (e) => e.tramiteCode === form.tramiteCode && e.technicianId === form.technicianId && !e.deleted,
+    ).length;
+  }, [form.tramiteCode, form.technicianId, entries]);
 
   const dateError = form.scheduleDate ? getDateError(form.scheduleDate) : null;
 
@@ -229,18 +247,53 @@ export default function NuevoTramitePage() {
             <label className="grid gap-2">
               <span className="text-xs font-semibold uppercase tracking-[0.18em] text-black/55">
                 Técnico asignado
+                {currentUser.areaId && (
+                  <span className="ml-2 normal-case font-normal text-black/40">(área {currentUser.areaId})</span>
+                )}
               </span>
               <select
                 value={form.technicianId}
                 onChange={(e) => setForm({ ...form, technicianId: e.target.value })}
                 className="rounded-2xl border-2 border-pink-200 bg-pink-50 px-4 py-3 focus:border-pink-500 focus:outline-none transition"
               >
-                {technicians.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name} · {item.areaLabel}
-                  </option>
-                ))}
+                {currentUser.areaId ? (
+                  availableTechnicians.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name}
+                    </option>
+                  ))
+                ) : (
+                  areas.map((area) => {
+                    const techsInArea = availableTechnicians.filter((t) => t.areaId === area.id);
+                    if (!techsInArea.length) return null;
+                    return (
+                      <optgroup key={area.id} label={`── ${area.label.toUpperCase()} ──`}>
+                        {techsInArea.map((item) => (
+                          <option key={item.id} value={item.id}>
+                            {item.name}
+                          </option>
+                        ))}
+                      </optgroup>
+                    );
+                  })
+                )}
               </select>
+              {reprogramCount >= 5 && (
+                <div className="rounded-xl border-2 border-red-300 bg-red-50 px-4 py-3 text-sm">
+                  <p className="font-bold text-red-800">🔴 Reprogramación repetida ({reprogramCount}x)</p>
+                  <p className="text-red-700 text-xs mt-0.5">
+                    Este trámite ya fue programado {reprogramCount} veces con el mismo técnico. Comunicar al supervisor.
+                  </p>
+                </div>
+              )}
+              {reprogramCount >= 3 && reprogramCount < 5 && (
+                <div className="rounded-xl border-2 border-amber-300 bg-amber-50 px-4 py-3 text-sm">
+                  <p className="font-bold text-amber-800">🟠 Reprogramación frecuente ({reprogramCount}x)</p>
+                  <p className="text-amber-700 text-xs mt-0.5">
+                    Este trámite ya fue programado {reprogramCount} veces con el mismo técnico. Verificar con el cliente.
+                  </p>
+                </div>
+              )}
             </label>
 
             <label className="grid gap-2">

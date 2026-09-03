@@ -15,6 +15,7 @@ export type PlannerUser = {
   id: string;
   name: string;
   pin: string;
+  areaId?: AreaId; // si se define, solo ve los técnicos de esa área
 };
 
 export type TechnicianOption = {
@@ -75,7 +76,7 @@ type PersistedState = {
 export const plannerUsers: PlannerUser[] = [
   { id: "wayra",     name: "WAYRA",     pin: "1111" },
   { id: "jaqueline", name: "JAQUELINE", pin: "2222" },
-  { id: "tunari",    name: "TUNARI",    pin: "3333" },
+  { id: "tunari",    name: "TUNARI",    pin: "3333", areaId: "tunari" },
 ];
 
 export const areas: Area[] = [
