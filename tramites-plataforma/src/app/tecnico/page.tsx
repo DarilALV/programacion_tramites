@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect, useRef } from "react";
 import { AppShell } from "@/components/app-shell";
+import { ToastAlert } from "@/components/toast-alert";
 import { technicians, useTramitesStore } from "@/lib/tramites-store";
 import { getServerNow } from "@/lib/server-time";
 
@@ -56,6 +57,8 @@ export default function AgendaTecnicoPage() {
   const [pinError, setPinError] = useState(false);
   const [reportePeriodo, setReportePeriodo] = useState<"dia" | "semana" | "mes">("dia");
   const [notifAllowed, setNotifAllowed] = useState(false);
+  const [toastShow, setToastShow] = useState(false);
+  const [toastMessage, setToastMessage] = useState("");
 
   const currentTechnician = technicians.find((t) => t.id === currentTechnicianId);
   const today = new Date().toISOString().slice(0, 10);
@@ -109,14 +112,18 @@ export default function AgendaTecnicoPage() {
       const key = `${e.id}-arrived`;
       if (!knownIdsRef.current.has(key) && e.followUp?.arrivalTime) {
         if (knownIdsRef.current.size > 0) {
-          notifyBrowser("🚶 Cliente llegó", `Trámite ${e.tramiteCode} — ${e.followUp.clientName ?? "sin nombre"} llegó a las ${e.followUp.arrivalTime}`);
+          notifyBrowser("🚶 Cliente llegó", `Trámite ${e.tramiteCode} — ${e.followUp.clientName ?? "sin nombre"}`);
+          setToastMessage(`🚶 ${e.followUp.clientName ?? "Cliente"} llegó\nTrámite ${e.tramiteCode}`);
+          setToastShow(true);
         }
         knownIdsRef.current.add(key);
       }
       const keyReg = `${e.id}-regreso`;
       if (!knownIdsRef.current.has(keyReg) && e.followUp?.followUpStatus === "regreso") {
         if (knownIdsRef.current.size > 0) {
-          notifyBrowser("↩️ Cliente regresó", `Trámite ${e.tramiteCode} — ${e.followUp.clientName ?? "sin nombre"} regresó`);
+          notifyBrowser("↩️ Cliente regresó", `Trámite ${e.tramiteCode} — ${e.followUp.clientName ?? "sin nombre"}`);
+          setToastMessage(`↩️ ${e.followUp.clientName ?? "Cliente"} regresó\nTrámite ${e.tramiteCode}`);
+          setToastShow(true);
         }
         knownIdsRef.current.add(keyReg);
       }
@@ -355,6 +362,12 @@ export default function AgendaTecnicoPage() {
 
   return (
     <AppShell title="Mi Agenda de Atención" description="Ver trámites programados y gestionar el workflow de atención" eyebrow="TÉCNICO">
+      <ToastAlert
+        show={toastShow}
+        title="🚨 CLIENTE ESPERANDO"
+        message={toastMessage}
+        onDismiss={() => setToastShow(false)}
+      />
       <div className="space-y-6">
 
         {/* ── HEADER CON LOGOUT ── */}
@@ -437,7 +450,7 @@ export default function AgendaTecnicoPage() {
                   st === "regreso"      ? "bg-yellow-50 border-yellow-400" :
                   st === "no-escucho"   ? "bg-orange-50 border-orange-300" :
                   st === "en-revision"  ? "bg-indigo-50 border-indigo-300" :
-                  st === "esperando"    ? "bg-red-50 border-red-400" :
+                  st === "esperando"    ? "bg-red-100 border-red-500 animate-pulse" :
                   "bg-white border-gray-200";
 
                 const esperaMinutos = fu?.arrivalTime ? minDiff(fu.arrivalTime, fu.completedTime) : null;
