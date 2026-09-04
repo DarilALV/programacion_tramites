@@ -11,10 +11,13 @@ export type Area = {
   people: string[];
 };
 
+export type UserRole = "registrador" | "supervisor" | "tecnico";
+
 export type PlannerUser = {
   id: string;
   name: string;
   pin: string;
+  role?: UserRole; // "registrador" (default), "supervisor", "tecnico"
   areaId?: AreaId; // si se define, solo ve los técnicos de esa área
 };
 
@@ -75,9 +78,10 @@ type PersistedState = {
 };
 
 export const plannerUsers: PlannerUser[] = [
-  { id: "wayra",     name: "WAYRA",     pin: "1111" },
-  { id: "jaqueline", name: "JAQUELINE", pin: "2222" },
-  { id: "tunari",    name: "TUNARI",    pin: "3333", areaId: "tunari" },
+  { id: "wayra",     name: "WAYRA",     pin: "1111", role: "registrador" },
+  { id: "jaqueline", name: "JAQUELINE", pin: "2222", role: "registrador" },
+  { id: "tunari",    name: "TUNARI",    pin: "3333", areaId: "tunari", role: "registrador" },
+  { id: "roly",      name: "ROLY",      pin: "4444", role: "supervisor" },
 ];
 
 export const areas: Area[] = [
