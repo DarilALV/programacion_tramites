@@ -34,8 +34,8 @@ export default function ReportesSupervisionPage() {
   const { entries, currentUser } = useTramitesStore();
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
   const [periodo, setPeriodo] = useState<"dia" | "semana" | "mes">("dia");
+  const [expandedTechId, setExpandedTechId] = useState<string | null>(null);
 
-  // Solo supervisores pueden acceder
   const isSupervisor = currentUser.role === "supervisor";
 
   let from: string, to: string;
@@ -43,7 +43,7 @@ export default function ReportesSupervisionPage() {
   else if (periodo === "semana") { const r = weekRange(selectedDate); from = r.from; to = r.to; }
   else { const r = monthRange(selectedDate); from = r.from; to = r.to; }
 
-  // Datos agregados por técnico
+  // Datos agregados por técnico + detalles de trámites
   const reporteData = useMemo(() => {
     const techMap: Record<string, any> = {};
 
@@ -55,10 +55,9 @@ export default function ReportesSupervisionPage() {
         total: 0,
         completados: 0,
         noEscucho: 0,
-        esperando: 0,
-        regreso: 0,
         waitTimes: [] as number[],
         attnTimes: [] as number[],
+        tramites: [] as any[],
       };
     });
 
@@ -79,29 +78,38 @@ export default function ReportesSupervisionPage() {
           total: 0,
           completados: 0,
           noEscucho: 0,
-          esperando: 0,
-          regreso: 0,
           waitTimes: [] as number[],
           attnTimes: [] as number[],
+          tramites: [] as any[],
         };
       }
 
       const st = e.followUp.followUpStatus ?? "esperando";
       techMap[tid].total++;
 
+      const esperaMin = e.followUp.arrivalTime && e.followUp.attendedTime ? minDiff(e.followUp.arrivalTime, e.followUp.attendedTime) : null;
+      const attnMin = e.followUp.attendedTime && e.followUp.completedTime ? minDiff(e.followUp.attendedTime, e.followUp.completedTime) : null;
+
+      techMap[tid].tramites.push({
+        tramiteCode: e.tramiteCode,
+        registrationNumber: e.registrationNumber,
+        clientName: e.followUp.clientName ?? "—",
+        status: st,
+        arrivalTime: e.followUp.arrivalTime ?? "—",
+        calledTime: e.followUp.calledTime ?? "—",
+        attendedTime: e.followUp.attendedTime ?? "—",
+        completedTime: e.followUp.completedTime ?? "—",
+        returnedTime: e.followUp.returnedTime ?? "—",
+        esperaMin,
+        attnMin,
+        observations: e.followUp.observations ?? "—",
+      });
+
       if (st === "completado") {
         techMap[tid].completados++;
-        if (e.followUp.arrivalTime && e.followUp.attendedTime) {
-          const w = minDiff(e.followUp.arrivalTime, e.followUp.attendedTime);
-          if (w >= 0) techMap[tid].waitTimes.push(w);
-        }
-        if (e.followUp.attendedTime && e.followUp.completedTime) {
-          const a = minDiff(e.followUp.attendedTime, e.followUp.completedTime);
-          if (a >= 0) techMap[tid].attnTimes.push(a);
-        }
+        if (esperaMin !== null && esperaMin >= 0) techMap[tid].waitTimes.push(esperaMin);
+        if (attnMin !== null && attnMin >= 0) techMap[tid].attnTimes.push(attnMin);
       } else if (st === "no-escucho") techMap[tid].noEscucho++;
-      else if (st === "esperando") techMap[tid].esperando++;
-      else if (st === "regreso") techMap[tid].regreso++;
     });
 
     return Object.values(techMap)
@@ -121,17 +129,33 @@ export default function ReportesSupervisionPage() {
 
   async function exportarExcel() {
     const XLSX = await import("xlsx");
-    const rows = reporteData.map((t) => ({
-      Técnico: t.techName,
-      Área: t.area,
-      Total: t.total,
-      Completados: t.completados,
-      "No escuchó": t.noEscucho,
-      Esperando: t.esperando,
-      "Regresó": t.regreso,
-      "Espera promedio": fmtMin(t.avgWait),
-      "Atención promedio": fmtMin(t.avgAttn),
-    }));
+    const rows: any[] = [];
+
+    reporteData.forEach((tech) => {
+      rows.push({
+        Técnico: tech.techName,
+        Área: tech.area,
+        Total: tech.total,
+        Completados: tech.completados,
+        "No escuchó": tech.noEscucho,
+        "Espera prom.": fmtMin(tech.avgWait),
+        "Atención prom.": fmtMin(tech.avgAttn),
+      });
+
+      tech.tramites.forEach((trm: any) => {
+        rows.push({
+          Técnico: `  └─ ${trm.tramiteCode}`,
+          Área: "",
+          Total: "",
+          Completados: trm.status,
+          "No escuchó": trm.clientName,
+          "Espera prom.": `${trm.arrivalTime} → ${trm.attendedTime}`,
+          "Atención prom.": fmtMin(trm.attnMin),
+        });
+      });
+
+      rows.push({ Técnico: "", Área: "", Total: "", Completados: "", "No escuchó": "", "Espera prom.": "", "Atención prom.": "" });
+    });
 
     rows.push({
       Técnico: "TOTAL",
@@ -139,14 +163,11 @@ export default function ReportesSupervisionPage() {
       Total: totales.total,
       Completados: totales.completados,
       "No escuchó": totales.noEscucho,
-      Esperando: 0,
-      Regresó: 0,
-      "Espera promedio": "",
-      "Atención promedio": "",
+      "Espera prom.": "",
+      "Atención prom.": "",
     });
 
     const ws = XLSX.utils.json_to_sheet(rows);
-    ws["!cols"] = [{ wch: 15 }, { wch: 15 }, { wch: 8 }, { wch: 12 }, { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 15 }, { wch: 15 }];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Reporte");
     XLSX.writeFile(wb, `reporte-supervision-${periodo}-${selectedDate}.xlsx`);
@@ -164,7 +185,7 @@ export default function ReportesSupervisionPage() {
   }
 
   return (
-    <AppShell title="Reportes de Supervisión" description="Resumen de desempeño de todos los técnicos" eyebrow="SUPERVISIÓN">
+    <AppShell title="Reportes de Supervisión" description="Resumen detallado de desempeño de todos los técnicos" eyebrow="SUPERVISIÓN">
       <div className="space-y-6">
 
         {/* Filtros */}
@@ -193,7 +214,7 @@ export default function ReportesSupervisionPage() {
           </div>
         </section>
 
-        {/* Resumen rápido */}
+        {/* Resumen */}
         <div className="grid grid-cols-3 gap-4">
           {[
             { label: "Total atendidos", value: totales.completados, color: "green" },
@@ -207,49 +228,93 @@ export default function ReportesSupervisionPage() {
           ))}
         </div>
 
-        {/* Tabla de técnicos */}
+        {/* Tabla expandible */}
         <section className="rounded-4xl border-2 border-blue-200 overflow-hidden">
           <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-4">
-            <h2 className="text-2xl font-bold">Desempeño por Técnico</h2>
+            <h2 className="text-2xl font-bold">Desempeño por Técnico (Click para expandir)</h2>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-100 border-b-2 border-gray-300">
-                <tr>
-                  <th className="px-4 py-3 text-left font-bold">Técnico</th>
-                  <th className="px-4 py-3 text-left font-bold">Área</th>
-                  <th className="px-4 py-3 text-center font-bold">Total</th>
-                  <th className="px-4 py-3 text-center font-bold">✅ Completados</th>
-                  <th className="px-4 py-3 text-center font-bold">🔇 No escuchó</th>
-                  <th className="px-4 py-3 text-center font-bold">⏳ Esperando</th>
-                  <th className="px-4 py-3 text-center font-bold">↩️ Regresó</th>
-                  <th className="px-4 py-3 text-center font-bold">Espera prom.</th>
-                  <th className="px-4 py-3 text-center font-bold">Atención prom.</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {reporteData.map((t) => (
-                  <tr key={t.techId} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 font-semibold">{t.techName}</td>
-                    <td className="px-4 py-3 text-gray-600">{t.area}</td>
-                    <td className="px-4 py-3 text-center font-bold">{t.total}</td>
-                    <td className="px-4 py-3 text-center text-green-700 font-bold">{t.completados}</td>
-                    <td className="px-4 py-3 text-center text-red-700 font-bold">{t.noEscucho}</td>
-                    <td className="px-4 py-3 text-center text-gray-600">{t.esperando}</td>
-                    <td className="px-4 py-3 text-center text-yellow-600">{t.regreso}</td>
-                    <td className="px-4 py-3 text-center text-blue-700">{fmtMin(t.avgWait)}</td>
-                    <td className="px-4 py-3 text-center text-purple-700">{fmtMin(t.avgAttn)}</td>
-                  </tr>
-                ))}
-                <tr className="bg-gray-100 font-bold border-t-2 border-gray-300">
-                  <td colSpan={2} className="px-4 py-3">TOTAL</td>
-                  <td className="px-4 py-3 text-center">{totales.total}</td>
-                  <td className="px-4 py-3 text-center text-green-700">{totales.completados}</td>
-                  <td className="px-4 py-3 text-center text-red-700">{totales.noEscucho}</td>
-                  <td colSpan={4} className="px-4 py-3"></td>
-                </tr>
-              </tbody>
-            </table>
+          <div className="divide-y divide-gray-200">
+            {reporteData.map((tech) => (
+              <div key={tech.techId}>
+                {/* Fila resumen clickeable */}
+                <button
+                  onClick={() => setExpandedTechId(expandedTechId === tech.techId ? null : tech.techId)}
+                  className="w-full px-6 py-4 bg-gray-50 hover:bg-gray-100 transition text-left flex items-center justify-between cursor-pointer"
+                >
+                  <div className="flex items-center gap-4 flex-1">
+                    <span className={`text-xl ${expandedTechId === tech.techId ? "rotate-90" : ""} transition`}>▶</span>
+                    <div>
+                      <p className="font-bold text-gray-800">{tech.techName}</p>
+                      <p className="text-xs text-gray-600">{tech.area}</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-6 text-sm font-semibold">
+                    <span>📋 Total: {tech.total}</span>
+                    <span className="text-green-700">✅ Completados: {tech.completados}</span>
+                    <span className="text-red-700">🔇 No escuchó: {tech.noEscucho}</span>
+                  </div>
+                </button>
+
+                {/* Detalles expandidos */}
+                {expandedTechId === tech.techId && (
+                  <div className="bg-white p-6">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs">
+                        <thead className="bg-gray-100 border-b">
+                          <tr>
+                            <th className="px-3 py-2 text-left font-bold">Trámite</th>
+                            <th className="px-3 py-2 text-left font-bold">Cliente</th>
+                            <th className="px-3 py-2 text-left font-bold">Estado</th>
+                            <th className="px-3 py-2 text-center font-bold">Llegada</th>
+                            <th className="px-3 py-2 text-center font-bold">Llamó</th>
+                            <th className="px-3 py-2 text-center font-bold">Atendido</th>
+                            <th className="px-3 py-2 text-center font-bold">Terminó</th>
+                            <th className="px-3 py-2 text-center font-bold">Espera</th>
+                            <th className="px-3 py-2 text-center font-bold">Atención</th>
+                            <th className="px-3 py-2 text-left font-bold">Obs.</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y">
+                          {tech.tramites.map((trm: any, idx: number) => (
+                            <tr key={idx} className="hover:bg-gray-50">
+                              <td className="px-3 py-2 font-mono font-bold">{trm.tramiteCode}</td>
+                              <td className="px-3 py-2">{trm.clientName}</td>
+                              <td className="px-3 py-2">
+                                <span className={`px-2 py-1 rounded text-xs font-bold ${
+                                  trm.status === "completado" ? "bg-green-100 text-green-800" :
+                                  trm.status === "no-escucho" ? "bg-red-100 text-red-800" :
+                                  trm.status === "regreso" ? "bg-yellow-100 text-yellow-800" :
+                                  "bg-gray-100 text-gray-800"
+                                }`}>
+                                  {trm.status}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2 text-center text-blue-700">{trm.arrivalTime}</td>
+                              <td className="px-3 py-2 text-center text-purple-700">{trm.calledTime}</td>
+                              <td className="px-3 py-2 text-center text-blue-700">{trm.attendedTime}</td>
+                              <td className="px-3 py-2 text-center text-green-700 font-bold">{trm.completedTime}</td>
+                              <td className="px-3 py-2 text-center font-semibold">{fmtMin(trm.esperaMin)}</td>
+                              <td className="px-3 py-2 text-center font-semibold">{fmtMin(trm.attnMin)}</td>
+                              <td className="px-3 py-2 text-gray-600 max-w-xs truncate">{trm.observations}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {/* Total */}
+            <div className="bg-gray-100 px-6 py-4 font-bold flex justify-between">
+              <span>TOTAL</span>
+              <div className="flex gap-6 text-sm">
+                <span>📋 {totales.total}</span>
+                <span className="text-green-700">✅ {totales.completados}</span>
+                <span className="text-red-700">🔇 {totales.noEscucho}</span>
+              </div>
+            </div>
           </div>
         </section>
       </div>
