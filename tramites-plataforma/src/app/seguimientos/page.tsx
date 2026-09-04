@@ -28,12 +28,11 @@ function techColor(count: number): { dot: string; bar: string; label: string } {
 
 type EditState = { clientName: string; technicianId: string; observations: string };
 type FormMode = "tecnico" | "interna";
-type GestionInterna = "Archivos" | "RAM" | "Firma de Jefatura" | "Firma Secretaria";
+type GestionInterna = "RAM" | "Firma de Jefatura" | "Firma Secretaria";
 
-const GESTIONES_INTERNAS: GestionInterna[] = ["Archivos", "RAM", "Firma de Jefatura", "Firma Secretaria"];
+const GESTIONES_INTERNAS: GestionInterna[] = ["RAM", "Firma de Jefatura", "Firma Secretaria"];
 
 const GESTION_COLOR: Record<GestionInterna, { bg: string; badge: string; dot: string }> = {
-  "Archivos":            { bg: "bg-gray-50 border-gray-300",   badge: "bg-gray-100 text-gray-800",   dot: "📋" },
   "RAM":                 { bg: "bg-blue-50 border-blue-300",   badge: "bg-blue-100 text-blue-800",   dot: "🗂️" },
   "Firma de Jefatura":   { bg: "bg-violet-50 border-violet-300", badge: "bg-violet-100 text-violet-800", dot: "✍️" },
   "Firma Secretaria":    { bg: "bg-teal-50 border-teal-300",   badge: "bg-teal-100 text-teal-800",   dot: "📝" },
