@@ -70,6 +70,7 @@ export type EntryFormValues = {
 
 type PersistedState = {
   currentUserId: string;
+  currentTechnicianId?: string;
   entries: Entry[];
 };
 
@@ -622,11 +623,17 @@ export function useTramitesStore() {
   const [hydrated, setHydrated] = useState(false);
   const [entries, setEntries] = useState<Entry[]>(seedEntries);
   const [currentUserId, setCurrentUserId] = useState(plannerUsers[0].id);
+  const [currentTechnicianId, setCurrentTechnicianId] = useState<string | undefined>(undefined);
 
 useEffect(() => {
   const savedUserId = localStorage.getItem('currentUserId');
   if (savedUserId && plannerUsers.some(u => u.id === savedUserId)) {
     setCurrentUserId(savedUserId);
+  }
+
+  const savedTechnicianId = localStorage.getItem('currentTechnicianId');
+  if (savedTechnicianId && technicians.some(t => t.id === savedTechnicianId)) {
+    setCurrentTechnicianId(savedTechnicianId);
   }
 
   let unsubscribe: (() => void) | undefined;
@@ -674,9 +681,9 @@ useEffect(() => {
 
     window.localStorage.setItem(
       storageKey,
-      JSON.stringify({ currentUserId, entries } satisfies PersistedState),
+      JSON.stringify({ currentUserId, currentTechnicianId, entries } satisfies PersistedState),
     );
-  }, [currentUserId, entries, hydrated]);
+  }, [currentUserId, currentTechnicianId, entries, hydrated]);
 
   const currentUser = useMemo(
     () => plannerUsers.find((user) => user.id === currentUserId) ?? plannerUsers[0],
@@ -832,5 +839,14 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
     updateEntry,
     removeEntry,
     resetDemo,
+    currentTechnicianId,
+    loginTechnician: (technicianId: string) => {
+      setCurrentTechnicianId(technicianId);
+      localStorage.setItem('currentTechnicianId', technicianId);
+    },
+    logoutTechnician: () => {
+      setCurrentTechnicianId(undefined);
+      localStorage.removeItem('currentTechnicianId');
+    },
   };
 }

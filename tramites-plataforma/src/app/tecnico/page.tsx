@@ -49,14 +49,39 @@ const STATUS_LABEL: Record<FollowUpStatus, string> = {
 };
 
 export default function AgendaTecnicoPage() {
-  const { entries, updateEntry } = useTramitesStore();
+  const { entries, updateEntry, currentTechnicianId, loginTechnician, logoutTechnician } = useTramitesStore();
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
-  const [selectedTechnicianId, setSelectedTechnicianId] = useState(technicians[0].id);
+  const [pinInput, setPinInput] = useState("");
+  const [pinError, setPinError] = useState(false);
   const [reportePeriodo, setReportePeriodo] = useState<"dia" | "semana" | "mes">("dia");
   const [notifAllowed, setNotifAllowed] = useState(false);
 
-  const selectedTechnician = technicians.find((t) => t.id === selectedTechnicianId) ?? technicians[0];
+  const currentTechnician = technicians.find((t) => t.id === currentTechnicianId);
   const today = new Date().toISOString().slice(0, 10);
+
+  // Si no hay técnico logged in, mostrar login modal
+  const showLoginModal = !currentTechnicianId;
+
+  function handlePinDigit(digit: string) {
+    if (pinInput.length >= 4) return;
+    const next = pinInput + digit;
+    setPinInput(next);
+    if (next.length === 4) {
+      setTimeout(() => verifyPin(next), 80);
+    }
+  }
+
+  function verifyPin(pin: string) {
+    const tech = technicians.find((t) => t.id === pinInput.slice(0, pinInput.length - 4 + pin.length));
+    if (tech && pin === "0000") { // PIN maestro para demo (o vincular a técnico)
+      loginTechnician(tech.id);
+      setPinInput("");
+      setPinError(false);
+    } else {
+      setPinError(true);
+      setPinInput("");
+    }
+  }
 
   // Request notification permission on mount
   useEffect(() => {
@@ -75,8 +100,9 @@ export default function AgendaTecnicoPage() {
   const knownIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
+    if (!currentTechnicianId) return;
     const techEntries = entries.filter((e) => {
-      const isThisTech = e.technicianId === selectedTechnicianId || e.followUp?.actualTechnicianId === selectedTechnicianId;
+      const isThisTech = e.technicianId === currentTechnicianId || e.followUp?.actualTechnicianId === currentTechnicianId;
       const isToday = e.scheduleDate === today || e.followUp?.createdAt?.startsWith(today);
       return isThisTech && isToday && e.followUp;
     });
@@ -96,42 +122,44 @@ export default function AgendaTecnicoPage() {
         knownIdsRef.current.add(keyReg);
       }
     });
-    // seed on first load
     if (knownIdsRef.current.size === 0) {
       techEntries.forEach((e) => {
         if (e.followUp?.arrivalTime) knownIdsRef.current.add(`${e.id}-arrived`);
         if (e.followUp?.followUpStatus === "regreso") knownIdsRef.current.add(`${e.id}-regreso`);
       });
     }
-  }, [entries, selectedTechnicianId, today]);
+  }, [entries, currentTechnicianId, today]);
 
-  const agendaHoy = useMemo(() => entries
-    .filter((e) => {
-      const isThisDate = e.scheduleDate === selectedDate;
-      const isThisTech = e.technicianId === selectedTechnicianId;
-      const isActualTech = e.followUp?.actualTechnicianId === selectedTechnicianId && e.followUp?.createdAt?.startsWith(selectedDate);
-      return (isThisDate && isThisTech) || isActualTech;
-    })
-    .sort((a, b) => {
-      const ta = a.scheduledTime ?? a.followUp?.arrivalTime ?? "00:00";
-      const tb = b.scheduledTime ?? b.followUp?.arrivalTime ?? "00:00";
-      return ta.localeCompare(tb);
-    }),
-    [entries, selectedDate, selectedTechnicianId]);
+  const agendaHoy = useMemo(() => {
+    if (!currentTechnicianId) return [];
+    return entries
+      .filter((e) => {
+        const isThisDate = e.scheduleDate === selectedDate;
+        const isThisTech = e.technicianId === currentTechnicianId;
+        const isActualTech = e.followUp?.actualTechnicianId === currentTechnicianId && e.followUp?.createdAt?.startsWith(selectedDate);
+        return (isThisDate && isThisTech) || isActualTech;
+      })
+      .sort((a, b) => {
+        const ta = a.scheduledTime ?? a.followUp?.arrivalTime ?? "00:00";
+        const tb = b.scheduledTime ?? b.followUp?.arrivalTime ?? "00:00";
+        return ta.localeCompare(tb);
+      });
+  }, [entries, selectedDate, currentTechnicianId]);
 
-  // Report data — entries for selected tech across date range
+  // Report data
   const reportEntries = useMemo(() => {
+    if (!currentTechnicianId) return [];
     let from: string, to: string;
     if (reportePeriodo === "dia") { from = to = selectedDate; }
     else if (reportePeriodo === "semana") { const r = weekRange(selectedDate); from = r.from; to = r.to; }
     else { const r = monthRange(selectedDate); from = r.from; to = r.to; }
 
     return entries.filter((e) => {
-      const isThisTech = e.technicianId === selectedTechnicianId || e.followUp?.actualTechnicianId === selectedTechnicianId;
+      const isThisTech = e.technicianId === currentTechnicianId || e.followUp?.actualTechnicianId === currentTechnicianId;
       const d = e.scheduleDate ?? e.followUp?.createdAt?.slice(0, 10) ?? "";
       return isThisTech && d >= from && d <= to && e.followUp;
     });
-  }, [entries, selectedTechnicianId, selectedDate, reportePeriodo]);
+  }, [entries, currentTechnicianId, selectedDate, reportePeriodo]);
 
   const reportStats = useMemo(() => {
     const completados = reportEntries.filter((e) => e.followUp?.completedTime);
@@ -151,7 +179,6 @@ export default function AgendaTecnicoPage() {
     };
   }, [reportEntries]);
 
-  // El técnico solo marca 3 momentos clave desde su despacho
   async function marcarRevisando(entryId: string) {
     const entry = entries.find((e) => e.id === entryId);
     if (!entry?.followUp) return;
@@ -166,8 +193,6 @@ export default function AgendaTecnicoPage() {
   }
 
   async function marcarLeAtendi(entryId: string) {
-    // Técnico regresó al despacho habiendo atendido al cliente
-    // attendedTime = calledTime (salió a llamar), completedTime = ahora
     const entry = entries.find((e) => e.id === entryId);
     if (!entry?.followUp) return;
     const { time } = await getServerNow();
@@ -189,7 +214,6 @@ export default function AgendaTecnicoPage() {
   }
 
   async function marcarTermineDeAtender(entryId: string) {
-    // Para el caso regreso: técnico fue a atenderlo y terminó
     const entry = entries.find((e) => e.id === entryId);
     if (!entry?.followUp) return;
     const { time } = await getServerNow();
@@ -211,7 +235,7 @@ export default function AgendaTecnicoPage() {
       const wait = fu.arrivalTime && fu.attendedTime ? minDiff(fu.arrivalTime, fu.attendedTime) : "";
       const attn = fu.attendedTime && fu.completedTime ? minDiff(fu.attendedTime, fu.completedTime) : "";
       return {
-        Fecha: e.scheduleDate, Técnico: selectedTechnician.name,
+        Fecha: e.scheduleDate, Técnico: currentTechnician?.name ?? "",
         "Trámite": e.tramiteCode, "Registro": e.registrationNumber,
         "Sin programación": fu.isUnscheduled ? "Sí" : "No",
         "Cliente": fu.clientName ?? "", "Llegó": fu.arrivalTime ?? "",
@@ -225,7 +249,7 @@ export default function AgendaTecnicoPage() {
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Reporte");
-    XLSX.writeFile(wb, `reporte-${selectedTechnician.name.replace(/\s/g, "_")}-${reportePeriodo}-${selectedDate}.xlsx`);
+    XLSX.writeFile(wb, `reporte-${currentTechnician?.name.replace(/\s/g, "_")}-${reportePeriodo}-${selectedDate}.xlsx`);
   }
 
   const arrivedNow = agendaHoy.filter((e) => {
@@ -233,38 +257,122 @@ export default function AgendaTecnicoPage() {
     return st && ["esperando", "en-revision", "regreso"].includes(st);
   });
 
+  if (showLoginModal) {
+    return (
+      <AppShell title="Mi Agenda de Atención" description="Acceso técnico" eyebrow="TÉCNICO">
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <div className="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-sm mx-4 space-y-6">
+            <div className="text-center">
+              <p className="text-xs font-semibold uppercase tracking-widest text-gray-500">Ingreso</p>
+              <h3 className="text-2xl font-bold mt-1">Técnico</h3>
+              <p className="text-sm text-gray-500 mt-1">Selecciona tu nombre e ingresa tu PIN</p>
+            </div>
+
+            <label className="grid gap-2">
+              <span className="text-sm font-semibold text-gray-700">Tu nombre</span>
+              <select
+                onChange={(e) => {
+                  setPinInput(e.target.value);
+                  setPinError(false);
+                }}
+                className="rounded-lg border-2 border-pink-300 px-4 py-3 focus:border-pink-500 focus:outline-none bg-white font-semibold"
+              >
+                <option value="">— Selecciona tu nombre —</option>
+                {technicians.map((t) => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+            </label>
+
+            {/* Indicador de puntos */}
+            {pinInput && (
+              <div className="flex justify-center gap-4">
+                {[0, 1, 2, 3].map((i) => (
+                  <div
+                    key={i}
+                    className={`w-5 h-5 rounded-full transition-all duration-150 ${
+                      pinInput.length > i
+                        ? pinError ? "bg-red-500 scale-110" : "bg-pink-600 scale-110"
+                        : "bg-gray-200"
+                    }`}
+                  />
+                ))}
+              </div>
+            )}
+
+            {pinError && (
+              <p className="text-center text-sm text-red-600 font-semibold animate-pulse">
+                PIN incorrecto — inténtalo de nuevo
+              </p>
+            )}
+
+            {/* Teclado numérico */}
+            {pinInput && (
+              <div className="grid grid-cols-3 gap-3">
+                {["1","2","3","4","5","6","7","8","9","","0","⌫"].map((d, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    disabled={!d}
+                    onClick={() => {
+                      if (d === "⌫") { setPinInput((p) => p.slice(0, -1)); setPinError(false); }
+                      else if (d) handlePinDigit(d);
+                    }}
+                    className={`h-14 rounded-xl text-xl font-bold transition select-none ${
+                      !d ? "pointer-events-none" :
+                      d === "⌫"
+                        ? "bg-gray-100 hover:bg-gray-200 text-gray-600 cursor-pointer"
+                        : "bg-pink-50 hover:bg-pink-100 active:bg-pink-200 text-pink-900 cursor-pointer"
+                    }`}
+                  >
+                    {d}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <p className="text-xs text-gray-400 text-center">PIN: 0000 (demo)</p>
+          </div>
+        </div>
+      </AppShell>
+    );
+  }
+
   return (
     <AppShell title="Mi Agenda de Atención" description="Ver trámites programados y gestionar el workflow de atención" eyebrow="TÉCNICO">
       <div className="space-y-6">
 
+        {/* ── HEADER CON LOGOUT ── */}
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <h2 className="text-2xl font-bold">Bienvenido, {currentTechnician?.name}</h2>
+            <p className="text-sm text-gray-500">{currentTechnician?.areaLabel}</p>
+          </div>
+          <button
+            onClick={() => logoutTechnician()}
+            className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold rounded-lg cursor-pointer"
+          >
+            🚪 Cerrar sesión
+          </button>
+        </div>
+
         {/* ── FILTROS ── */}
         <section className="rounded-4xl border-2 border-pink-200 bg-pink-50 p-6 space-y-4">
           <div className="flex items-center justify-between flex-wrap gap-3">
-            <h3 className="text-lg font-bold text-gray-800">Filtros</h3>
+            <h3 className="text-lg font-bold text-gray-800">Mi Agenda</h3>
             {!notifAllowed && "Notification" in (typeof window !== "undefined" ? window : {}) && (
               <button onClick={() => Notification.requestPermission().then((p) => setNotifAllowed(p === "granted"))}
                 className="text-xs bg-amber-100 text-amber-800 border border-amber-300 px-3 py-1.5 rounded-lg cursor-pointer hover:bg-amber-200">
-                🔔 Activar notificaciones de escritorio
+                🔔 Activar notificaciones
               </button>
             )}
             {notifAllowed && <span className="text-xs text-green-700 font-semibold">🔔 Notificaciones activas</span>}
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <label className="grid gap-2">
-              <span className="text-sm font-semibold text-gray-700">Técnico</span>
-              <select value={selectedTechnicianId} onChange={(e) => setSelectedTechnicianId(e.target.value)}
-                className="rounded-lg border-2 border-pink-300 px-4 py-3 focus:border-pink-500 focus:outline-none bg-white font-semibold">
-                {technicians.map((tech) => (
-                  <option key={tech.id} value={tech.id}>{tech.name} · {tech.areaLabel}</option>
-                ))}
-              </select>
-            </label>
-            <label className="grid gap-2">
-              <span className="text-sm font-semibold text-gray-700">Fecha</span>
-              <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)}
-                className="rounded-lg border-2 border-pink-300 px-4 py-3 focus:border-pink-500 focus:outline-none" />
-            </label>
-          </div>
+          <label className="grid gap-2">
+            <span className="text-sm font-semibold text-gray-700">Fecha</span>
+            <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)}
+              className="rounded-lg border-2 border-pink-300 px-4 py-3 focus:border-pink-500 focus:outline-none w-full md:w-48" />
+          </label>
         </section>
 
         {/* ── ALERTA: CLIENTES QUE ESPERAN ── */}
@@ -293,7 +401,7 @@ export default function AgendaTecnicoPage() {
         {/* ── AGENDA ── */}
         <section className="rounded-4xl border-2 border-pink-200 overflow-hidden">
           <div className="bg-gradient-to-r from-pink-600 to-purple-600 text-white px-6 py-4 flex items-center justify-between gap-4 flex-wrap">
-            <h2 className="text-2xl font-bold">Agenda — {selectedTechnician.name}</h2>
+            <h2 className="text-2xl font-bold">Agenda — {selectedDate}</h2>
             <div className="flex items-center gap-3 text-sm">
               <span>📋 {agendaHoy.length} trámites</span>
               <span>✅ {agendaHoy.filter((e) => e.followUp?.followUpStatus === "completado").length} completados</span>
@@ -341,10 +449,10 @@ export default function AgendaTecnicoPage() {
                         <p className="text-xs text-gray-500 uppercase mb-1">Cliente</p>
                         <p className="font-semibold">{fu?.clientName ?? "—"}</p>
                         {fu?.arrivalTime && <p className="text-xs text-pink-700 font-semibold mt-1">📍 Llegó: {fu.arrivalTime}</p>}
-                        {fu?.calledTime && <p className="text-xs text-purple-700">📣 Salió a llamar: {fu.calledTime}</p>}
-                        {fu?.returnedTime && <p className="text-xs text-yellow-700">↩️ Cliente regresó: {fu.returnedTime}</p>}
+                        {fu?.calledTime && <p className="text-xs text-purple-700">📣 Salí: {fu.calledTime}</p>}
+                        {fu?.returnedTime && <p className="text-xs text-yellow-700">↩️ Regresé: {fu.returnedTime}</p>}
                         {fu?.attendedTime && <p className="text-xs text-blue-700">👤 Atendido: {fu.attendedTime}</p>}
-                        {fu?.completedTime && <p className="text-xs text-green-700 font-semibold">✅ Terminó: {fu.completedTime}</p>}
+                        {fu?.completedTime && <p className="text-xs text-green-700 font-semibold">✅ Terminé: {fu.completedTime}</p>}
                       </div>
 
                       {/* Estado + métricas */}
@@ -353,30 +461,29 @@ export default function AgendaTecnicoPage() {
                         <p className="font-bold">{st ? STATUS_LABEL[st] : "🕐 Sin llegada"}</p>
                         {llamadoHaceMin !== null && llamadoHaceMin >= 0 && (
                           <p className={`text-xs mt-1 font-semibold ${llamadoHaceMin > 10 ? "text-red-600" : "text-purple-700"}`}>
-                            Salió hace {fmtMin(llamadoHaceMin)}
+                            Salí hace {fmtMin(llamadoHaceMin)}
                           </p>
                         )}
                         {st === "completado" && esperaMinutos !== null && (
                           <div className="mt-1 space-y-0.5">
-                            <p className="text-xs text-gray-500">Espera total: <strong>{fmtMin(esperaMinutos)}</strong></p>
+                            <p className="text-xs text-gray-500">Espera: <strong>{fmtMin(esperaMinutos)}</strong></p>
                             {atencionMinutos !== null && <p className="text-xs text-gray-500">Atención: <strong>{fmtMin(atencionMinutos)}</strong></p>}
                           </div>
                         )}
                       </div>
 
-                      {/* ── ACCIONES (solo 2-3 botones clave) ── */}
+                      {/* ── ACCIONES ── */}
                       <div className="flex flex-col gap-2">
                         {!fu && (
-                          <p className="text-xs text-gray-400 italic">Sin llegada registrada en seguimientos</p>
+                          <p className="text-xs text-gray-400 italic">Sin llegada registrada</p>
                         )}
 
-                        {/* DESPACHO: llegó aviso → puede revisar o salir directo */}
                         {(st === "esperando" || st === "en-revision") && (
                           <>
                             {st === "esperando" && (
                               <button onClick={() => marcarRevisando(entry.id)}
                                 className="px-3 py-2 bg-indigo-100 text-indigo-800 text-xs font-bold rounded-lg hover:bg-indigo-200 cursor-pointer border border-indigo-300">
-                                📋 Revisando expediente
+                                📋 Revisando
                               </button>
                             )}
                             <button onClick={() => marcarSaliALlamar(entry.id)}
@@ -386,13 +493,12 @@ export default function AgendaTecnicoPage() {
                           </>
                         )}
 
-                        {/* REGRESÓ AL DESPACHO: ¿lo atendió o no respondió? */}
                         {st === "llamado" && (
                           <div className="space-y-2">
-                            <p className="text-xs text-gray-500 font-semibold uppercase">Al regresar al despacho:</p>
+                            <p className="text-xs text-gray-500 font-semibold">Al regresar:</p>
                             <button onClick={() => marcarLeAtendi(entry.id)}
                               className="w-full px-3 py-2 bg-green-600 text-white text-sm font-bold rounded-lg hover:bg-green-700 cursor-pointer shadow">
-                              ✅ Lo atendí — terminé
+                              ✅ Lo atendí
                             </button>
                             <button onClick={() => marcarNoRespondio(entry.id)}
                               className="w-full px-3 py-2 bg-orange-500 text-white text-sm font-bold rounded-lg hover:bg-orange-600 cursor-pointer shadow">
@@ -401,29 +507,26 @@ export default function AgendaTecnicoPage() {
                           </div>
                         )}
 
-                        {/* NO ESCUCHÓ: esperar que seguimientos marque regreso */}
                         {st === "no-escucho" && (
                           <div className="rounded-lg bg-orange-50 border border-orange-200 p-3">
-                            <p className="text-xs text-orange-800 font-semibold">⏳ Esperando que el cliente regrese</p>
-                            <p className="text-xs text-orange-600 mt-1">Ventanilla notificará cuando llegue</p>
+                            <p className="text-xs text-orange-800 font-semibold">⏳ Esperando regreso</p>
                           </div>
                         )}
 
-                        {/* CLIENTE REGRESÓ: el técnico va y atiende — solo marca cuando termina */}
                         {st === "regreso" && (
                           <div className="space-y-2">
                             <div className="rounded-lg bg-yellow-50 border border-yellow-300 p-2">
-                              <p className="text-xs text-yellow-800 font-semibold">↩️ Cliente regresó a ventanilla</p>
+                              <p className="text-xs text-yellow-800 font-semibold">↩️ Regresó</p>
                             </div>
                             <button onClick={() => marcarTermineDeAtender(entry.id)}
                               className="w-full px-3 py-2 bg-green-600 text-white text-sm font-bold rounded-lg hover:bg-green-700 cursor-pointer shadow">
-                              ✅ Terminé de atender
+                              ✅ Terminé
                             </button>
                           </div>
                         )}
 
                         {st === "completado" && (
-                          <span className="text-sm text-green-700 font-bold">✓ Atención finalizada</span>
+                          <span className="text-sm text-green-700 font-bold">✓ Finalizado</span>
                         )}
                       </div>
                     </div>
@@ -441,7 +544,7 @@ export default function AgendaTecnicoPage() {
         {/* ── REPORTES ── */}
         <section className="rounded-4xl border-2 border-pink-200 p-6 space-y-4">
           <div className="flex items-center justify-between flex-wrap gap-3">
-            <h2 className="text-2xl font-bold">Reportes</h2>
+            <h2 className="text-2xl font-bold">Mis Reportes</h2>
             <div className="flex gap-2 flex-wrap">
               {(["dia", "semana", "mes"] as const).map((p) => (
                 <button key={p} onClick={() => setReportePeriodo(p)}
@@ -458,15 +561,9 @@ export default function AgendaTecnicoPage() {
             </div>
           </div>
 
-          {reportePeriodo !== "dia" && (
-            <p className="text-xs text-gray-500">
-              {reportePeriodo === "semana" ? (() => { const r = weekRange(selectedDate); return `Semana: ${r.from} — ${r.to}`; })() : (() => { const r = monthRange(selectedDate); return `Mes: ${r.from} — ${r.to}`; })()}
-            </p>
-          )}
-
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
             {[
-              { label: "Total seguimientos", value: reportStats.total, color: "blue" },
+              { label: "Total", value: reportStats.total, color: "blue" },
               { label: "Completados", value: reportStats.completados, color: "green" },
               { label: "No escucharon", value: reportStats.noEscucho, color: "orange" },
               { label: "Espera promedio", value: reportStats.avgEspera !== null ? fmtMin(reportStats.avgEspera) : "—", color: "purple" },
@@ -480,7 +577,7 @@ export default function AgendaTecnicoPage() {
           </div>
 
           {reportEntries.length === 0 && (
-            <p className="text-gray-500 text-sm text-center py-4">Sin seguimientos en el periodo seleccionado.</p>
+            <p className="text-gray-500 text-sm text-center py-4">Sin seguimientos en el periodo.</p>
           )}
         </section>
       </div>
