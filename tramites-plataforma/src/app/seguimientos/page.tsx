@@ -713,6 +713,9 @@ export default function SeguimientosPage() {
                                   ↩️ Regresó
                                 </button>
                               )}
+                              <button onClick={() => { setDerivingEntryId(entry.id); setDerivingToTechId(""); }} className="text-xs px-2 py-1 rounded bg-purple-500 text-white hover:bg-purple-600 cursor-pointer whitespace-nowrap">
+                                ↗️ Derivar
+                              </button>
                               <button onClick={() => handleStartEdit(entry)} className="text-xs px-2 py-1 rounded bg-blue-500 text-white hover:bg-blue-600 cursor-pointer">✏️ Editar</button>
                               <button onClick={() => setConfirmDeleteId(entry.id)} className="text-xs px-2 py-1 rounded bg-gray-300 text-gray-700 hover:bg-red-100 cursor-pointer">🗑️</button>
                             </div>
@@ -763,6 +766,77 @@ export default function SeguimientosPage() {
             </div>
           )}
         </section>
+
+        {/* ── MODAL DERIVACIÓN ── */}
+        {derivingEntryId && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 space-y-6">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-800">Derivar Trámite</h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  Reasigna este trámite a otro técnico
+                </p>
+              </div>
+
+              {/* Información del trámite */}
+              {entries.find((e) => e.id === derivingEntryId) && (() => {
+                const e = entries.find((e) => e.id === derivingEntryId)!;
+                return (
+                  <div className="rounded-xl bg-purple-50 border-2 border-purple-200 p-4">
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div>
+                        <p className="text-xs text-gray-600">Trámite</p>
+                        <p className="font-bold text-purple-900">{e.tramiteCode}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-600">Cliente</p>
+                        <p className="font-bold text-purple-900">{e.followUp?.clientName ?? "—"}</p>
+                      </div>
+                      <div className="col-span-2">
+                        <p className="text-xs text-gray-600">Técnico actual</p>
+                        <p className="font-bold text-purple-900">{e.technicianName}</p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Selector nuevo técnico */}
+              <label className="grid gap-2">
+                <span className="text-sm font-semibold text-gray-700">Nuevo Técnico *</span>
+                <select value={derivingToTechId} onChange={(e) => setDerivingToTechId(e.target.value)}
+                  className="rounded-lg border-2 border-purple-300 px-4 py-3 focus:border-purple-500 focus:outline-none bg-white">
+                  <option value="">— Selecciona técnico —</option>
+                  {availableAreas.map((area) => {
+                    const techsInArea = availableTechnicians.filter((t) => t.areaId === area.id);
+                    return (
+                      <optgroup key={area.id} label={`── ${area.label.toUpperCase()} ──`}>
+                        {techsInArea.map((t) => (
+                          <option key={t.id} value={t.id}>
+                            {t.name}
+                          </option>
+                        ))}
+                      </optgroup>
+                    );
+                  })}
+                </select>
+              </label>
+
+              {/* Botones */}
+              <div className="flex gap-3">
+                <button onClick={() => { setDerivingEntryId(null); setDerivingToTechId(""); }}
+                  className="flex-1 px-4 py-3 rounded-lg bg-gray-300 text-gray-700 font-semibold hover:bg-gray-400 cursor-pointer transition">
+                  Cancelar
+                </button>
+                <button onClick={() => handleDerivar(derivingEntryId, derivingToTechId)}
+                  disabled={!derivingToTechId}
+                  className={`flex-1 px-4 py-3 rounded-lg font-semibold transition cursor-pointer ${derivingToTechId ? "bg-purple-600 text-white hover:bg-purple-700" : "bg-gray-300 text-gray-500 cursor-not-allowed"}`}>
+                  ↗️ Derivar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </AppShell>
   );
