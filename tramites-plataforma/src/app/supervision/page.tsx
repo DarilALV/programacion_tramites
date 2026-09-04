@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { formatDate, getStatusTone, useTramitesStore } from "@/lib/tramites-store";
 import { Search, X, Info, Download, ChevronLeft, ChevronRight } from "lucide-react";
@@ -654,6 +655,16 @@ export default function TechnicianSchedulePage() {
       description="Visualiza los trámites asignados a ti organizados por fecha programada"
       eyebrow="PROGRAMACIONES"
     >
+      {/* Botón flotante a reportes de supervisión */}
+      <div className="mb-6 flex justify-end">
+        <Link
+          href="/supervision/reportes"
+          className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-3 transition cursor-pointer shadow-lg"
+        >
+          📊 Ver Reportes de Supervisión
+        </Link>
+      </div>
+
       <section className="grid gap-6">
         {/* Controles */}
         <article className="rounded-4xl border border-black/10 bg-white p-6 shadow-[0_16px_40px_rgba(26,21,12,0.08)]">
