@@ -112,14 +112,23 @@ export const areas: Area[] = [
   },
 ];
 
-export const technicians: TechnicianOption[] = areas.flatMap((area) =>
-  area.people.map((name) => ({
-    id: name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""),
-    name,
-    areaId: area.id,
-    areaLabel: area.label,
-  })),
-);
+export const technicians: TechnicianOption[] = [
+  // Área especial: Archivos (engloba RAM, Firma de Jefatura, Firma Secretaria)
+  {
+    id: "archivos",
+    name: "Archivos",
+    areaId: "archivos" as AreaId,
+    areaLabel: "Archivos",
+  },
+  ...areas.flatMap((area) =>
+    area.people.map((name) => ({
+      id: name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""),
+      name,
+      areaId: area.id,
+      areaLabel: area.label,
+    })),
+  ),
+];
 
 const storageKey = "gmc-tramites-mvp";
 

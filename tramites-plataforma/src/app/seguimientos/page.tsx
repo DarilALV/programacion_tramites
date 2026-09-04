@@ -191,12 +191,19 @@ export default function SeguimientosPage() {
     if (!selectedGestion) return showMsg("⚠️ Selecciona el tipo de gestión", "error");
 
     const { time: arrival, iso } = await getServerNow();
-    const gestionId = selectedGestion.toLowerCase().replace(/\s+/g, "-");
+
+    // Asignar a "Archivos" (que engloba RAM, Firma Jefatura, Firma Secretaria)
+    const archivosId = "archivos";
+    const archivosName = "Archivos";
+    const archivosArea = "Archivos";
 
     // Si existe el trámite en el sistema, lo actualiza; si no, crea entrada nueva
     if (foundEntry) {
       updateEntry(foundEntry.id, {
         ...foundEntry,
+        technicianId: archivosId,
+        technicianName: archivosName,
+        technicianArea: archivosArea,
         followUp: {
           clientName: clientName.trim(),
           arrivalTime: arrival,
@@ -212,23 +219,23 @@ export default function SeguimientosPage() {
         createdBy: currentUser.id, createdByName: currentUser.name,
         registrationNumber: getNextRegistrationNumber(),
         tramiteCode: tramiteCode.trim(),
-        technicianId: `__${gestionId}__`,
-        technicianName: selectedGestion,
-        technicianArea: "Gestión Interna",
+        technicianId: archivosId,
+        technicianName: archivosName,
+        technicianArea: archivosArea,
         scheduleDate: today, registrationDate: today,
         observations: "", status: "Registrado", createdAt: iso,
         followUp: {
           clientName: clientName.trim(),
           arrivalTime: arrival,
           followUpStatus: "completado",
-          observations: observations.trim() || undefined,
+          observations: (observations.trim() ? `[${selectedGestion}] ${observations.trim()}` : `[${selectedGestion}]`),
           createdAt: iso,
           isUnscheduled: true,
         },
       };
       createEntry(newEntry);
     }
-    showMsg(`✅ Gestión registrada: ${selectedGestion} — ${arrival}`, "success");
+    showMsg(`✅ Gestión registrada: ${selectedGestion} → Archivos — ${arrival}`, "success");
     setTramiteCode(""); setClientName(""); setSelectedGestion(""); setObservations("");
   }
 
