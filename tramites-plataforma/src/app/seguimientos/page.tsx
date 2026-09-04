@@ -28,11 +28,12 @@ function techColor(count: number): { dot: string; bar: string; label: string } {
 
 type EditState = { clientName: string; technicianId: string; observations: string };
 type FormMode = "tecnico" | "interna";
-type GestionInterna = "RAM" | "Firma de Jefatura" | "Firma Secretaria";
+type GestionInterna = "Archivos" | "RAM" | "Firma de Jefatura" | "Firma Secretaria";
 
-const GESTIONES_INTERNAS: GestionInterna[] = ["RAM", "Firma de Jefatura", "Firma Secretaria"];
+const GESTIONES_INTERNAS: GestionInterna[] = ["Archivos", "RAM", "Firma de Jefatura", "Firma Secretaria"];
 
 const GESTION_COLOR: Record<GestionInterna, { bg: string; badge: string; dot: string }> = {
+  "Archivos":            { bg: "bg-gray-50 border-gray-300",   badge: "bg-gray-100 text-gray-800",   dot: "📋" },
   "RAM":                 { bg: "bg-blue-50 border-blue-300",   badge: "bg-blue-100 text-blue-800",   dot: "🗂️" },
   "Firma de Jefatura":   { bg: "bg-violet-50 border-violet-300", badge: "bg-violet-100 text-violet-800", dot: "✍️" },
   "Firma Secretaria":    { bg: "bg-teal-50 border-teal-300",   badge: "bg-teal-100 text-teal-800",   dot: "📝" },
@@ -52,6 +53,8 @@ export default function SeguimientosPage() {
   const [editingFollowUpId, setEditingFollowUpId] = useState<string | null>(null);
   const [editState, setEditState] = useState<EditState>({ clientName: "", technicianId: "", observations: "" });
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [derivingEntryId, setDerivingEntryId] = useState<string | null>(null);
+  const [derivingToTechId, setDerivingToTechId] = useState("");
 
   const { entries, updateEntry, createEntry, removeEntry, technicians, currentUser, getNextRegistrationNumber } =
     useTramitesStore();
@@ -274,6 +277,25 @@ export default function SeguimientosPage() {
     }
     setConfirmDeleteId(null);
     showMsg(`Seguimiento de ${entry.tramiteCode} eliminado`);
+  }
+
+  async function handleDerivar(entryId: string, newTechId: string) {
+    const entry = entries.find((e) => e.id === entryId);
+    if (!entry) return;
+    const newTech = technicians.find((t) => t.id === newTechId);
+    if (!newTech) return;
+
+    // Actualizar technicianId y technicianName
+    updateEntry(entryId, {
+      ...entry,
+      technicianId: newTechId,
+      technicianName: newTech.name,
+      technicianArea: newTech.areaLabel,
+    });
+
+    showMsg(`✅ Trámite derivado a ${newTech.name}`);
+    setDerivingEntryId(null);
+    setDerivingToTechId("");
   }
 
   async function exportarReporte() {
