@@ -51,6 +51,7 @@ const STATUS_LABEL: Record<FollowUpStatus, string> = {
 export default function AgendaTecnicoPage() {
   const { entries, updateEntry, currentTechnicianId, loginTechnician, logoutTechnician } = useTramitesStore();
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
+  const [selectedTechnicianId, setSelectedTechnicianId] = useState("");
   const [pinInput, setPinInput] = useState("");
   const [pinError, setPinError] = useState(false);
   const [reportePeriodo, setReportePeriodo] = useState<"dia" | "semana" | "mes">("dia");
@@ -66,16 +67,14 @@ export default function AgendaTecnicoPage() {
     if (pinInput.length >= 4) return;
     const next = pinInput + digit;
     setPinInput(next);
-    if (next.length === 4) {
-      setTimeout(() => verifyPin(next), 80);
-    }
   }
 
-  function verifyPin(pin: string) {
-    const tech = technicians.find((t) => t.id === pinInput.slice(0, pinInput.length - 4 + pin.length));
-    if (tech && pin === "0000") { // PIN maestro para demo (o vincular a técnico)
-      loginTechnician(tech.id);
+  function handleLogin() {
+    if (!selectedTechnicianId || pinInput.length !== 4) return;
+    if (pinInput === "0000") { // PIN maestro para demo
+      loginTechnician(selectedTechnicianId);
       setPinInput("");
+      setSelectedTechnicianId("");
       setPinError(false);
     } else {
       setPinError(true);
@@ -271,8 +270,9 @@ export default function AgendaTecnicoPage() {
             <label className="grid gap-2">
               <span className="text-sm font-semibold text-gray-700">Tu nombre</span>
               <select
+                value={selectedTechnicianId}
                 onChange={(e) => {
-                  setPinInput(e.target.value);
+                  setSelectedTechnicianId(e.target.value);
                   setPinError(false);
                 }}
                 className="rounded-lg border-2 border-pink-300 px-4 py-3 focus:border-pink-500 focus:outline-none bg-white font-semibold"
@@ -284,54 +284,69 @@ export default function AgendaTecnicoPage() {
               </select>
             </label>
 
-            {/* Indicador de puntos */}
-            {pinInput && (
-              <div className="flex justify-center gap-4">
-                {[0, 1, 2, 3].map((i) => (
-                  <div
-                    key={i}
-                    className={`w-5 h-5 rounded-full transition-all duration-150 ${
-                      pinInput.length > i
-                        ? pinError ? "bg-red-500 scale-110" : "bg-pink-600 scale-110"
-                        : "bg-gray-200"
-                    }`}
-                  />
-                ))}
-              </div>
-            )}
+            {selectedTechnicianId && (
+              <>
+                <label className="grid gap-2">
+                  <span className="text-sm font-semibold text-gray-700">PIN de 4 dígitos</span>
+                  {/* Indicador de puntos */}
+                  <div className="flex justify-center gap-4 mb-3">
+                    {[0, 1, 2, 3].map((i) => (
+                      <div
+                        key={i}
+                        className={`w-5 h-5 rounded-full transition-all duration-150 ${
+                          pinInput.length > i
+                            ? pinError ? "bg-red-500 scale-110" : "bg-pink-600 scale-110"
+                            : "bg-gray-200"
+                        }`}
+                      />
+                    ))}
+                  </div>
 
-            {pinError && (
-              <p className="text-center text-sm text-red-600 font-semibold animate-pulse">
-                PIN incorrecto — inténtalo de nuevo
-              </p>
-            )}
+                  {pinError && (
+                    <p className="text-center text-sm text-red-600 font-semibold animate-pulse mb-2">
+                      PIN incorrecto — inténtalo de nuevo
+                    </p>
+                  )}
 
-            {/* Teclado numérico */}
-            {pinInput && (
-              <div className="grid grid-cols-3 gap-3">
-                {["1","2","3","4","5","6","7","8","9","","0","⌫"].map((d, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    disabled={!d}
-                    onClick={() => {
-                      if (d === "⌫") { setPinInput((p) => p.slice(0, -1)); setPinError(false); }
-                      else if (d) handlePinDigit(d);
-                    }}
-                    className={`h-14 rounded-xl text-xl font-bold transition select-none ${
-                      !d ? "pointer-events-none" :
-                      d === "⌫"
-                        ? "bg-gray-100 hover:bg-gray-200 text-gray-600 cursor-pointer"
-                        : "bg-pink-50 hover:bg-pink-100 active:bg-pink-200 text-pink-900 cursor-pointer"
-                    }`}
-                  >
-                    {d}
-                  </button>
-                ))}
-              </div>
-            )}
+                  {/* Teclado numérico */}
+                  <div className="grid grid-cols-3 gap-3">
+                    {["1","2","3","4","5","6","7","8","9","","0","⌫"].map((d, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        disabled={!d}
+                        onClick={() => {
+                          if (d === "⌫") { setPinInput((p) => p.slice(0, -1)); setPinError(false); }
+                          else if (d) handlePinDigit(d);
+                        }}
+                        className={`h-14 rounded-xl text-xl font-bold transition select-none ${
+                          !d ? "pointer-events-none" :
+                          d === "⌫"
+                            ? "bg-gray-100 hover:bg-gray-200 text-gray-600 cursor-pointer"
+                            : "bg-pink-50 hover:bg-pink-100 active:bg-pink-200 text-pink-900 cursor-pointer"
+                        }`}
+                      >
+                        {d}
+                      </button>
+                    ))}
+                  </div>
+                </label>
 
-            <p className="text-xs text-gray-400 text-center">PIN: 0000 (demo)</p>
+                <button
+                  onClick={handleLogin}
+                  disabled={pinInput.length !== 4}
+                  className={`w-full px-4 py-3 rounded-lg font-bold text-white transition ${
+                    pinInput.length === 4
+                      ? "bg-pink-600 hover:bg-pink-700 cursor-pointer"
+                      : "bg-gray-300 cursor-not-allowed"
+                  }`}
+                >
+                  🔓 Acceder
+                </button>
+
+                <p className="text-xs text-gray-400 text-center">PIN demo: 0000</p>
+              </>
+            )}
           </div>
         </div>
       </AppShell>
