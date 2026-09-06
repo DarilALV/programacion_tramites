@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { AppShell } from "@/components/app-shell";
 import { useTramitesStore, areas, type Entry } from "@/lib/tramites-store";
 import { getServerNow } from "@/lib/server-time";
@@ -49,6 +49,7 @@ export default function SeguimientosPage() {
   const [messageType, setMessageType] = useState<"success" | "error">("success");
   const [programadosExpanded, setProgramadosExpanded] = useState(false);
   const [searchFollowUps, setSearchFollowUps] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [editingFollowUpId, setEditingFollowUpId] = useState<string | null>(null);
   const [editState, setEditState] = useState<EditState>({ clientName: "", technicianId: "", observations: "" });
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -69,6 +70,14 @@ export default function SeguimientosPage() {
 
   const today = new Date().toISOString().slice(0, 10);
 
+  // Debounce search: wait 300ms after user stops typing before filtering
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchFollowUps);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchFollowUps]);
+
   const foundEntry = useMemo(() => {
     if (!tramiteCode.trim()) return null;
     return entries.find((e) => e.tramiteCode === tramiteCode.trim()) ?? null;
@@ -82,14 +91,14 @@ export default function SeguimientosPage() {
     [entries, today]);
 
   const filteredFollowUps = useMemo(() => {
-    if (!searchFollowUps.trim()) return todayFollowUps;
-    const q = searchFollowUps.toLowerCase();
+    if (!debouncedSearch.trim()) return todayFollowUps;
+    const q = debouncedSearch.toLowerCase();
     return todayFollowUps.filter((e) =>
       e.tramiteCode.includes(q) ||
       (e.followUp?.clientName ?? "").toLowerCase().includes(q) ||
       e.technicianName.toLowerCase().includes(q)
     );
-  }, [todayFollowUps, searchFollowUps]);
+  }, [todayFollowUps, debouncedSearch]);
 
   const techCountToday = useMemo(() => {
     const c: Record<string, number> = {};
