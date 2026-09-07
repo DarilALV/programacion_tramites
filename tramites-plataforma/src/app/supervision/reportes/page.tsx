@@ -63,8 +63,11 @@ export default function ReportesSupervisionPage() {
 
     entries.forEach((e) => {
       if (!e.followUp) return;
-      const d = e.scheduleDate ?? e.followUp.createdAt?.slice(0, 10) ?? "";
-      if (d < from || d > to) return;
+      // Use arrival date as primary (when client came), fall back to schedule date
+      const d = e.followUp?.arrivalTime ?
+        e.followUp.createdAt?.slice(0, 10) ?? e.scheduleDate ?? "" :
+        e.scheduleDate ?? e.followUp?.createdAt?.slice(0, 10) ?? "";
+      if (!d || d < from || d > to) return;
 
       const tid = e.followUp.actualTechnicianId ?? e.technicianId;
       const tech = technicians.find((t) => t.id === tid);
