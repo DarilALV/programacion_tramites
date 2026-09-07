@@ -164,6 +164,7 @@ export default function SeguimientosPage() {
       updateEntry(foundEntry.id, {
         ...foundEntry,
         followUp: {
+          ...foundEntry.followUp,
           clientName: clientName.trim(),
           arrivalTime: arrival,
           followUpStatus: "esperando",

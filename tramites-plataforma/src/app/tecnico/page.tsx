@@ -307,9 +307,16 @@ export default function AgendaTecnicoPage() {
     else { const r = monthRange(selectedDate); from = r.from; to = r.to; }
 
     return entries.filter((e) => {
+      if (!e.followUp) return false; // Must have followUp to count
+
       const isThisTech = e.technicianId === currentTechnicianId || e.followUp?.actualTechnicianId === currentTechnicianId;
-      const d = e.scheduleDate ?? e.followUp?.createdAt?.slice(0, 10) ?? "";
-      return isThisTech && d >= from && d <= to && e.followUp;
+      if (!isThisTech) return false;
+
+      // Use arrival date (when client came) as primary date, fall back to schedule date
+      const d = e.followUp?.arrivalTime ? e.followUp.createdAt?.slice(0, 10) ?? e.scheduleDate ?? "" :
+                e.scheduleDate ?? e.followUp?.createdAt?.slice(0, 10) ?? "";
+
+      return d >= from && d <= to;
     });
   }, [entries, currentTechnicianId, selectedDate, reportePeriodo]);
 
