@@ -314,7 +314,13 @@ export default function AgendaTecnicoPage() {
   }, [entries, currentTechnicianId, selectedDate, reportePeriodo]);
 
   const reportStats = useMemo(() => {
-    const completados = reportEntries.filter((e) => e.followUp?.completedTime);
+    const completados = reportEntries.filter((e) => e.followUp?.followUpStatus === "completado");
+    const noEscucho = reportEntries.filter((e) => e.followUp?.followUpStatus === "no-escucho");
+    const enProceso = reportEntries.filter((e) => {
+      const st = e.followUp?.followUpStatus;
+      return st && ["esperando", "en-revision", "llamado", "regreso"].includes(st);
+    });
+
     const waitTimes = completados
       .map((e) => e.followUp?.arrivalTime && e.followUp?.attendedTime ? minDiff(e.followUp.arrivalTime, e.followUp.attendedTime) : null)
       .filter((v): v is number => v !== null && v >= 0);
@@ -322,10 +328,12 @@ export default function AgendaTecnicoPage() {
       .map((e) => e.followUp?.attendedTime && e.followUp?.completedTime ? minDiff(e.followUp.attendedTime, e.followUp.completedTime) : null)
       .filter((v): v is number => v !== null && v >= 0);
     const avg = (arr: number[]) => arr.length ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : null;
+
     return {
       total: reportEntries.length,
       completados: completados.length,
-      noEscucho: reportEntries.filter((e) => e.followUp?.followUpStatus === "no-escucho").length,
+      noEscucho: noEscucho.length,
+      enProceso: enProceso.length,
       avgEspera: avg(waitTimes),
       avgAtencion: avg(attnTimes),
     };
@@ -621,13 +629,14 @@ export default function AgendaTecnicoPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
             {[
               { label: "Total", value: reportStats.total, color: "blue" },
               { label: "Completados", value: reportStats.completados, color: "green" },
+              { label: "En Proceso", value: reportStats.enProceso, color: "yellow" },
               { label: "No escucharon", value: reportStats.noEscucho, color: "orange" },
-              { label: "Espera promedio", value: reportStats.avgEspera !== null ? fmtMin(reportStats.avgEspera) : "—", color: "purple" },
-              { label: "Atención promedio", value: reportStats.avgAtencion !== null ? fmtMin(reportStats.avgAtencion) : "—", color: "pink" },
+              { label: "Espera prom.", value: reportStats.avgEspera !== null ? fmtMin(reportStats.avgEspera) : "—", color: "purple" },
+              { label: "Atención prom.", value: reportStats.avgAtencion !== null ? fmtMin(reportStats.avgAtencion) : "—", color: "pink" },
             ].map(({ label, value, color }) => (
               <div key={label} className={`rounded-xl border-2 border-${color}-200 bg-${color}-50 p-4`}>
                 <p className="text-xs text-gray-600 uppercase leading-tight">{label}</p>
