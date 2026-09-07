@@ -253,8 +253,8 @@ export default function AgendaTecnicoPage() {
       const key = `${e.id}-arrived`;
       if (!knownIdsRef.current.has(key) && e.followUp?.arrivalTime) {
         if (knownIdsRef.current.size > 0) {
-          notifyBrowser("🚶 Cliente llegó", `Trámite ${e.tramiteCode} — ${e.followUp.clientName ?? "sin nombre"}`);
-          setToastMessage(`🚶 ${e.followUp.clientName ?? "Cliente"} llegó\nTrámite ${e.tramiteCode}`);
+          notifyBrowser("🚶 Contribuyente llegó", `Trámite ${e.tramiteCode} — ${e.followUp.clientName ?? "sin nombre"}`);
+          setToastMessage(`🚶 ${e.followUp.clientName ?? "Contribuyente"} llegó\nTrámite ${e.tramiteCode}`);
           setToastShow(true);
         }
         knownIdsRef.current.add(key);
@@ -262,8 +262,8 @@ export default function AgendaTecnicoPage() {
       const keyReg = `${e.id}-regreso`;
       if (!knownIdsRef.current.has(keyReg) && e.followUp?.followUpStatus === "regreso") {
         if (knownIdsRef.current.size > 0) {
-          notifyBrowser("↩️ Cliente regresó", `Trámite ${e.tramiteCode} — ${e.followUp.clientName ?? "sin nombre"}`);
-          setToastMessage(`↩️ ${e.followUp.clientName ?? "Cliente"} regresó\nTrámite ${e.tramiteCode}`);
+          notifyBrowser("↩️ Contribuyente regresó", `Trámite ${e.tramiteCode} — ${e.followUp.clientName ?? "sin nombre"}`);
+          setToastMessage(`↩️ ${e.followUp.clientName ?? "Contribuyente"} regresó\nTrámite ${e.tramiteCode}`);
           setToastShow(true);
         }
         knownIdsRef.current.add(keyReg);
@@ -281,10 +281,15 @@ export default function AgendaTecnicoPage() {
     if (!currentTechnicianId) return [];
     return entries
       .filter((e) => {
+        // Si tiene seguimiento hoy, mostrar si es el técnico asignado (original o derivado)
+        if (e.followUp?.createdAt?.startsWith(selectedDate)) {
+          const isThisTech = e.technicianId === currentTechnicianId || e.followUp?.actualTechnicianId === currentTechnicianId;
+          return isThisTech;
+        }
+        // Si no tiene seguimiento, mostrar si está programado para esa fecha y es este técnico
         const isThisDate = e.scheduleDate === selectedDate;
         const isThisTech = e.technicianId === currentTechnicianId;
-        const isActualTech = e.followUp?.actualTechnicianId === currentTechnicianId && e.followUp?.createdAt?.startsWith(selectedDate);
-        return (isThisDate && isThisTech) || isActualTech;
+        return isThisDate && isThisTech && e.followUp;
       })
       .sort((a, b) => {
         const ta = a.scheduledTime ?? a.followUp?.arrivalTime ?? "00:00";
