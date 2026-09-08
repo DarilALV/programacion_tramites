@@ -103,12 +103,12 @@ export const areas: Area[] = [
   {
     id: "revision-plano",
     label: "Revision plano",
-    people: ["CHRISTIAN D.", "MARTHA M.", "ROGER M.", "ELSA R.", "MERCEDES C.", "LAVINIA L."],
+    people: ["KARLA VARGAS", "MARTHA M.", "ROGER M.", "ELSA R.", "MERCEDES C.", "LAVINIA L."],
   },
   {
     id: "tunari",
     label: "Tunari",
-    people: ["KARLA VARGAS", "MARIA RENE F.", "JORGE SOLIZ", "KAREN S.", "ROYER M.", "ALFREDO V.", "KARLA AGUILAR", "PABLO MEDINA", "DEMETRIO", "FREDDY"],
+    people: ["CHRISTIAN D.", "MARIA RENE F.", "JORGE SOLIZ", "KAREN S.", "ROYER M.", "ALFREDO V.", "KARLA AGUILAR", "PABLO MEDINA", "DEMETRIO", "FREDDY"],
   },
 ];
 
