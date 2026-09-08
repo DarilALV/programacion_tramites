@@ -264,27 +264,25 @@ export default function SeguimientosPage() {
     setEditingFollowUpId(entry.id);
     setEditState({
       clientName: entry.followUp?.clientName ?? "",
-      technicianId: entry.followUp?.actualTechnicianId ?? entry.technicianId,
+      technicianId: "", // No usado aquí, solo en estado para compatibilidad
       observations: entry.followUp?.observations ?? "",
     });
     setConfirmDeleteId(null);
   }
 
   function handleSaveEdit(entry: Entry) {
-    const tech = technicians.find((t) => t.id === editState.technicianId);
-    const techChanged = editState.technicianId !== entry.technicianId;
+    // Editar SOLO actualiza cliente y observaciones, no técnico
+    // Para cambiar técnico, usar "Derivar"
     updateEntry(entry.id, {
       ...entry,
       followUp: {
         ...entry.followUp,
         clientName: editState.clientName.trim(),
-        actualTechnicianId: techChanged ? editState.technicianId : undefined,
-        actualTechnicianName: techChanged ? tech?.name : undefined,
         observations: editState.observations.trim() || undefined,
       },
     });
     setEditingFollowUpId(null);
-    showMsg("✓ Seguimiento actualizado");
+    showMsg("✓ Seguimiento actualizado (cliente y observaciones)");
   }
 
   function handleDeleteFollowUp(entry: Entry) {
@@ -648,7 +646,7 @@ export default function SeguimientosPage() {
                       return (
                         <tr key={entry.id} className="bg-blue-50 border-b border-blue-200">
                           <td colSpan={7} className="px-4 py-3">
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                               <label className="grid gap-1">
                                 <span className="text-xs text-gray-600">Nombre cliente</span>
                                 <input value={editState.clientName}
@@ -656,19 +654,14 @@ export default function SeguimientosPage() {
                                   className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm" />
                               </label>
                               <label className="grid gap-1">
-                                <span className="text-xs text-gray-600">Técnico</span>
-                                <select value={editState.technicianId}
-                                  onChange={(e) => setEditState({ ...editState, technicianId: e.target.value })}
-                                  className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm bg-white">
-                                  {availableTechnicians.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                                </select>
-                              </label>
-                              <label className="grid gap-1">
                                 <span className="text-xs text-gray-600">Observaciones</span>
                                 <input value={editState.observations}
                                   onChange={(e) => setEditState({ ...editState, observations: e.target.value })}
                                   className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm" />
                               </label>
+                            </div>
+                            <div className="rounded-lg bg-blue-50 border border-blue-200 p-3 mt-2">
+                              <p className="text-xs text-blue-700 font-semibold">ℹ️ Para cambiar técnico, usa el botón <span className="bg-purple-500 text-white px-2 py-0.5 rounded text-xs font-bold">↗️ Derivar</span></p>
                             </div>
                             <div className="flex gap-2 mt-2">
                               <button onClick={() => handleSaveEdit(entry)} className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-semibold cursor-pointer hover:bg-green-700">✓ Guardar</button>
