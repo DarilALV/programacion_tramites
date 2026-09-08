@@ -155,7 +155,10 @@ export default function SeguimientosPage() {
     if (!selectedTechnicianId) return showMsg("⚠️ Selecciona el técnico", "error");
 
     const count = techCountToday[selectedTechnicianId] ?? 0;
-    if (count >= LIMITE) return showMsg(`⛔ ${effectiveTechnician?.name} ya alcanzó el límite de ${LIMITE} seguimientos hoy`, "error");
+    // Permitir superar límite, solo mostrar warning si está cerca
+    if (count >= LIMITE) {
+      showMsg(`⚠️ ${effectiveTechnician?.name} ya atendió ${count} (límite: ${LIMITE}). Continuará registrando.`, "success");
+    }
 
     const { time: arrival, iso } = await getServerNow();
 
@@ -464,7 +467,7 @@ export default function SeguimientosPage() {
                       <div className={`h-3 rounded-full transition-all ${selColors.bar}`}
                         style={{ width: `${Math.min((selCount / LIMITE) * 100, 100)}%` }} />
                     </div>
-                    {selOverLimit && <p className="text-xs text-red-600 font-semibold">⛔ Este técnico ya no puede recibir más seguimientos hoy</p>}
+                    {selOverLimit && <p className="text-xs text-orange-600 font-semibold">⚠️ Este técnico está sobre el límite de {LIMITE} pero puede continuar atendiendo</p>}
                   </div>
                 )}
               </label>
@@ -501,8 +504,8 @@ export default function SeguimientosPage() {
 
           {formMode === "tecnico" ? (
             <button onClick={handleRegisterArrival}
-              disabled={!canSubmitTecnico || selOverLimit || !!codeValidationError}
-              className={`w-full rounded-lg px-6 py-3 font-semibold text-white text-lg transition shadow-md ${canSubmitTecnico && !selOverLimit && !codeValidationError ? "bg-pink-600 hover:bg-pink-700 cursor-pointer" : "bg-gray-400 cursor-not-allowed"}`}>
+              disabled={!canSubmitTecnico || !!codeValidationError}
+              className={`w-full rounded-lg px-6 py-3 font-semibold text-white text-lg transition shadow-md ${canSubmitTecnico && !codeValidationError ? "bg-pink-600 hover:bg-pink-700 cursor-pointer" : "bg-gray-400 cursor-not-allowed"}`}>
               ✅ Registrar Llegada con Técnico
             </button>
           ) : (
