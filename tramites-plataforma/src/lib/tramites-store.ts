@@ -108,7 +108,7 @@ export const areas: Area[] = [
   {
     id: "tunari",
     label: "Tunari",
-    people: ["KARLA VARGAS", "MARIA RENE F.", "JORGE SOLIZ", "KAREN S.", "ROYER M.", "ALFREDO V.", "KARLA AGUILAR", "PABLO MEDINA", "DEMETRIO", "FREDDY"],
+    people: ["CHRISTIAN D.", "MARIA RENE F.", "JORGE SOLIZ", "KAREN S.", "ROYER M.", "ALFREDO V.", "KARLA AGUILAR", "PABLO MEDINA", "DEMETRIO", "FREDDY"],
   },
 ];
 
