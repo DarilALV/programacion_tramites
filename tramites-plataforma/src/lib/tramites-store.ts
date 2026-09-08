@@ -80,7 +80,7 @@ type PersistedState = {
 export const plannerUsers: PlannerUser[] = [
   { id: "wayra",     name: "WAYRA",     pin: "1111", role: "registrador" },
   { id: "jaqueline", name: "JAQUELINE", pin: "2222", role: "registrador" },
-  { id: "tunari",    name: "TUNARI",    pin: "3333", areaId: "tunari", role: "registrador" },
+  { id: "tunari",    name: "TUNARI",    pin: "3333", role: "registrador" }, // Sin areaId: ve todos los técnicos
   { id: "roly",      name: "ROLY",      pin: "4444", role: "supervisor" },
 ];
 
