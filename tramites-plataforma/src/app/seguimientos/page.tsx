@@ -87,7 +87,7 @@ export default function SeguimientosPage() {
 
   const todayFollowUps = useMemo(() => entries
     .filter((e) => e.followUp?.createdAt?.startsWith(today) || (e.scheduleDate === today && e.followUp))
-    .sort((a, b) => (b.followUp?.arrivalTime ?? "").localeCompare(a.followUp?.arrivalTime ?? "")),
+    .sort((a, b) => (a.followUp?.arrivalTime ?? "").localeCompare(b.followUp?.arrivalTime ?? "")),
     [entries, today]);
 
   const filteredFollowUps = useMemo(() => {

@@ -292,8 +292,8 @@ export default function AgendaTecnicoPage() {
         return isThisDate && isThisTech && e.followUp;
       })
       .sort((a, b) => {
-        const ta = a.scheduledTime ?? a.followUp?.arrivalTime ?? "00:00";
-        const tb = b.scheduledTime ?? b.followUp?.arrivalTime ?? "00:00";
+        const ta = a.followUp?.arrivalTime ?? a.scheduledTime ?? "00:00";
+        const tb = b.followUp?.arrivalTime ?? b.scheduledTime ?? "00:00";
         return ta.localeCompare(tb);
       });
   }, [entries, selectedDate, currentTechnicianId]);
