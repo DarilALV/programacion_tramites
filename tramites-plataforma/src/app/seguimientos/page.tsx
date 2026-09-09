@@ -87,9 +87,18 @@ export default function SeguimientosPage() {
   const effectiveTechnician = technicians.find((t) => t.id === selectedTechnicianId);
 
   const todayFollowUps = useMemo(() => entries
-    .filter((e) => e.followUp?.createdAt?.startsWith(today) || (e.scheduleDate === today && e.followUp))
+    .filter((e) => {
+      const isToday = e.followUp?.createdAt?.startsWith(today) || (e.scheduleDate === today && e.followUp);
+      if (!isToday) return false;
+      // Si el usuario tiene areaId, filtrar por técnicos de esa área
+      if (currentUser.areaId) {
+        const technicianArea = e.technicianArea;
+        return areas.some((a) => a.id === currentUser.areaId && a.label === technicianArea);
+      }
+      return true;
+    })
     .sort((a, b) => (b.followUp?.arrivalTime ?? "").localeCompare(a.followUp?.arrivalTime ?? "")),
-    [entries, today]);
+    [entries, today, currentUser.areaId]);
 
   const filteredFollowUps = useMemo(() => {
     if (!debouncedSearch.trim()) return todayFollowUps;
