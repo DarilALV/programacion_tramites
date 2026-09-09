@@ -130,7 +130,16 @@ export default function SeguimientosPage() {
 
   const technicianLoad = useMemo(() => {
     const load: Record<string, { name: string; programados: number; llegadas: number; atendidos: number; completados: number }> = {};
-    entries.filter((e) => e.scheduleDate === today).forEach((e) => {
+    entries.filter((e) => {
+      const isToday = e.scheduleDate === today;
+      if (!isToday) return false;
+      // Si el usuario tiene areaId, filtrar por técnicos de esa área
+      if (currentUser.areaId) {
+        const technicianArea = e.technicianArea;
+        return areas.some((a) => a.id === currentUser.areaId && a.label === technicianArea);
+      }
+      return true;
+    }).forEach((e) => {
       if (!load[e.technicianId]) load[e.technicianId] = { name: e.technicianName, programados: 0, llegadas: 0, atendidos: 0, completados: 0 };
       load[e.technicianId].programados++;
     });
@@ -143,7 +152,7 @@ export default function SeguimientosPage() {
       if (e.followUp?.completedTime) load[tid].completados++;
     });
     return load;
-  }, [entries, todayFollowUps, today]);
+  }, [entries, todayFollowUps, today, currentUser.areaId]);
 
   function showMsg(text: string, type: "success" | "error" = "success") {
     setMessage(text); setMessageType(type); setTimeout(() => setMessage(""), 4000);
