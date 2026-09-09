@@ -18,8 +18,9 @@ function fmtMin(m: number) {
   return m < 60 ? `${m} min` : `${Math.floor(m / 60)}h ${m % 60}m`;
 }
 
-function techColor(count: number): { dot: string; bar: string; label: string } {
-  if (count >= LIMITE) return { dot: "🔴", bar: "bg-red-500", label: `⛔ Lleno (${count}/${LIMITE})` };
+function techColor(count: number, isArchivos: boolean = false): { dot: string; bar: string; label: string } {
+  if (isArchivos) return { dot: "📁", bar: "bg-blue-500", label: `${count} (ilimitado)` };
+  if (count >= LIMITE) return { dot: "🔴", bar: "bg-red-500", label: `⚠️ ${count}/${LIMITE}` };
   if (count >= 12)     return { dot: "🔴", bar: "bg-red-400", label: `${count}/${LIMITE}` };
   if (count >= 7)      return { dot: "🟠", bar: "bg-amber-400", label: `${count}/${LIMITE}` };
   if (count > 0)       return { dot: "🟢", bar: "bg-green-500", label: `${count}/${LIMITE}` };
@@ -342,8 +343,8 @@ export default function SeguimientosPage() {
   const canSubmitTecnico = tramiteCode.trim() && clientName.trim() && selectedTechnicianId;
   const canSubmitInterna = tramiteCode.trim() && clientName.trim() && selectedGestion;
   const selCount = techCountToday[selectedTechnicianId] ?? 0;
-  const selOverLimit = selCount >= LIMITE;
-  const selColors = selectedTechnicianId ? techColor(selCount) : null;
+  const selOverLimit = selectedTechnicianId !== "archivos" && selCount >= LIMITE;
+  const selColors = selectedTechnicianId ? techColor(selCount, selectedTechnicianId === "archivos") : null;
   const codeValidationError = tramiteCode.trim() ? validateCode(tramiteCode) : null;
 
   return (
@@ -440,11 +441,11 @@ export default function SeguimientosPage() {
                       <optgroup key={area.id} label={`── ${area.label.toUpperCase()} ──`}>
                         {techsInArea.map((t) => {
                           const cnt = techCountToday[t.id] ?? 0;
-                          const { dot } = techColor(cnt);
-                          const full = cnt >= LIMITE;
+                          const isArchivos = t.id === "archivos";
+                          const { dot, label } = techColor(cnt, isArchivos);
                           return (
-                            <option key={t.id} value={t.id} disabled={full}>
-                              {dot} {t.name}{cnt > 0 ? ` (${cnt}/${LIMITE})` : ""}
+                            <option key={t.id} value={t.id}>
+                              {dot} {t.name} ({label})
                             </option>
                           );
                         })}
@@ -456,7 +457,7 @@ export default function SeguimientosPage() {
                 {selColors && (
                   <div className="space-y-1">
                     <div className="flex justify-between text-xs">
-                      <span className="text-gray-600">{effectiveTechnician?.name}: <strong>{selCount}</strong> de {LIMITE} hoy</span>
+                      <span className="text-gray-600">{effectiveTechnician?.name}: <strong>{selCount}</strong> {selectedTechnicianId === "archivos" ? "(ilimitado)" : `de ${LIMITE} hoy`}</span>
                       <span className={`font-semibold ${selOverLimit ? "text-red-600" : selCount >= 12 ? "text-red-500" : selCount >= 7 ? "text-amber-600" : "text-green-700"}`}>
                         {selColors.label}
                       </span>
@@ -465,7 +466,7 @@ export default function SeguimientosPage() {
                       <div className={`h-3 rounded-full transition-all ${selColors.bar}`}
                         style={{ width: `${Math.min((selCount / LIMITE) * 100, 100)}%` }} />
                     </div>
-                    {selOverLimit && <p className="text-xs text-orange-600 font-semibold">⚠️ Este técnico está sobre el límite de {LIMITE} pero puede continuar atendiendo</p>}
+                    {selOverLimit && selectedTechnicianId !== "archivos" && <p className="text-xs text-orange-600 font-semibold">⚠️ Este técnico está sobre el límite de {LIMITE} pero puede continuar atendiendo</p>}
                   </div>
                 )}
               </label>
@@ -534,7 +535,7 @@ export default function SeguimientosPage() {
               ) : (
                 Object.entries(programadosHoy).map(([tid, data]) => {
                   const cnt = techCountToday[tid] ?? 0;
-                  const { dot, bar } = techColor(cnt);
+                  const { dot, bar } = techColor(cnt, tid === "archivos");
                   return (
                     <div key={tid} className="rounded-xl border-2 border-purple-100 bg-purple-50 p-4">
                       <div className="flex items-center justify-between mb-2">
@@ -745,7 +746,7 @@ export default function SeguimientosPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {Object.entries(technicianLoad).map(([tid, data]) => {
                 const cnt = techCountToday[tid] ?? 0;
-                const { dot, bar } = techColor(cnt);
+                const { dot, bar } = techColor(cnt, tid === "archivos");
                 return (
                   <div key={tid} className="rounded-xl border-2 border-pink-200 bg-white p-4 space-y-3">
                     <div className="flex items-center justify-between">
