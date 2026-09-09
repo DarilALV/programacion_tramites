@@ -239,8 +239,17 @@ export default function AgendaTecnicoPage() {
     void checkAndRequest();
   }, []);
 
-  // Track known follow-up IDs to detect new arrivals
+  // Track known follow-up IDs in localStorage to survive page reloads
   const knownIdsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!currentTechnicianId) return;
+    // Load from localStorage on mount
+    const stored = typeof window !== "undefined" ? localStorage.getItem(`notifIds-${currentTechnicianId}`) : null;
+    if (stored) {
+      knownIdsRef.current = new Set(JSON.parse(stored));
+    }
+  }, [currentTechnicianId]);
 
   useEffect(() => {
     if (!currentTechnicianId) return;
@@ -274,6 +283,10 @@ export default function AgendaTecnicoPage() {
         if (e.followUp?.arrivalTime) knownIdsRef.current.add(`${e.id}-arrived`);
         if (e.followUp?.followUpStatus === "regreso") knownIdsRef.current.add(`${e.id}-regreso`);
       });
+    }
+    // Persist to localStorage
+    if (typeof window !== "undefined") {
+      localStorage.setItem(`notifIds-${currentTechnicianId}`, JSON.stringify(Array.from(knownIdsRef.current)));
     }
   }, [entries, currentTechnicianId, today]);
 
