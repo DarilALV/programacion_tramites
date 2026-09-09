@@ -88,7 +88,7 @@ export default function SeguimientosPage() {
 
   const todayFollowUps = useMemo(() => entries
     .filter((e) => e.followUp?.createdAt?.startsWith(today) || (e.scheduleDate === today && e.followUp))
-    .sort((a, b) => (a.followUp?.arrivalTime ?? "").localeCompare(b.followUp?.arrivalTime ?? "")),
+    .sort((a, b) => (b.followUp?.arrivalTime ?? "").localeCompare(a.followUp?.arrivalTime ?? "")),
     [entries, today]);
 
   const filteredFollowUps = useMemo(() => {
@@ -761,7 +761,7 @@ export default function SeguimientosPage() {
                     </div>
                     <div>
                       <div className="flex justify-between text-xs mb-1">
-                        <span className="text-gray-500">Seguimientos: {cnt}/{LIMITE}</span>
+                        <span className="text-gray-500">Seguimientos: {tid === "archivos" ? `${cnt} (ilimitado)` : `${cnt}/${LIMITE}`}</span>
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-2">
                         <div className={`h-2 rounded-full ${bar}`} style={{ width: `${Math.min((cnt / LIMITE) * 100, 100)}%` }} />
