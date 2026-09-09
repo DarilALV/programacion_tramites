@@ -167,13 +167,16 @@ export default function SeguimientosPage() {
       const techChanged = selectedTechnicianId !== foundEntry.technicianId;
       updateEntry(foundEntry.id, {
         ...foundEntry,
+        technicianId: selectedTechnicianId,
+        technicianName: effectiveTechnician?.name ?? selectedTechnicianId,
+        technicianArea: effectiveTechnician?.areaLabel ?? foundEntry.technicianArea,
         followUp: {
           ...foundEntry.followUp,
           clientName: clientName.trim(),
           arrivalTime: arrival,
           followUpStatus: "esperando",
-          actualTechnicianId: techChanged ? selectedTechnicianId : undefined,
-          actualTechnicianName: techChanged ? effectiveTechnician?.name : undefined,
+          actualTechnicianId: techChanged ? foundEntry.technicianId : undefined,
+          actualTechnicianName: techChanged ? foundEntry.technicianName : undefined,
           observations: observations.trim() || undefined,
           createdAt: iso,
         },
