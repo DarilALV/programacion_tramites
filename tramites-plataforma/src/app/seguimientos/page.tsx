@@ -48,7 +48,7 @@ export default function SeguimientosPage() {
   const [observations, setObservations] = useState("");
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState<"success" | "error">("success");
-  const [programadosExpanded, setProgramadosExpanded] = useState(false);
+  // const [programadosExpanded, setProgramadosExpanded] = useState(false); // Oculto de momento para no confundir
   const [searchFollowUps, setSearchFollowUps] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [editingFollowUpId, setEditingFollowUpId] = useState<string | null>(null);
@@ -516,7 +516,7 @@ export default function SeguimientosPage() {
           )}
         </section>
 
-        {/* ── PROGRAMADOS DE HOY ── */}
+        {/* ── PROGRAMADOS DE HOY (OCULTO DE MOMENTO PARA NO CONFUNDIR) ──
         <section className="rounded-4xl border-2 border-purple-200 overflow-hidden">
           <button onClick={() => setProgramadosExpanded(!programadosExpanded)}
             className="w-full flex items-center justify-between px-6 py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white cursor-pointer">
@@ -570,6 +570,7 @@ export default function SeguimientosPage() {
             </div>
           )}
         </section>
+        ── FIN PROGRAMADOS OCULTOS ── */}
 
         {/* ── SEGUIMIENTOS DE HOY ── */}
         <section className="rounded-4xl border-2 border-pink-200 overflow-hidden">
@@ -754,7 +755,7 @@ export default function SeguimientosPage() {
                       <span>{dot}</span>
                     </div>
                     <div className="grid grid-cols-2 gap-1 text-sm">
-                      <span className="text-gray-500">Programados:</span><span className="font-semibold">{data.programados}</span>
+                      {/* <span className="text-gray-500">Programados:</span><span className="font-semibold">{data.programados}</span> */}
                       <span className="text-gray-500">Llegadas:</span><span className="font-semibold text-pink-700">{data.llegadas}</span>
                       <span className="text-gray-500">Atendidos:</span><span className="font-semibold text-blue-700">{data.atendidos}</span>
                       <span className="text-gray-500">Completados:</span><span className="font-semibold text-green-700">{data.completados}</span>
