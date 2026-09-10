@@ -690,8 +690,13 @@ export function useTramitesStore() {
   const [entries, setEntries] = useState<Entry[]>(seedEntries);
   const [juntas, setJuntas] = useState<Junta[]>(() => {
     if (typeof window === "undefined") return [];
-    const saved = localStorage.getItem('juntas');
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const saved = localStorage.getItem('juntas');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      console.error('Error parsing juntas from localStorage:', e);
+      return [];
+    }
   });
   const [currentUserId, setCurrentUserId] = useState(plannerUsers[0].id);
   const [currentTechnicianId, setCurrentTechnicianId] = useState<string | undefined>(undefined);
@@ -746,12 +751,14 @@ useEffect(() => {
 }, []);
 
 useEffect(() => {
+  let unsubscribeJuntas: (() => void) | undefined;
+
   (async () => {
     try {
       const { firestore } = await import('@/lib/firebase');
       const { collection, onSnapshot } = await import('firebase/firestore');
 
-      const unsubscribeJuntas = onSnapshot(
+      unsubscribeJuntas = onSnapshot(
         collection(firestore, 'juntas'),
         (snapshot) => {
           if (!snapshot.empty) {
@@ -766,11 +773,14 @@ useEffect(() => {
           console.warn('Firestore juntas listener error:', error);
         }
       );
-      return () => unsubscribeJuntas();
     } catch (error) {
       console.warn('Error setting up Firestore juntas listener:', error);
     }
   })();
+
+  return () => {
+    if (unsubscribeJuntas) unsubscribeJuntas();
+  };
 }, []);
 
   useEffect(() => {
@@ -825,52 +835,48 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
     return obj;
   }
 
-  function firestoreSet(entryId: string, data: Entry) {
-    (async () => {
-      try {
-        const { firestore } = await import('@/lib/firebase');
-        const { doc, setDoc } = await import('firebase/firestore');
-        await setDoc(doc(firestore, 'entries', entryId), stripUndefined(data));
-      } catch (error) {
-        console.error('Error escribiendo en Firestore:', error);
-      }
-    })();
+  async function firestoreSet(entryId: string, data: Entry) {
+    try {
+      const { firestore } = await import('@/lib/firebase');
+      const { doc, setDoc } = await import('firebase/firestore');
+      await setDoc(doc(firestore, 'entries', entryId), stripUndefined(data));
+    } catch (error) {
+      console.error('Error escribiendo en Firestore:', error);
+      throw error;
+    }
   }
 
-  function firestoreDelete(entryId: string) {
-    (async () => {
-      try {
-        const { firestore } = await import('@/lib/firebase');
-        const { doc, deleteDoc } = await import('firebase/firestore');
-        await deleteDoc(doc(firestore, 'entries', entryId));
-      } catch (error) {
-        console.error('Error eliminando de Firestore:', error);
-      }
-    })();
+  async function firestoreDelete(entryId: string) {
+    try {
+      const { firestore } = await import('@/lib/firebase');
+      const { doc, deleteDoc } = await import('firebase/firestore');
+      await deleteDoc(doc(firestore, 'entries', entryId));
+    } catch (error) {
+      console.error('Error eliminando de Firestore:', error);
+      throw error;
+    }
   }
 
-  function firestoreSetJunta(juntaId: string, data: Junta) {
-    (async () => {
-      try {
-        const { firestore } = await import('@/lib/firebase');
-        const { doc, setDoc } = await import('firebase/firestore');
-        await setDoc(doc(firestore, 'juntas', juntaId), stripUndefined(data));
-      } catch (error) {
-        console.error('Error escribiendo junta en Firestore:', error);
-      }
-    })();
+  async function firestoreSetJunta(juntaId: string, data: Junta) {
+    try {
+      const { firestore } = await import('@/lib/firebase');
+      const { doc, setDoc } = await import('firebase/firestore');
+      await setDoc(doc(firestore, 'juntas', juntaId), stripUndefined(data));
+    } catch (error) {
+      console.error('Error escribiendo junta en Firestore:', error);
+      throw error;
+    }
   }
 
-  function firestoreDeleteJunta(juntaId: string) {
-    (async () => {
-      try {
-        const { firestore } = await import('@/lib/firebase');
-        const { doc, deleteDoc } = await import('firebase/firestore');
-        await deleteDoc(doc(firestore, 'juntas', juntaId));
-      } catch (error) {
-        console.error('Error eliminando junta de Firestore:', error);
-      }
-    })();
+  async function firestoreDeleteJunta(juntaId: string) {
+    try {
+      const { firestore } = await import('@/lib/firebase');
+      const { doc, deleteDoc } = await import('firebase/firestore');
+      await deleteDoc(doc(firestore, 'juntas', juntaId));
+    } catch (error) {
+      console.error('Error eliminando junta de Firestore:', error);
+      throw error;
+    }
   }
 
   function createEntry(form: EntryFormValues | Partial<Entry>) {
@@ -952,7 +958,7 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
     };
     const newJuntas = [...juntas, junta];
     setJuntas(newJuntas);
-    localStorage.setItem('juntas', JSON.stringify(newJuntas));
+    if (typeof window !== "undefined") localStorage.setItem('juntas', JSON.stringify(newJuntas));
     firestoreSetJunta(junta.id, junta);
     return junta;
   }
@@ -960,7 +966,7 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
   function updateJunta(juntaId: string, updates: Partial<Junta>) {
     const newJuntas = juntas.map((j) => j.id === juntaId ? { ...j, ...updates } : j);
     setJuntas(newJuntas);
-    localStorage.setItem('juntas', JSON.stringify(newJuntas));
+    if (typeof window !== "undefined") localStorage.setItem('juntas', JSON.stringify(newJuntas));
     const updatedJunta = newJuntas.find(j => j.id === juntaId);
     if (updatedJunta) firestoreSetJunta(juntaId, updatedJunta);
   }
@@ -968,7 +974,7 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
   function deleteJunta(juntaId: string) {
     const newJuntas = juntas.filter(j => j.id !== juntaId);
     setJuntas(newJuntas);
-    localStorage.setItem('juntas', JSON.stringify(newJuntas));
+    if (typeof window !== "undefined") localStorage.setItem('juntas', JSON.stringify(newJuntas));
     firestoreDeleteJunta(juntaId);
   }
 

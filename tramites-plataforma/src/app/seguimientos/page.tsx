@@ -733,10 +733,10 @@ export default function SeguimientosPage() {
                       </div>
                       <div className="grid gap-1">
                         {data.entries.sort((a, b) => (a.scheduledTime ?? "").localeCompare(b.scheduledTime ?? "")).map((e) => (
-                          <div key={e.id} className={`flex items-center justify-between text-xs px-3 py-1.5 rounded-lg ${e.followUp ? "bg-green-100 text-green-800" : "bg-white text-gray-700 border border-gray-200"}`}>
+                          <div key={e.id} className={`flex items-center justify-between text-xs px-3 py-1.5 rounded-lg ${e.followUps?.[0]?.attendedTime ? "bg-green-100 text-green-800" : "bg-white text-gray-700 border border-gray-200"}`}>
                             <span className="font-mono font-semibold">{e.tramiteCode}</span>
                             <span>{e.scheduledTime ?? "--:--"}</span>
-                            <span>{e.followUp ? `✓ ${e.followUp.clientName ?? "llegó"}` : "⏳ pendiente"}</span>
+                            <span>{e.followUps?.[0]?.attendedTime ? `✓ ${e.followUps?.[0]?.clientName ?? "llegó"}` : "⏳ pendiente"}</span>
                           </div>
                         ))}
                       </div>
