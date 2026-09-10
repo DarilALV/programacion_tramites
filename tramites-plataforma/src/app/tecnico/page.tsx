@@ -52,11 +52,11 @@ const STATUS_LABEL: Record<FollowUpStatus, string> = {
 interface AgendaRowProps {
   entry: Entry;
   followUp?: FollowUp;
-  onRevisando: (id: string) => void;
-  onSaliALlamar: (id: string) => void;
-  onAtendi: (id: string) => void;
-  onNoRespondio: (id: string) => void;
-  onTermineDeAtender: (id: string) => void;
+  onRevisando: (id: string, followUpCreatedAt?: string) => void;
+  onSaliALlamar: (id: string, followUpCreatedAt?: string) => void;
+  onAtendi: (id: string, followUpCreatedAt?: string) => void;
+  onNoRespondio: (id: string, followUpCreatedAt?: string) => void;
+  onTermineDeAtender: (id: string, followUpCreatedAt?: string) => void;
 }
 
 const AgendaRow = memo(function AgendaRow({
@@ -135,12 +135,12 @@ const AgendaRow = memo(function AgendaRow({
           {(st === "esperando" || st === "en-revision") && (
             <>
               {st === "esperando" && (
-                <button onClick={() => onRevisando(entry.id)}
+                <button onClick={() => onRevisando(entry.id, fu?.createdAt)}
                   className="px-3 py-2 bg-indigo-100 text-indigo-800 text-xs font-bold rounded-lg hover:bg-indigo-200 cursor-pointer border border-indigo-300">
                   📋 Revisando
                 </button>
               )}
-              <button onClick={() => onSaliALlamar(entry.id)}
+              <button onClick={() => onSaliALlamar(entry.id, fu?.createdAt)}
                 className="px-3 py-2 bg-purple-600 text-white text-sm font-bold rounded-lg hover:bg-purple-700 cursor-pointer shadow">
                 🚶 Salgo a llamar
               </button>
@@ -150,11 +150,11 @@ const AgendaRow = memo(function AgendaRow({
           {st === "llamado" && (
             <div className="space-y-2">
               <p className="text-xs text-gray-500 font-semibold">Al regresar:</p>
-              <button onClick={() => onAtendi(entry.id)}
+              <button onClick={() => onAtendi(entry.id, fu?.createdAt)}
                 className="w-full px-3 py-2 bg-green-600 text-white text-sm font-bold rounded-lg hover:bg-green-700 cursor-pointer shadow">
                 ✅ Lo atendí
               </button>
-              <button onClick={() => onNoRespondio(entry.id)}
+              <button onClick={() => onNoRespondio(entry.id, fu?.createdAt)}
                 className="w-full px-3 py-2 bg-orange-500 text-white text-sm font-bold rounded-lg hover:bg-orange-600 cursor-pointer shadow">
                 ↩️ No respondió
               </button>
@@ -172,7 +172,7 @@ const AgendaRow = memo(function AgendaRow({
               <div className="rounded-lg bg-yellow-50 border border-yellow-300 p-2">
                 <p className="text-xs text-yellow-800 font-semibold">↩️ Regresó</p>
               </div>
-              <button onClick={() => onTermineDeAtender(entry.id)}
+              <button onClick={() => onTermineDeAtender(entry.id, fu?.createdAt)}
                 className="w-full px-3 py-2 bg-green-600 text-white text-sm font-bold rounded-lg hover:bg-green-700 cursor-pointer shadow">
                 ✅ Terminé
               </button>
@@ -400,61 +400,71 @@ export default function AgendaTecnicoPage() {
     };
   }, [reportEntries]);
 
-  const marcarRevisando = useCallback(async (entryId: string) => {
+  const marcarRevisando = useCallback(async (entryId: string, followUpCreatedAt?: string) => {
     const entry = entries.find((e) => e.id === entryId);
-    const fu = entry?.followUps?.[0];
-    if (!entry || !fu) return;
-    const newFollowUps = [...(entry.followUps ?? [])];
-    newFollowUps[0] = { ...fu, followUpStatus: "en-revision" };
+    if (!entry) return;
+    const fu = followUpCreatedAt
+      ? entry.followUps?.find(f => f.createdAt === followUpCreatedAt)
+      : entry.followUps?.[0];
+    if (!fu) return;
+    const newFollowUps = (entry.followUps ?? []).map(f => f === fu ? { ...fu, followUpStatus: "en-revision" as const } : f);
     updateEntry(entryId, { ...entry, followUps: newFollowUps });
   }, [entries, updateEntry]);
 
-  const marcarSaliALlamar = useCallback(async (entryId: string) => {
+  const marcarSaliALlamar = useCallback(async (entryId: string, followUpCreatedAt?: string) => {
     const entry = entries.find((e) => e.id === entryId);
-    const fu = entry?.followUps?.[0];
-    if (!entry || !fu) return;
+    if (!entry) return;
+    const fu = followUpCreatedAt
+      ? entry.followUps?.find(f => f.createdAt === followUpCreatedAt)
+      : entry.followUps?.[0];
+    if (!fu) return;
     const { time } = await getServerNow();
-    const newFollowUps = [...(entry.followUps ?? [])];
-    newFollowUps[0] = { ...fu, followUpStatus: "llamado", calledTime: time };
+    const newFollowUps = (entry.followUps ?? []).map(f => f === fu ? { ...fu, followUpStatus: "llamado" as const, calledTime: time } : f);
     updateEntry(entryId, { ...entry, followUps: newFollowUps });
   }, [entries, updateEntry]);
 
-  const marcarLeAtendi = useCallback(async (entryId: string) => {
+  const marcarLeAtendi = useCallback(async (entryId: string, followUpCreatedAt?: string) => {
     const entry = entries.find((e) => e.id === entryId);
-    const fu = entry?.followUps?.[0];
-    if (!entry || !fu) return;
+    if (!entry) return;
+    const fu = followUpCreatedAt
+      ? entry.followUps?.find(f => f.createdAt === followUpCreatedAt)
+      : entry.followUps?.[0];
+    if (!fu) return;
     const { time } = await getServerNow();
-    const newFollowUps = [...(entry.followUps ?? [])];
-    newFollowUps[0] = {
+    const newFollowUps = (entry.followUps ?? []).map(f => f === fu ? {
       ...fu,
-      followUpStatus: "completado",
+      followUpStatus: "completado" as const,
       attendedTime: fu.calledTime ?? fu.returnedTime ?? time,
       completedTime: time,
-    };
+    } : f);
     updateEntry(entryId, { ...entry, followUps: newFollowUps });
   }, [entries, updateEntry]);
 
-  const marcarNoRespondio = useCallback(async (entryId: string) => {
+  const marcarNoRespondio = useCallback(async (entryId: string, followUpCreatedAt?: string) => {
     const entry = entries.find((e) => e.id === entryId);
-    const fu = entry?.followUps?.[0];
-    if (!entry || !fu) return;
-    const newFollowUps = [...(entry.followUps ?? [])];
-    newFollowUps[0] = { ...fu, followUpStatus: "no-escucho" };
+    if (!entry) return;
+    const fu = followUpCreatedAt
+      ? entry.followUps?.find(f => f.createdAt === followUpCreatedAt)
+      : entry.followUps?.[0];
+    if (!fu) return;
+    const newFollowUps = (entry.followUps ?? []).map(f => f === fu ? { ...fu, followUpStatus: "no-escucho" as const } : f);
     updateEntry(entryId, { ...entry, followUps: newFollowUps });
   }, [entries, updateEntry]);
 
-  const marcarTermineDeAtender = useCallback(async (entryId: string) => {
+  const marcarTermineDeAtender = useCallback(async (entryId: string, followUpCreatedAt?: string) => {
     const entry = entries.find((e) => e.id === entryId);
-    const fu = entry?.followUps?.[0];
-    if (!entry || !fu) return;
+    if (!entry) return;
+    const fu = followUpCreatedAt
+      ? entry.followUps?.find(f => f.createdAt === followUpCreatedAt)
+      : entry.followUps?.[0];
+    if (!fu) return;
     const { time } = await getServerNow();
-    const newFollowUps = [...(entry.followUps ?? [])];
-    newFollowUps[0] = {
+    const newFollowUps = (entry.followUps ?? []).map(f => f === fu ? {
       ...fu,
-      followUpStatus: "completado",
+      followUpStatus: "completado" as const,
       attendedTime: fu.returnedTime ?? time,
       completedTime: time,
-    };
+    } : f);
     updateEntry(entryId, { ...entry, followUps: newFollowUps });
   }, [entries, updateEntry]);
 
