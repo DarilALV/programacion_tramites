@@ -738,13 +738,19 @@ export default function AgendaTecnicoPage() {
                                     </div>
                                     <div className="flex gap-2 pt-2">
                                       {status === "esperando" && (
-                                        <button onClick={() => updateEntry(entry.id, { ...entry, followUps: [{ ...fu, followUpStatus: "en-revision" }] })}
+                                        <button onClick={() => {
+                                          const updatedFollowUps = entry.followUps?.map((f) => f === fu ? { ...fu, followUpStatus: "en-revision" } : f) ?? [];
+                                          updateEntry(entry.id, { ...entry, followUps: updatedFollowUps });
+                                        }}
                                           className="px-3 py-1.5 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition font-semibold">
                                           🔄 En revisión
                                         </button>
                                       )}
                                       {status === "en-revision" && (
-                                        <button onClick={() => updateEntry(entry.id, { ...entry, followUps: [{ ...fu, followUpStatus: "completado" }] })}
+                                        <button onClick={() => {
+                                          const updatedFollowUps = entry.followUps?.map((f) => f === fu ? { ...fu, followUpStatus: "completado" } : f) ?? [];
+                                          updateEntry(entry.id, { ...entry, followUps: updatedFollowUps });
+                                        }}
                                           className="px-3 py-1.5 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 transition font-semibold">
                                           ✓ Marcar revisado
                                         </button>

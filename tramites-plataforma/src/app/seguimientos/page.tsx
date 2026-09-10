@@ -567,7 +567,7 @@ export default function SeguimientosPage() {
                   <div><p className="text-xs text-gray-500">Registro</p><p className="font-bold">{foundEntry.registrationNumber}</p></div>
                   <div><p className="text-xs text-gray-500">Fecha programada</p><p className="font-bold">{foundEntry.scheduleDate}</p></div>
                   <div><p className="text-xs text-gray-500">Técnico asignado</p><p className="font-bold text-blue-900">{foundEntry.technicianName}</p></div>
-                  {foundEntry.followUps && foundEntry.followUps.length > 0 && <div><p className="text-xs text-orange-600 font-semibold">⚠️ Ya tiene seguimiento</p></div>}
+                  {foundEntry.followUps && foundEntry.followUps.length > 0 && <div><p className="text-xs text-blue-600">📊 {foundEntry.followUps.length} seguimiento{foundEntry.followUps.length !== 1 ? "s" : ""}</p></div>}
                 </div>
               </div>
             )}
