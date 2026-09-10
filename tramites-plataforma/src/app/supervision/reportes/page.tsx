@@ -62,14 +62,14 @@ export default function ReportesSupervisionPage() {
     });
 
     entries.forEach((e) => {
-      if (!e.followUp) return;
-      // Use arrival date as primary (when client came), fall back to schedule date
-      const d = e.followUp?.arrivalTime ?
-        e.followUp.createdAt?.slice(0, 10) ?? e.scheduleDate ?? "" :
-        e.scheduleDate ?? e.followUp?.createdAt?.slice(0, 10) ?? "";
+      const fu = e.followUps?.[0];
+      if (!fu) return;
+      const d = fu.arrivalTime ?
+        fu.createdAt?.slice(0, 10) ?? e.scheduleDate ?? "" :
+        e.scheduleDate ?? fu.createdAt?.slice(0, 10) ?? "";
       if (!d || d < from || d > to) return;
 
-      const tid = e.followUp.actualTechnicianId ?? e.technicianId;
+      const tid = fu.actualTechnicianId ?? e.technicianId;
       const tech = technicians.find((t) => t.id === tid);
       if (!tech) return;
 
@@ -87,25 +87,25 @@ export default function ReportesSupervisionPage() {
         };
       }
 
-      const st = e.followUp.followUpStatus ?? "esperando";
+      const st = fu.followUpStatus ?? "esperando";
       techMap[tid].total++;
 
-      const esperaMin = e.followUp.arrivalTime && e.followUp.attendedTime ? minDiff(e.followUp.arrivalTime, e.followUp.attendedTime) : null;
-      const attnMin = e.followUp.attendedTime && e.followUp.completedTime ? minDiff(e.followUp.attendedTime, e.followUp.completedTime) : null;
+      const esperaMin = fu.arrivalTime && fu.attendedTime ? minDiff(fu.arrivalTime, fu.attendedTime) : null;
+      const attnMin = fu.attendedTime && fu.completedTime ? minDiff(fu.attendedTime, fu.completedTime) : null;
 
       techMap[tid].tramites.push({
         tramiteCode: e.tramiteCode,
         registrationNumber: e.registrationNumber,
-        clientName: e.followUp.clientName ?? "—",
+        clientName: fu.clientName ?? "—",
         status: st,
-        arrivalTime: e.followUp.arrivalTime ?? "—",
-        calledTime: e.followUp.calledTime ?? "—",
-        attendedTime: e.followUp.attendedTime ?? "—",
-        completedTime: e.followUp.completedTime ?? "—",
-        returnedTime: e.followUp.returnedTime ?? "—",
+        arrivalTime: fu.arrivalTime ?? "—",
+        calledTime: fu.calledTime ?? "—",
+        attendedTime: fu.attendedTime ?? "—",
+        completedTime: fu.completedTime ?? "—",
+        returnedTime: fu.returnedTime ?? "—",
         esperaMin,
         attnMin,
-        observations: e.followUp.observations ?? "—",
+        observations: fu.observations ?? "—",
       });
 
       if (st === "completado") {

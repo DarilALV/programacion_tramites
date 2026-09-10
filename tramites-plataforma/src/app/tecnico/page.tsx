@@ -66,7 +66,7 @@ const AgendaRow = memo(function AgendaRow({
   onNoRespondio,
   onTermineDeAtender,
 }: AgendaRowProps) {
-  const fu = entry.followUp;
+  const fu = entry.followUps?.[0];
   const st = (fu?.followUpStatus ?? (fu ? "esperando" : undefined)) as FollowUpStatus | undefined;
 
   const rowBg =
@@ -254,25 +254,28 @@ export default function AgendaTecnicoPage() {
   useEffect(() => {
     if (!currentTechnicianId) return;
     const techEntries = entries.filter((e) => {
-      const isThisTech = e.technicianId === currentTechnicianId || e.followUp?.actualTechnicianId === currentTechnicianId;
-      const isToday = e.scheduleDate === today || e.followUp?.createdAt?.startsWith(today);
-      return isThisTech && isToday && e.followUp;
+      const fu = e.followUps?.[0];
+      const isThisTech = e.technicianId === currentTechnicianId || fu?.actualTechnicianId === currentTechnicianId;
+      const isToday = e.scheduleDate === today || fu?.createdAt?.startsWith(today);
+      return isThisTech && isToday && fu;
     });
     techEntries.forEach((e) => {
+      const fu = e.followUps?.[0];
+      if (!fu) return;
       const key = `${e.id}-arrived`;
-      if (!knownIdsRef.current.has(key) && e.followUp?.arrivalTime) {
+      if (!knownIdsRef.current.has(key) && fu.arrivalTime) {
         if (knownIdsRef.current.size > 0) {
-          notifyBrowser("🚶 Contribuyente llegó", `Trámite ${e.tramiteCode} — ${e.followUp.clientName ?? "sin nombre"}`);
-          setToastMessage(`🚶 ${e.followUp.clientName ?? "Contribuyente"} llegó\nTrámite ${e.tramiteCode}`);
+          notifyBrowser("🚶 Contribuyente llegó", `Trámite ${e.tramiteCode} — ${fu.clientName ?? "sin nombre"}`);
+          setToastMessage(`🚶 ${fu.clientName ?? "Contribuyente"} llegó\nTrámite ${e.tramiteCode}`);
           setToastShow(true);
         }
         knownIdsRef.current.add(key);
       }
       const keyReg = `${e.id}-regreso`;
-      if (!knownIdsRef.current.has(keyReg) && e.followUp?.followUpStatus === "regreso") {
+      if (!knownIdsRef.current.has(keyReg) && fu.followUpStatus === "regreso") {
         if (knownIdsRef.current.size > 0) {
-          notifyBrowser("↩️ Contribuyente regresó", `Trámite ${e.tramiteCode} — ${e.followUp.clientName ?? "sin nombre"}`);
-          setToastMessage(`↩️ ${e.followUp.clientName ?? "Contribuyente"} regresó\nTrámite ${e.tramiteCode}`);
+          notifyBrowser("↩️ Contribuyente regresó", `Trámite ${e.tramiteCode} — ${fu.clientName ?? "sin nombre"}`);
+          setToastMessage(`↩️ ${fu.clientName ?? "Contribuyente"} regresó\nTrámite ${e.tramiteCode}`);
           setToastShow(true);
         }
         knownIdsRef.current.add(keyReg);
@@ -280,11 +283,12 @@ export default function AgendaTecnicoPage() {
     });
     if (knownIdsRef.current.size === 0) {
       techEntries.forEach((e) => {
-        if (e.followUp?.arrivalTime) knownIdsRef.current.add(`${e.id}-arrived`);
-        if (e.followUp?.followUpStatus === "regreso") knownIdsRef.current.add(`${e.id}-regreso`);
+        const fu = e.followUps?.[0];
+        if (!fu) return;
+        if (fu.arrivalTime) knownIdsRef.current.add(`${e.id}-arrived`);
+        if (fu.followUpStatus === "regreso") knownIdsRef.current.add(`${e.id}-regreso`);
       });
     }
-    // Persist to localStorage
     if (typeof window !== "undefined") {
       localStorage.setItem(`notifIds-${currentTechnicianId}`, JSON.stringify(Array.from(knownIdsRef.current)));
     }
@@ -294,19 +298,18 @@ export default function AgendaTecnicoPage() {
     if (!currentTechnicianId) return [];
     return entries
       .filter((e) => {
-        // Si tiene seguimiento hoy, mostrar si es el técnico asignado (original o derivado)
-        if (e.followUp?.createdAt?.startsWith(selectedDate)) {
-          const isThisTech = e.technicianId === currentTechnicianId || e.followUp?.actualTechnicianId === currentTechnicianId;
+        const fu = e.followUps?.[0];
+        if (fu?.createdAt?.startsWith(selectedDate)) {
+          const isThisTech = e.technicianId === currentTechnicianId || fu.actualTechnicianId === currentTechnicianId;
           return isThisTech;
         }
-        // Si no tiene seguimiento, mostrar si está programado para esa fecha y es este técnico
         const isThisDate = e.scheduleDate === selectedDate;
         const isThisTech = e.technicianId === currentTechnicianId;
-        return isThisDate && isThisTech && e.followUp;
+        return isThisDate && isThisTech && fu;
       })
       .sort((a, b) => {
-        const ta = a.followUp?.arrivalTime ?? a.scheduledTime ?? "00:00";
-        const tb = b.followUp?.arrivalTime ?? b.scheduledTime ?? "00:00";
+        const ta = a.followUps?.[0]?.arrivalTime ?? a.scheduledTime ?? "00:00";
+        const tb = b.followUps?.[0]?.arrivalTime ?? b.scheduledTime ?? "00:00";
         return ta.localeCompare(tb);
       });
   }, [entries, selectedDate, currentTechnicianId]);
@@ -320,32 +323,38 @@ export default function AgendaTecnicoPage() {
     else { const r = monthRange(selectedDate); from = r.from; to = r.to; }
 
     return entries.filter((e) => {
-      if (!e.followUp) return false; // Must have followUp to count
+      const fu = e.followUps?.[0];
+      if (!fu) return false;
 
-      const isThisTech = e.technicianId === currentTechnicianId || e.followUp?.actualTechnicianId === currentTechnicianId;
+      const isThisTech = e.technicianId === currentTechnicianId || fu.actualTechnicianId === currentTechnicianId;
       if (!isThisTech) return false;
 
-      // Use arrival date (when client came) as primary date, fall back to schedule date
-      const d = e.followUp?.arrivalTime ? e.followUp.createdAt?.slice(0, 10) ?? e.scheduleDate ?? "" :
-                e.scheduleDate ?? e.followUp?.createdAt?.slice(0, 10) ?? "";
+      const d = fu.arrivalTime ? fu.createdAt?.slice(0, 10) ?? e.scheduleDate ?? "" :
+                e.scheduleDate ?? fu.createdAt?.slice(0, 10) ?? "";
 
       return d >= from && d <= to;
     });
   }, [entries, currentTechnicianId, selectedDate, reportePeriodo]);
 
   const reportStats = useMemo(() => {
-    const completados = reportEntries.filter((e) => e.followUp?.followUpStatus === "completado");
-    const noEscucho = reportEntries.filter((e) => e.followUp?.followUpStatus === "no-escucho");
+    const completados = reportEntries.filter((e) => e.followUps?.[0]?.followUpStatus === "completado");
+    const noEscucho = reportEntries.filter((e) => e.followUps?.[0]?.followUpStatus === "no-escucho");
     const enProceso = reportEntries.filter((e) => {
-      const st = e.followUp?.followUpStatus;
+      const st = e.followUps?.[0]?.followUpStatus;
       return st && ["esperando", "en-revision", "llamado", "regreso"].includes(st);
     });
 
     const waitTimes = completados
-      .map((e) => e.followUp?.arrivalTime && e.followUp?.attendedTime ? minDiff(e.followUp.arrivalTime, e.followUp.attendedTime) : null)
+      .map((e) => {
+        const fu = e.followUps?.[0];
+        return fu?.arrivalTime && fu?.attendedTime ? minDiff(fu.arrivalTime, fu.attendedTime) : null;
+      })
       .filter((v): v is number => v !== null && v >= 0);
     const attnTimes = completados
-      .map((e) => e.followUp?.attendedTime && e.followUp?.completedTime ? minDiff(e.followUp.attendedTime, e.followUp.completedTime) : null)
+      .map((e) => {
+        const fu = e.followUps?.[0];
+        return fu?.attendedTime && fu?.completedTime ? minDiff(fu.attendedTime, fu.completedTime) : null;
+      })
       .filter((v): v is number => v !== null && v >= 0);
     const avg = (arr: number[]) => arr.length ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : null;
 
@@ -361,57 +370,67 @@ export default function AgendaTecnicoPage() {
 
   const marcarRevisando = useCallback(async (entryId: string) => {
     const entry = entries.find((e) => e.id === entryId);
-    if (!entry?.followUp) return;
-    updateEntry(entryId, { ...entry, followUp: { ...entry.followUp, followUpStatus: "en-revision" } });
+    const fu = entry?.followUps?.[0];
+    if (!entry || !fu) return;
+    const newFollowUps = [...(entry.followUps ?? [])];
+    newFollowUps[0] = { ...fu, followUpStatus: "en-revision" };
+    updateEntry(entryId, { ...entry, followUps: newFollowUps });
   }, [entries, updateEntry]);
 
   const marcarSaliALlamar = useCallback(async (entryId: string) => {
     const entry = entries.find((e) => e.id === entryId);
-    if (!entry?.followUp) return;
+    const fu = entry?.followUps?.[0];
+    if (!entry || !fu) return;
     const { time } = await getServerNow();
-    updateEntry(entryId, { ...entry, followUp: { ...entry.followUp, followUpStatus: "llamado", calledTime: time } });
+    const newFollowUps = [...(entry.followUps ?? [])];
+    newFollowUps[0] = { ...fu, followUpStatus: "llamado", calledTime: time };
+    updateEntry(entryId, { ...entry, followUps: newFollowUps });
   }, [entries, updateEntry]);
 
   const marcarLeAtendi = useCallback(async (entryId: string) => {
     const entry = entries.find((e) => e.id === entryId);
-    if (!entry?.followUp) return;
+    const fu = entry?.followUps?.[0];
+    if (!entry || !fu) return;
     const { time } = await getServerNow();
-    updateEntry(entryId, {
-      ...entry,
-      followUp: {
-        ...entry.followUp,
-        followUpStatus: "completado",
-        attendedTime: entry.followUp.calledTime ?? entry.followUp.returnedTime ?? time,
-        completedTime: time,
-      },
-    });
+    const newFollowUps = [...(entry.followUps ?? [])];
+    newFollowUps[0] = {
+      ...fu,
+      followUpStatus: "completado",
+      attendedTime: fu.calledTime ?? fu.returnedTime ?? time,
+      completedTime: time,
+    };
+    updateEntry(entryId, { ...entry, followUps: newFollowUps });
   }, [entries, updateEntry]);
 
   const marcarNoRespondio = useCallback(async (entryId: string) => {
     const entry = entries.find((e) => e.id === entryId);
-    if (!entry?.followUp) return;
-    updateEntry(entryId, { ...entry, followUp: { ...entry.followUp, followUpStatus: "no-escucho" } });
+    const fu = entry?.followUps?.[0];
+    if (!entry || !fu) return;
+    const newFollowUps = [...(entry.followUps ?? [])];
+    newFollowUps[0] = { ...fu, followUpStatus: "no-escucho" };
+    updateEntry(entryId, { ...entry, followUps: newFollowUps });
   }, [entries, updateEntry]);
 
   const marcarTermineDeAtender = useCallback(async (entryId: string) => {
     const entry = entries.find((e) => e.id === entryId);
-    if (!entry?.followUp) return;
+    const fu = entry?.followUps?.[0];
+    if (!entry || !fu) return;
     const { time } = await getServerNow();
-    updateEntry(entryId, {
-      ...entry,
-      followUp: {
-        ...entry.followUp,
-        followUpStatus: "completado",
-        attendedTime: entry.followUp.returnedTime ?? time,
-        completedTime: time,
-      },
-    });
+    const newFollowUps = [...(entry.followUps ?? [])];
+    newFollowUps[0] = {
+      ...fu,
+      followUpStatus: "completado",
+      attendedTime: fu.returnedTime ?? time,
+      completedTime: time,
+    };
+    updateEntry(entryId, { ...entry, followUps: newFollowUps });
   }, [entries, updateEntry]);
 
   async function exportarReporte() {
     const XLSX = await import("xlsx");
     const rows = reportEntries.map((e) => {
-      const fu = e.followUp!;
+      const fu = e.followUps?.[0];
+      if (!fu) return null;
       const wait = fu.arrivalTime && fu.attendedTime ? minDiff(fu.arrivalTime, fu.attendedTime) : "";
       const attn = fu.attendedTime && fu.completedTime ? minDiff(fu.attendedTime, fu.completedTime) : "";
       return {
@@ -425,7 +444,7 @@ export default function AgendaTecnicoPage() {
         "Espera (min)": wait, "Atención (min)": attn,
         "Obs.": fu.observations ?? "",
       };
-    });
+    }).filter((r): r is any => r !== null);
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Reporte");
@@ -433,7 +452,7 @@ export default function AgendaTecnicoPage() {
   }
 
   const arrivedNow = agendaHoy.filter((e) => {
-    const st = e.followUp?.followUpStatus as FollowUpStatus | undefined;
+    const st = e.followUps?.[0]?.followUpStatus as FollowUpStatus | undefined;
     return st && ["esperando", "en-revision", "regreso"].includes(st);
   });
 
@@ -583,7 +602,8 @@ export default function AgendaTecnicoPage() {
             <p className="text-sm font-semibold text-red-700 uppercase mb-3">⚠️ {arrivedNow.length} cliente{arrivedNow.length > 1 ? "s" : ""} esperando atención</p>
             <div className="space-y-2">
               {arrivedNow.map((e) => {
-                const fu = e.followUp!;
+                const fu = e.followUps?.[0];
+                if (!fu) return null;
                 const st = (fu.followUpStatus ?? "esperando") as FollowUpStatus;
                 return (
                   <div key={e.id} className="flex items-center justify-between bg-white rounded-lg px-4 py-3 border border-red-200 flex-wrap gap-2">
@@ -606,7 +626,7 @@ export default function AgendaTecnicoPage() {
             <h2 className="text-2xl font-bold">Agenda — {selectedDate}</h2>
             <div className="flex items-center gap-3 text-sm">
               <span>📋 {agendaHoy.length} trámites</span>
-              <span>✅ {agendaHoy.filter((e) => e.followUp?.followUpStatus === "completado").length} completados</span>
+              <span>✅ {agendaHoy.filter((e) => e.followUps?.[0]?.followUpStatus === "completado").length} completados</span>
             </div>
           </div>
 
