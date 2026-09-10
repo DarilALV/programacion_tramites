@@ -24,6 +24,7 @@ export type PlannerUser = {
 
 export type Junta = {
   id: string;
+  name: string; // Nombre personalizado
   date: string; // "2026-09-10"
   technicianId: string;
   technicianName: string;
@@ -884,9 +885,10 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
     setCurrentUserId(plannerUsers[0].id);
   }
 
-  function createJunta(technicianId: string, tramiteCount: number, observations?: string) {
+  function createJunta(technicianId: string, name: string, tramiteCount: number, observations?: string) {
     const junta: Junta = {
       id: `junta-${Date.now()}`,
+      name,
       date: new Date().toISOString().slice(0, 10),
       technicianId,
       technicianName: technicians.find(t => t.id === technicianId)?.name || technicianId,

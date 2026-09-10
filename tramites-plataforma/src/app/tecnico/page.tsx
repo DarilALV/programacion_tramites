@@ -692,7 +692,7 @@ export default function AgendaTecnicoPage() {
                     >
                       <div className="flex-1">
                         <p className="font-bold text-emerald-900">
-                          {isExpanded ? "▼" : "▶"} Junta {junta.id.slice(-6).toUpperCase()}
+                          {isExpanded ? "▼" : "▶"} {junta.name}
                         </p>
                         <div className="text-sm text-emerald-700 mt-1 space-y-0.5">
                           <p>📅 Ingresada: {new Date(junta.createdAt).toLocaleString("es-ES")}</p>

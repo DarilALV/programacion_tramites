@@ -54,6 +54,7 @@ export default function SeguimientosPage() {
   const [editingFollowUpId, setEditingFollowUpId] = useState<string | null>(null);
   const [showJuntaModal, setShowJuntaModal] = useState(false);
   const [juntaTechnicianId, setJuntaTechnicianId] = useState("");
+  const [juntaName, setJuntaName] = useState("");
   const [juntaTramites, setJuntaTramites] = useState<{ code: string; clientName: string }[]>([]);
   const [juntaObservations, setJuntaObservations] = useState("");
   const [expandedJuntaId, setExpandedJuntaId] = useState<string | null>(null);
@@ -189,6 +190,7 @@ export default function SeguimientosPage() {
 
   async function handleCreateJunta() {
     if (!juntaTechnicianId) return showMsg("⚠️ Selecciona un técnico", "error");
+    if (!juntaName.trim()) return showMsg("⚠️ Ingresa un nombre para la junta", "error");
     if (juntaTramites.length === 0) return showMsg("⚠️ Agrega al menos un trámite", "error");
 
     // Validar que todos tengan código y cliente
@@ -196,7 +198,7 @@ export default function SeguimientosPage() {
     if (invalid) return showMsg("⚠️ Todos los trámites deben tener código y nombre de cliente", "error");
 
     // Crear la junta primero
-    const junta = createJunta(juntaTechnicianId, juntaTramites.length, juntaObservations.trim() || undefined);
+    const junta = createJunta(juntaTechnicianId, juntaName.trim(), juntaTramites.length, juntaObservations.trim() || undefined);
 
     // Crear Entry para cada trámite
     const { iso } = await getServerNow();
@@ -227,9 +229,10 @@ export default function SeguimientosPage() {
       createEntry(newEntry);
     });
 
-    showMsg(`✅ Junta registrada: ${juntaTramites.length} trámites para ${technicians.find(t => t.id === juntaTechnicianId)?.name}`, "success");
+    showMsg(`✅ Junta "${juntaName}" registrada: ${juntaTramites.length} trámites para ${technicians.find(t => t.id === juntaTechnicianId)?.name}`, "success");
     setShowJuntaModal(false);
     setJuntaTechnicianId("");
+    setJuntaName("");
     setJuntaTramites([]);
     setJuntaObservations("");
   }
@@ -690,7 +693,7 @@ export default function SeguimientosPage() {
                     >
                       <div className="flex-1">
                         <p className="font-bold text-emerald-900">
-                          {isExpanded ? "▼" : "▶"} Junta {junta.id.slice(-6).toUpperCase()}
+                          {isExpanded ? "▼" : "▶"} {junta.name}
                         </p>
                         <div className="text-sm text-emerald-700 mt-1 space-y-0.5">
                           <p>👤 {junta.technicianName} | 📊 {junta.tramiteCount} trámites | 📝 {junta.registeredBy}</p>
@@ -1025,6 +1028,18 @@ export default function SeguimientosPage() {
               </select>
             </label>
 
+            {/* Nombre de Junta */}
+            <label className="grid gap-2">
+              <span className="text-sm font-semibold">Nombre de la Junta *</span>
+              <input
+                type="text"
+                value={juntaName}
+                onChange={(e) => setJuntaName(e.target.value)}
+                placeholder="Ej: Revisión TUNARI - Semana 1"
+                className="rounded-lg border-2 border-emerald-300 px-4 py-3 focus:border-emerald-500 focus:outline-none text-sm"
+              />
+            </label>
+
             {/* Observaciones */}
             <label className="grid gap-2">
               <span className="text-sm font-semibold">Observaciones (opcional)</span>
@@ -1102,6 +1117,7 @@ export default function SeguimientosPage() {
                 onClick={() => {
                   setShowJuntaModal(false);
                   setJuntaTechnicianId("");
+                  setJuntaName("");
                   setJuntaTramites([]);
                   setJuntaObservations("");
                 }}
