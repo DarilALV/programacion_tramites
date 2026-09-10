@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 
 export type AreaId = "supervisor" | "ruat" | "legal" | "revision-plano" | "tunari";
 export type EntryStatus = "Registrado" | "En revisión" | "Aprobado";
+export type FollowUpType = "normal" | "junta_ingreso" | "derivado" | "legalización";
 
 export type Area = {
   id: AreaId;
@@ -40,6 +41,24 @@ export type TechnicianOption = {
   areaLabel: string;
 };
 
+export type FollowUp = {
+  type?: FollowUpType;
+  juntaId?: string;
+  clientName?: string;
+  arrivalTime?: string;
+  attendedTime?: string;
+  completedTime?: string;
+  calledTime?: string;
+  returnedTime?: string;
+  actualTechnicianId?: string;
+  actualTechnicianName?: string;
+  attended?: boolean;
+  followUpStatus?: "esperando" | "en-revision" | "llamado" | "no-escucho" | "regreso" | "atendiendo" | "completado";
+  observations?: string;
+  createdAt?: string;
+  isUnscheduled?: boolean;
+};
+
 export type Entry = {
   id: string;
   createdBy: string;
@@ -54,26 +73,11 @@ export type Entry = {
   observations: string;
   status: EntryStatus;
   createdAt: string;
-  deleted?: boolean;     // borrado suave — visible solo en Firestore Console
-   // NUEVOS CAMPOS:
-  scheduledTime?: string;  // Hora programada (ej: "10:00")
-  scheduledEndTime?: string; //Hora fin estimada
-  // Datos de seguimiento:
-  followUp?: {
-    clientName?: string;
-    arrivalTime?: string;
-    attendedTime?: string;
-    completedTime?: string;
-    calledTime?: string;
-    returnedTime?: string;
-    actualTechnicianId?: string;
-    actualTechnicianName?: string;
-    attended?: boolean;
-    followUpStatus?: "esperando" | "en-revision" | "llamado" | "no-escucho" | "regreso" | "atendiendo" | "completado";
-    observations?: string;
-    createdAt?: string;
-    isUnscheduled?: boolean;
-  };
+  deleted?: boolean;
+  scheduledTime?: string;
+  scheduledEndTime?: string;
+  juntaId?: string;
+  followUps?: FollowUp[];
 };
 
 export type EntryFormValues = {
@@ -284,23 +288,55 @@ scheduledEndTime: typeof rawEntry.scheduledEndTime === "string"
   ? rawEntry.scheduledEndTime 
   : undefined,
 
-followUp: rawEntry.followUp && typeof rawEntry.followUp === "object"
-  ? {
-      clientName: typeof (rawEntry.followUp as any).clientName === "string" ? (rawEntry.followUp as any).clientName : undefined,
-      arrivalTime: typeof (rawEntry.followUp as any).arrivalTime === "string" ? (rawEntry.followUp as any).arrivalTime : undefined,
-      attended: typeof (rawEntry.followUp as any).attended === "boolean" ? (rawEntry.followUp as any).attended : undefined,
-      attendedTime: typeof (rawEntry.followUp as any).attendedTime === "string" ? (rawEntry.followUp as any).attendedTime : undefined,
-      completedTime: typeof (rawEntry.followUp as any).completedTime === "string" ? (rawEntry.followUp as any).completedTime : undefined,
-      calledTime: typeof (rawEntry.followUp as any).calledTime === "string" ? (rawEntry.followUp as any).calledTime : undefined,
-      returnedTime: typeof (rawEntry.followUp as any).returnedTime === "string" ? (rawEntry.followUp as any).returnedTime : undefined,
-      followUpStatus: typeof (rawEntry.followUp as any).followUpStatus === "string" ? (rawEntry.followUp as any).followUpStatus : undefined,
-      actualTechnicianId: typeof (rawEntry.followUp as any).actualTechnicianId === "string" ? (rawEntry.followUp as any).actualTechnicianId : undefined,
-      actualTechnicianName: typeof (rawEntry.followUp as any).actualTechnicianName === "string" ? (rawEntry.followUp as any).actualTechnicianName : undefined,
-      observations: typeof (rawEntry.followUp as any).observations === "string" ? (rawEntry.followUp as any).observations : undefined,
-      createdAt: typeof (rawEntry.followUp as any).createdAt === "string" ? (rawEntry.followUp as any).createdAt : undefined,
-      isUnscheduled: typeof (rawEntry.followUp as any).isUnscheduled === "boolean" ? (rawEntry.followUp as any).isUnscheduled : undefined,
-    }
-  : undefined,
+followUps: (() => {
+  const followUps: FollowUp[] = [];
+
+  // Migrar from followUp (singular, legacy)
+  if (rawEntry.followUp && typeof rawEntry.followUp === "object") {
+    const fu = rawEntry.followUp as any;
+    followUps.push({
+      type: typeof fu.type === "string" ? fu.type : "normal",
+      juntaId: typeof fu.juntaId === "string" ? fu.juntaId : undefined,
+      clientName: typeof fu.clientName === "string" ? fu.clientName : undefined,
+      arrivalTime: typeof fu.arrivalTime === "string" ? fu.arrivalTime : undefined,
+      attended: typeof fu.attended === "boolean" ? fu.attended : undefined,
+      attendedTime: typeof fu.attendedTime === "string" ? fu.attendedTime : undefined,
+      completedTime: typeof fu.completedTime === "string" ? fu.completedTime : undefined,
+      calledTime: typeof fu.calledTime === "string" ? fu.calledTime : undefined,
+      returnedTime: typeof fu.returnedTime === "string" ? fu.returnedTime : undefined,
+      followUpStatus: typeof fu.followUpStatus === "string" ? fu.followUpStatus : undefined,
+      actualTechnicianId: typeof fu.actualTechnicianId === "string" ? fu.actualTechnicianId : undefined,
+      actualTechnicianName: typeof fu.actualTechnicianName === "string" ? fu.actualTechnicianName : undefined,
+      observations: typeof fu.observations === "string" ? fu.observations : undefined,
+      createdAt: typeof fu.createdAt === "string" ? fu.createdAt : undefined,
+      isUnscheduled: typeof fu.isUnscheduled === "boolean" ? fu.isUnscheduled : undefined,
+    });
+  }
+
+  // Migrar from followUps (plural, new)
+  if (Array.isArray(rawEntry.followUps)) {
+    followUps.push(...(rawEntry.followUps as any[]).map((fu) => ({
+      type: typeof fu.type === "string" ? fu.type : "normal",
+      juntaId: typeof fu.juntaId === "string" ? fu.juntaId : undefined,
+      clientName: typeof fu.clientName === "string" ? fu.clientName : undefined,
+      arrivalTime: typeof fu.arrivalTime === "string" ? fu.arrivalTime : undefined,
+      attended: typeof fu.attended === "boolean" ? fu.attended : undefined,
+      attendedTime: typeof fu.attendedTime === "string" ? fu.attendedTime : undefined,
+      completedTime: typeof fu.completedTime === "string" ? fu.completedTime : undefined,
+      calledTime: typeof fu.calledTime === "string" ? fu.calledTime : undefined,
+      returnedTime: typeof fu.returnedTime === "string" ? fu.returnedTime : undefined,
+      followUpStatus: typeof fu.followUpStatus === "string" ? fu.followUpStatus : undefined,
+      actualTechnicianId: typeof fu.actualTechnicianId === "string" ? fu.actualTechnicianId : undefined,
+      actualTechnicianName: typeof fu.actualTechnicianName === "string" ? fu.actualTechnicianName : undefined,
+      observations: typeof fu.observations === "string" ? fu.observations : undefined,
+      createdAt: typeof fu.createdAt === "string" ? fu.createdAt : undefined,
+      isUnscheduled: typeof fu.isUnscheduled === "boolean" ? fu.isUnscheduled : undefined,
+    })));
+  }
+
+  return followUps.length > 0 ? followUps : undefined;
+})(),
+juntaId: typeof rawEntry.juntaId === "string" ? rawEntry.juntaId : undefined,
   };
 }
 
@@ -373,13 +409,14 @@ const seedEntries: Entry[] = [
     createdAt: new Date().toISOString(),
     scheduledTime: "08:15",
     scheduledEndTime: "08:30",
-    followUp: {
+    followUps: [{
+      type: "normal",
       clientName: "Juan Pérez",
       arrivalTime: "08:15",
       attended: false,
       observations: "Cliente llegó",
       createdAt: new Date().toISOString(),
-    },
+    }],
   },
   {
     id: "entry-today-3",
@@ -397,14 +434,15 @@ const seedEntries: Entry[] = [
     createdAt: new Date().toISOString(),
     scheduledTime: "08:30",
     scheduledEndTime: "08:45",
-    followUp: {
+    followUps: [{
+      type: "normal",
       clientName: "María García",
       arrivalTime: "08:28",
       attended: true,
       attendedTime: "08:35",
       observations: "Ya fue atendido",
       createdAt: new Date().toISOString(),
-    },
+    }],
   },
   {
     id: "entry-today-4",
@@ -439,13 +477,14 @@ const seedEntries: Entry[] = [
     createdAt: new Date().toISOString(),
     scheduledTime: "08:00",
     scheduledEndTime: "08:15",
-    followUp: {
+    followUps: [{
+      type: "normal",
       clientName: "Carlos López",
       arrivalTime: "08:02",
       attended: false,
       observations: "Llegó hace poco",
       createdAt: new Date().toISOString(),
-    },
+    }],
   },
   {
     id: "entry-today-6",
@@ -497,13 +536,14 @@ const seedEntries: Entry[] = [
     createdAt: new Date().toISOString(),
     scheduledTime: "08:15",
     scheduledEndTime: "08:30",
-    followUp: {
+    followUps: [{
+      type: "normal",
       clientName: "Ana Rodríguez",
       arrivalTime: "08:14",
       attended: false,
       observations: "Cliente esperando",
       createdAt: new Date().toISOString(),
-    },
+    }],
   },
 
   // MAÑANA - Algunos datos para prueba futura

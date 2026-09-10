@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { AppShell } from "@/components/app-shell";
-import { useTramitesStore, areas, type Entry } from "@/lib/tramites-store";
+import { useTramitesStore, areas, type Entry, type FollowUp } from "@/lib/tramites-store";
 import { getServerNow } from "@/lib/server-time";
 import { Search } from "lucide-react";
 
@@ -92,32 +92,36 @@ export default function SeguimientosPage() {
 
   const todayFollowUps = useMemo(() => entries
     .filter((e) => {
-      const isToday = e.followUp?.createdAt?.startsWith(today) || (e.scheduleDate === today && e.followUp);
-      if (!isToday) return false;
-      // Si el usuario tiene areaId, filtrar por técnicos de esa área
+      const hasFollowUpsToday = e.followUps?.some((fu) => fu.createdAt?.startsWith(today) || (e.scheduleDate === today && fu));
+      if (!hasFollowUpsToday) return false;
       if (currentUser.areaId) {
         const technicianArea = e.technicianArea;
         return areas.some((a) => a.id === currentUser.areaId && a.label === technicianArea);
       }
       return true;
     })
-    .sort((a, b) => (b.followUp?.arrivalTime ?? "").localeCompare(a.followUp?.arrivalTime ?? "")),
+    .sort((a, b) => {
+      const aTime = a.followUps?.[0]?.arrivalTime ?? "";
+      const bTime = b.followUps?.[0]?.arrivalTime ?? "";
+      return bTime.localeCompare(aTime);
+    }),
     [entries, today, currentUser.areaId]);
 
   const filteredFollowUps = useMemo(() => {
     if (!debouncedSearch.trim()) return todayFollowUps;
     const q = debouncedSearch.toLowerCase();
-    return todayFollowUps.filter((e) =>
-      e.tramiteCode.includes(q) ||
-      (e.followUp?.clientName ?? "").toLowerCase().includes(q) ||
-      e.technicianName.toLowerCase().includes(q)
-    );
+    return todayFollowUps.filter((e) => {
+      const clientName = e.followUps?.[0]?.clientName ?? "";
+      return e.tramiteCode.includes(q) ||
+        clientName.toLowerCase().includes(q) ||
+        e.technicianName.toLowerCase().includes(q);
+    });
   }, [todayFollowUps, debouncedSearch]);
 
   const techCountToday = useMemo(() => {
     const c: Record<string, number> = {};
     todayFollowUps.forEach((e) => {
-      const tid = e.followUp?.actualTechnicianId ?? e.technicianId;
+      const tid = e.followUps?.[0]?.actualTechnicianId ?? e.technicianId;
       c[tid] = (c[tid] ?? 0) + 1;
     });
     return c;
@@ -137,7 +141,6 @@ export default function SeguimientosPage() {
     entries.filter((e) => {
       const isToday = e.scheduleDate === today;
       if (!isToday) return false;
-      // Si el usuario tiene areaId, filtrar por técnicos de esa área
       if (currentUser.areaId) {
         const technicianArea = e.technicianArea;
         return areas.some((a) => a.id === currentUser.areaId && a.label === technicianArea);
@@ -148,12 +151,13 @@ export default function SeguimientosPage() {
       load[e.technicianId].programados++;
     });
     todayFollowUps.forEach((e) => {
-      const tid = e.followUp?.actualTechnicianId ?? e.technicianId;
-      const tn = e.followUp?.actualTechnicianName ?? e.technicianName;
+      const fu = e.followUps?.[0];
+      const tid = fu?.actualTechnicianId ?? e.technicianId;
+      const tn = fu?.actualTechnicianName ?? e.technicianName;
       if (!load[tid]) load[tid] = { name: tn, programados: 0, llegadas: 0, atendidos: 0, completados: 0 };
       load[tid].llegadas++;
-      if (e.followUp?.attendedTime) load[tid].atendidos++;
-      if (e.followUp?.completedTime) load[tid].completados++;
+      if (fu?.attendedTime) load[tid].atendidos++;
+      if (fu?.completedTime) load[tid].completados++;
     });
     return load;
   }, [entries, todayFollowUps, today, currentUser.areaId]);
@@ -189,7 +193,6 @@ export default function SeguimientosPage() {
     if (!selectedTechnicianId) return showMsg("⚠️ Selecciona el técnico", "error");
 
     const count = techCountToday[selectedTechnicianId] ?? 0;
-    // Permitir superar límite, solo mostrar warning si está cerca
     if (count >= LIMITE) {
       showMsg(`⚠️ ${effectiveTechnician?.name} ya atendió ${count} (límite: ${LIMITE}). Continuará registrando.`, "success");
     }
@@ -198,21 +201,22 @@ export default function SeguimientosPage() {
 
     if (foundEntry) {
       const techChanged = selectedTechnicianId !== foundEntry.technicianId;
+      const newFollowUp: FollowUp = {
+        type: "normal",
+        clientName: clientName.trim(),
+        arrivalTime: arrival,
+        followUpStatus: "esperando",
+        actualTechnicianId: techChanged ? foundEntry.technicianId : undefined,
+        actualTechnicianName: techChanged ? foundEntry.technicianName : undefined,
+        observations: observations.trim() || undefined,
+        createdAt: iso,
+      };
       updateEntry(foundEntry.id, {
         ...foundEntry,
         technicianId: selectedTechnicianId,
         technicianName: effectiveTechnician?.name ?? selectedTechnicianId,
         technicianArea: effectiveTechnician?.areaLabel ?? foundEntry.technicianArea,
-        followUp: {
-          ...foundEntry.followUp,
-          clientName: clientName.trim(),
-          arrivalTime: arrival,
-          followUpStatus: "esperando",
-          actualTechnicianId: techChanged ? foundEntry.technicianId : undefined,
-          actualTechnicianName: techChanged ? foundEntry.technicianName : undefined,
-          observations: observations.trim() || undefined,
-          createdAt: iso,
-        },
+        followUps: [...(foundEntry.followUps ?? []), newFollowUp],
       });
     } else {
       const newEntry: Entry = {
@@ -225,7 +229,7 @@ export default function SeguimientosPage() {
         technicianArea: effectiveTechnician?.areaLabel ?? "",
         scheduleDate: today, registrationDate: today,
         observations: "", status: "Registrado", createdAt: iso,
-        followUp: { clientName: clientName.trim(), arrivalTime: arrival, followUpStatus: "esperando", observations: observations.trim() || undefined, createdAt: iso, isUnscheduled: true },
+        followUps: [{ type: "normal", clientName: clientName.trim(), arrivalTime: arrival, followUpStatus: "esperando", observations: observations.trim() || undefined, createdAt: iso, isUnscheduled: true }],
       };
       createEntry(newEntry);
     }
@@ -241,26 +245,26 @@ export default function SeguimientosPage() {
 
     const { time: arrival, iso } = await getServerNow();
 
-    // Asignar a "Archivos" (que engloba RAM, Firma Jefatura, Firma Secretaria)
     const archivosId = "archivos";
     const archivosName = "Archivos";
     const archivosArea = "Archivos";
 
-    // Si existe el trámite en el sistema, lo actualiza; si no, crea entrada nueva
     if (foundEntry) {
+      const newFollowUp: FollowUp = {
+        type: "normal",
+        clientName: clientName.trim(),
+        arrivalTime: arrival,
+        followUpStatus: "completado",
+        observations: (observations.trim() ? `[${selectedGestion}] ${observations.trim()}` : `[${selectedGestion}]`),
+        createdAt: iso,
+        isUnscheduled: false,
+      };
       updateEntry(foundEntry.id, {
         ...foundEntry,
         technicianId: archivosId,
         technicianName: archivosName,
         technicianArea: archivosArea,
-        followUp: {
-          clientName: clientName.trim(),
-          arrivalTime: arrival,
-          followUpStatus: "completado",
-          observations: (observations.trim() ? `[${selectedGestion}] ${observations.trim()}` : `[${selectedGestion}]`),
-          createdAt: iso,
-          isUnscheduled: false,
-        },
+        followUps: [...(foundEntry.followUps ?? []), newFollowUp],
       });
     } else {
       const newEntry: Entry = {
@@ -273,14 +277,15 @@ export default function SeguimientosPage() {
         technicianArea: archivosArea,
         scheduleDate: today, registrationDate: today,
         observations: "", status: "Registrado", createdAt: iso,
-        followUp: {
+        followUps: [{
+          type: "normal",
           clientName: clientName.trim(),
           arrivalTime: arrival,
           followUpStatus: "completado",
           observations: (observations.trim() ? `[${selectedGestion}] ${observations.trim()}` : `[${selectedGestion}]`),
           createdAt: iso,
           isUnscheduled: true,
-        },
+        }],
       };
       createEntry(newEntry);
     }
@@ -289,45 +294,43 @@ export default function SeguimientosPage() {
   }
 
   async function handleMarkRegreso(entry: Entry) {
-    const { time, iso } = await getServerNow();
-    updateEntry(entry.id, {
-      ...entry,
-      followUp: { ...entry.followUp, followUpStatus: "regreso", returnedTime: time, createdAt: entry.followUp?.createdAt ?? iso },
-    });
+    const { time } = await getServerNow();
+    const newFollowUps = [...(entry.followUps ?? [])];
+    if (newFollowUps.length === 0) return;
+    const last = newFollowUps[newFollowUps.length - 1];
+    newFollowUps[newFollowUps.length - 1] = { ...last, followUpStatus: "regreso", returnedTime: time } as FollowUp;
+    updateEntry(entry.id, { ...entry, followUps: newFollowUps });
     showMsg(`↩️ Cliente regresó registrado a las ${time}`, "success");
   }
 
   function handleStartEdit(entry: Entry) {
+    const lastFollowUp = entry.followUps?.[entry.followUps.length - 1];
     setEditingFollowUpId(entry.id);
     setEditState({
-      clientName: entry.followUp?.clientName ?? "",
-      technicianId: "", // No usado aquí, solo en estado para compatibilidad
-      observations: entry.followUp?.observations ?? "",
+      clientName: lastFollowUp?.clientName ?? "",
+      technicianId: "",
+      observations: lastFollowUp?.observations ?? "",
     });
     setConfirmDeleteId(null);
   }
 
   function handleSaveEdit(entry: Entry) {
-    // Editar SOLO actualiza cliente y observaciones, no técnico
-    // Para cambiar técnico, usar "Derivar"
-    updateEntry(entry.id, {
-      ...entry,
-      followUp: {
-        ...entry.followUp,
-        clientName: editState.clientName.trim(),
-        observations: editState.observations.trim() || undefined,
-      },
-    });
+    const newFollowUps = [...(entry.followUps ?? [])];
+    if (newFollowUps.length === 0) return;
+    const last = newFollowUps[newFollowUps.length - 1];
+    newFollowUps[newFollowUps.length - 1] = { ...last, clientName: editState.clientName.trim(), observations: editState.observations.trim() || undefined };
+    updateEntry(entry.id, { ...entry, followUps: newFollowUps });
     setEditingFollowUpId(null);
     showMsg("✓ Seguimiento actualizado (cliente y observaciones)");
   }
 
   function handleDeleteFollowUp(entry: Entry) {
-    if (entry.followUp?.isUnscheduled) {
+    const lastFollowUp = entry.followUps?.[entry.followUps.length - 1];
+    if (lastFollowUp?.isUnscheduled && entry.followUps?.length === 1) {
       removeEntry(entry.id);
-    } else {
-      const { followUp: _followUp, ...rest } = entry; // eslint-disable-line @typescript-eslint/no-unused-vars
-      updateEntry(entry.id, rest as Entry);
+    } else if (entry.followUps && entry.followUps.length > 0) {
+      const newFollowUps = entry.followUps.slice(0, -1);
+      updateEntry(entry.id, { ...entry, followUps: newFollowUps.length > 0 ? newFollowUps : undefined });
     }
     setConfirmDeleteId(null);
     showMsg(`Seguimiento de ${entry.tramiteCode} eliminado`);
@@ -354,22 +357,23 @@ export default function SeguimientosPage() {
 
   async function exportarReporte() {
     const XLSX = await import("xlsx");
-    const rows = todayFollowUps.map((e) => {
-      const fu = e.followUp!;
-      const tech = fu.actualTechnicianName ?? e.technicianName;
-      const wait = fu.arrivalTime && fu.attendedTime ? minutesDiff(fu.arrivalTime, fu.attendedTime) : "";
-      const attn = fu.attendedTime && fu.completedTime ? minutesDiff(fu.attendedTime, fu.completedTime) : "";
-      return {
-        Fecha: today, "Trámite": e.tramiteCode, "Registro": e.registrationNumber,
-        "Cliente": fu.clientName ?? "", "Técnico": tech, "Área": e.technicianArea,
-        "Sin programación": fu.isUnscheduled ? "Sí" : "No",
-        "Llegada": fu.arrivalTime ?? "", "Estado": fu.followUpStatus ?? "",
-        "Hora llamado": fu.calledTime ?? "", "Regresó": fu.returnedTime ?? "",
-        "Atendido": fu.attendedTime ?? "", "Completado": fu.completedTime ?? "",
-        "Espera (min)": wait, "Atención (min)": attn,
-        "Obs.": fu.observations ?? "", "Por": e.createdByName,
-      };
-    });
+    const rows = todayFollowUps.flatMap((e) =>
+      (e.followUps ?? []).map((fu) => {
+        const tech = fu.actualTechnicianName ?? e.technicianName;
+        const wait = fu.arrivalTime && fu.attendedTime ? minutesDiff(fu.arrivalTime, fu.attendedTime) : "";
+        const attn = fu.attendedTime && fu.completedTime ? minutesDiff(fu.attendedTime, fu.completedTime) : "";
+        return {
+          Fecha: today, "Trámite": e.tramiteCode, "Registro": e.registrationNumber,
+          "Cliente": fu.clientName ?? "", "Técnico": tech, "Área": e.technicianArea,
+          "Sin programación": fu.isUnscheduled ? "Sí" : "No",
+          "Llegada": fu.arrivalTime ?? "", "Estado": fu.followUpStatus ?? "",
+          "Hora llamado": fu.calledTime ?? "", "Regresó": fu.returnedTime ?? "",
+          "Atendido": fu.attendedTime ?? "", "Completado": fu.completedTime ?? "",
+          "Espera (min)": wait, "Atención (min)": attn,
+          "Obs.": fu.observations ?? "", "Por": e.createdByName,
+        };
+      })
+    );
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Seguimientos");
@@ -438,7 +442,7 @@ export default function SeguimientosPage() {
                   <div><p className="text-xs text-gray-500">Registro</p><p className="font-bold">{foundEntry.registrationNumber}</p></div>
                   <div><p className="text-xs text-gray-500">Fecha programada</p><p className="font-bold">{foundEntry.scheduleDate}</p></div>
                   <div><p className="text-xs text-gray-500">Técnico asignado</p><p className="font-bold text-blue-900">{foundEntry.technicianName}</p></div>
-                  {foundEntry.followUp && <div><p className="text-xs text-orange-600 font-semibold">⚠️ Ya tiene seguimiento</p></div>}
+                  {foundEntry.followUps && foundEntry.followUps.length > 0 && <div><p className="text-xs text-orange-600 font-semibold">⚠️ Ya tiene seguimiento</p></div>}
                 </div>
               </div>
             )}
@@ -616,8 +620,8 @@ export default function SeguimientosPage() {
               <span className="text-sm font-normal ml-2">({todayFollowUps.length})</span>
             </h2>
             <div className="flex items-center gap-3 flex-wrap">
-              <span className="text-sm">🟢 {todayFollowUps.filter((e) => !e.followUp?.attendedTime).length} en espera</span>
-              <span className="text-sm">✅ {todayFollowUps.filter((e) => e.followUp?.completedTime).length} completados</span>
+              <span className="text-sm">🟢 {todayFollowUps.filter((e) => !e.followUps?.[0]?.attendedTime).length} en espera</span>
+              <span className="text-sm">✅ {todayFollowUps.filter((e) => e.followUps?.[0]?.completedTime).length} completados</span>
               {todayFollowUps.length > 0 && (
                 <button onClick={exportarReporte} className="bg-white text-pink-700 font-semibold text-sm px-4 py-1.5 rounded-lg hover:bg-pink-50 transition cursor-pointer">
                   📥 Exportar Excel
@@ -657,7 +661,8 @@ export default function SeguimientosPage() {
                 </thead>
                 <tbody>
                   {filteredFollowUps.map((entry, idx) => {
-                    const fu = entry.followUp!;
+                    const fu = entry.followUps?.[0];
+                    if (!fu) return null;
                     const tech = fu.actualTechnicianName ?? entry.technicianName;
                     const wait = fu.arrivalTime ? minutesDiff(fu.arrivalTime, fu.attendedTime) : null;
                     const st = fu.followUpStatus ?? "esperando";
@@ -834,7 +839,7 @@ export default function SeguimientosPage() {
                       </div>
                       <div>
                         <p className="text-xs text-gray-600">Cliente</p>
-                        <p className="font-bold text-purple-900">{e.followUp?.clientName ?? "—"}</p>
+                        <p className="font-bold text-purple-900">{e.followUps?.[0]?.clientName ?? "—"}</p>
                       </div>
                       <div className="col-span-2">
                         <p className="text-xs text-gray-600">Técnico actual</p>
