@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect, useRef, useCallback, memo } from "react";
 import { AppShell } from "@/components/app-shell";
 import { ToastAlert } from "@/components/toast-alert";
-import { technicians, useTramitesStore, type Entry } from "@/lib/tramites-store";
+import { technicians, useTramitesStore, type Entry, type FollowUp } from "@/lib/tramites-store";
 import { getServerNow } from "@/lib/server-time";
 
 type FollowUpStatus = "esperando" | "en-revision" | "llamado" | "no-escucho" | "regreso" | "atendiendo" | "completado";
@@ -51,6 +51,7 @@ const STATUS_LABEL: Record<FollowUpStatus, string> = {
 
 interface AgendaRowProps {
   entry: Entry;
+  followUp?: FollowUp;
   onRevisando: (id: string) => void;
   onSaliALlamar: (id: string) => void;
   onAtendi: (id: string) => void;
@@ -60,13 +61,14 @@ interface AgendaRowProps {
 
 const AgendaRow = memo(function AgendaRow({
   entry,
+  followUp: propsFollowUp,
   onRevisando,
   onSaliALlamar,
   onAtendi,
   onNoRespondio,
   onTermineDeAtender,
 }: AgendaRowProps) {
-  const fu = entry.followUps?.[0];
+  const fu = propsFollowUp ?? entry.followUps?.[0];
   const st = (fu?.followUpStatus ?? (fu ? "esperando" : undefined)) as FollowUpStatus | undefined;
 
   const rowBg =
@@ -317,17 +319,19 @@ export default function AgendaTecnicoPage() {
     if (!currentTechnicianId) return [];
     return entries
       .filter((e) => {
-        const fu = e.followUps?.[0];
-        // Excluir trámites de junta (van a sección separada)
-        if (fu?.type === "junta_ingreso") return false;
+        const hasTodayFollowUp = (e.followUps ?? []).some((fu) => {
+          if (fu.type === "junta_ingreso") return false;
+          if (fu.createdAt?.startsWith(selectedDate)) {
+            const isThisTech = e.technicianId === currentTechnicianId || fu.actualTechnicianId === currentTechnicianId;
+            return isThisTech;
+          }
+          return false;
+        });
+        if (hasTodayFollowUp) return true;
 
-        if (fu?.createdAt?.startsWith(selectedDate)) {
-          const isThisTech = e.technicianId === currentTechnicianId || fu.actualTechnicianId === currentTechnicianId;
-          return isThisTech;
-        }
         const isThisDate = e.scheduleDate === selectedDate;
         const isThisTech = e.technicianId === currentTechnicianId;
-        return isThisDate && isThisTech && fu;
+        return isThisDate && isThisTech && (e.followUps ?? []).length > 0;
       })
       .sort((a, b) => {
         const ta = a.followUps?.[0]?.arrivalTime ?? a.scheduledTime ?? "00:00";
@@ -335,6 +339,12 @@ export default function AgendaTecnicoPage() {
         return ta.localeCompare(tb);
       });
   }, [entries, selectedDate, currentTechnicianId]);
+
+  const expandedAgendaHoy = useMemo(() => {
+    return agendaHoy.flatMap((entry) =>
+      (entry.followUps ?? []).map((followUp) => ({ entry, followUp }))
+    );
+  }, [agendaHoy]);
 
   // Report data
   const reportEntries = useMemo(() => {
@@ -473,8 +483,8 @@ export default function AgendaTecnicoPage() {
     XLSX.writeFile(wb, `reporte-${currentTechnician?.name.replace(/\s/g, "_")}-${reportePeriodo}-${selectedDate}.xlsx`);
   }
 
-  const arrivedNow = agendaHoy.filter((e) => {
-    const st = e.followUps?.[0]?.followUpStatus as FollowUpStatus | undefined;
+  const arrivedNow = expandedAgendaHoy.filter(({ followUp }) => {
+    const st = followUp?.followUpStatus as FollowUpStatus | undefined;
     return st && ["esperando", "en-revision", "regreso"].includes(st);
   });
 
@@ -623,12 +633,10 @@ export default function AgendaTecnicoPage() {
           <section className="rounded-4xl border-4 border-red-400 bg-gradient-to-r from-red-50 to-orange-50 p-6">
             <p className="text-sm font-semibold text-red-700 uppercase mb-3">⚠️ {arrivedNow.length} cliente{arrivedNow.length > 1 ? "s" : ""} esperando atención</p>
             <div className="space-y-2">
-              {arrivedNow.map((e) => {
-                const fu = e.followUps?.[0];
-                if (!fu) return null;
+              {arrivedNow.map(({ entry: e, followUp: fu }) => {
                 const st = (fu.followUpStatus ?? "esperando") as FollowUpStatus;
                 return (
-                  <div key={e.id} className="flex items-center justify-between bg-white rounded-lg px-4 py-3 border border-red-200 flex-wrap gap-2">
+                  <div key={`${e.id}-${fu.createdAt}`} className="flex items-center justify-between bg-white rounded-lg px-4 py-3 border border-red-200 flex-wrap gap-2">
                     <div className="flex gap-4 text-sm">
                       <span className="font-mono font-bold">{e.tramiteCode}</span>
                       <span className="font-semibold">{fu.clientName ?? "—"}</span>
@@ -647,19 +655,20 @@ export default function AgendaTecnicoPage() {
           <div className="bg-gradient-to-r from-pink-600 to-purple-600 text-white px-6 py-4 flex items-center justify-between gap-4 flex-wrap">
             <h2 className="text-2xl font-bold">Agenda — {selectedDate}</h2>
             <div className="flex items-center gap-3 text-sm">
-              <span>📋 {agendaHoy.length} trámites</span>
-              <span>✅ {agendaHoy.filter((e) => e.followUps?.[0]?.followUpStatus === "completado").length} completados</span>
+              <span>📋 {expandedAgendaHoy.length} seguimientos</span>
+              <span>✅ {expandedAgendaHoy.filter(({ followUp }) => followUp.followUpStatus === "completado").length} completados</span>
             </div>
           </div>
 
-          {agendaHoy.length === 0 ? (
+          {expandedAgendaHoy.length === 0 ? (
             <div className="px-6 py-10 text-center text-gray-500">No hay trámites para esta fecha.</div>
           ) : (
             <div className="divide-y-2 divide-pink-100">
-              {agendaHoy.map((entry) => (
+              {expandedAgendaHoy.map(({ entry, followUp }, idx) => (
                 <AgendaRow
-                  key={entry.id}
+                  key={`${entry.id}-${followUp.createdAt}`}
                   entry={entry}
+                  followUp={followUp}
                   onRevisando={marcarRevisando}
                   onSaliALlamar={marcarSaliALlamar}
                   onAtendi={marcarLeAtendi}
