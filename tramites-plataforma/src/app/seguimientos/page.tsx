@@ -110,26 +110,27 @@ export default function SeguimientosPage() {
 
   const effectiveTechnician = technicians.find((t) => t.id === selectedTechnicianId);
 
-  const todayFollowUps = useMemo(() => entries
-    .filter((e) => {
-      // Excluir trámites de junta (type === "junta_ingreso")
+  const todayFollowUps = useMemo(() => {
+    const filtered = entries.filter((e) => {
       const fu = e.followUps?.[0];
       if (fu?.type === "junta_ingreso") return false;
+      if (!e.followUps?.length) return false;
 
-      const hasFollowUpsToday = e.followUps?.some((fu) => fu.createdAt?.startsWith(today) || (e.scheduleDate === today && fu));
+      const hasFollowUpsToday = e.followUps.some((fu) => fu.createdAt?.startsWith(today) || (e.scheduleDate === today && fu));
       if (!hasFollowUpsToday) return false;
+
       if (currentUser.areaId) {
-        const technicianArea = e.technicianArea;
-        return areas.some((a) => a.id === currentUser.areaId && a.label === technicianArea);
+        return areas.some((a) => a.id === currentUser.areaId && a.label === e.technicianArea);
       }
       return true;
-    })
-    .sort((a, b) => {
+    });
+
+    return filtered.sort((a, b) => {
       const aTime = a.followUps?.[0]?.arrivalTime ?? "";
       const bTime = b.followUps?.[0]?.arrivalTime ?? "";
       return bTime.localeCompare(aTime);
-    }),
-    [entries, today, currentUser.areaId]);
+    });
+  }, [entries, today, currentUser.areaId, areas]);
 
   const filteredFollowUps = useMemo(() => {
     if (!debouncedSearch.trim()) return todayFollowUps;
@@ -142,49 +143,36 @@ export default function SeguimientosPage() {
     });
   }, [todayFollowUps, debouncedSearch]);
 
-  const techCountToday = useMemo(() => {
-    const c: Record<string, number> = {};
+  const { techCountToday, programadosHoy, technicianLoad } = useMemo(() => {
+    const countToday: Record<string, number> = {};
+    const programados: Record<string, { name: string; area: string; entries: Entry[] }> = {};
+    const load: Record<string, { name: string; programados: number; llegadas: number; atendidos: number; completados: number }> = {};
+
+    entries.forEach((e) => {
+      const isToday = e.scheduleDate === today;
+      const inArea = !currentUser.areaId || areas.some((a) => a.id === currentUser.areaId && a.label === e.technicianArea);
+
+      if (isToday && inArea) {
+        if (!load[e.technicianId]) load[e.technicianId] = { name: e.technicianName, programados: 0, llegadas: 0, atendidos: 0, completados: 0 };
+        load[e.technicianId].programados++;
+        if (!programados[e.technicianId]) programados[e.technicianId] = { name: e.technicianName, area: e.technicianArea, entries: [] };
+        programados[e.technicianId].entries.push(e);
+      }
+    });
+
     todayFollowUps.forEach((e) => {
       const tid = e.followUps?.[0]?.actualTechnicianId ?? e.technicianId;
-      c[tid] = (c[tid] ?? 0) + 1;
-    });
-    return c;
-  }, [todayFollowUps]);
-
-  const programadosHoy = useMemo(() => {
-    const m: Record<string, { name: string; area: string; entries: Entry[] }> = {};
-    entries.filter((e) => e.scheduleDate === today).forEach((e) => {
-      if (!m[e.technicianId]) m[e.technicianId] = { name: e.technicianName, area: e.technicianArea, entries: [] };
-      m[e.technicianId].entries.push(e);
-    });
-    return m;
-  }, [entries, today]);
-
-  const technicianLoad = useMemo(() => {
-    const load: Record<string, { name: string; programados: number; llegadas: number; atendidos: number; completados: number }> = {};
-    entries.filter((e) => {
-      const isToday = e.scheduleDate === today;
-      if (!isToday) return false;
-      if (currentUser.areaId) {
-        const technicianArea = e.technicianArea;
-        return areas.some((a) => a.id === currentUser.areaId && a.label === technicianArea);
-      }
-      return true;
-    }).forEach((e) => {
-      if (!load[e.technicianId]) load[e.technicianId] = { name: e.technicianName, programados: 0, llegadas: 0, atendidos: 0, completados: 0 };
-      load[e.technicianId].programados++;
-    });
-    todayFollowUps.forEach((e) => {
-      const fu = e.followUps?.[0];
-      const tid = fu?.actualTechnicianId ?? e.technicianId;
-      const tn = fu?.actualTechnicianName ?? e.technicianName;
+      const tn = e.followUps?.[0]?.actualTechnicianName ?? e.technicianName;
+      countToday[tid] = (countToday[tid] ?? 0) + 1;
       if (!load[tid]) load[tid] = { name: tn, programados: 0, llegadas: 0, atendidos: 0, completados: 0 };
       load[tid].llegadas++;
+      const fu = e.followUps?.[0];
       if (fu?.attendedTime) load[tid].atendidos++;
       if (fu?.completedTime) load[tid].completados++;
     });
-    return load;
-  }, [entries, todayFollowUps, today, currentUser.areaId]);
+
+    return { techCountToday: countToday, programadosHoy: programados, technicianLoad: load };
+  }, [entries, todayFollowUps, today, currentUser.areaId, areas]);
 
   function showMsg(text: string, type: "success" | "error" = "success") {
     setMessage(text); setMessageType(type); setTimeout(() => setMessage(""), 4000);
