@@ -52,12 +52,16 @@ export default function SeguimientosPage() {
   const [searchFollowUps, setSearchFollowUps] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [editingFollowUpId, setEditingFollowUpId] = useState<string | null>(null);
+  const [showJuntaModal, setShowJuntaModal] = useState(false);
+  const [juntaTechnicianId, setJuntaTechnicianId] = useState("");
+  const [juntaTramiteCount, setJuntaTramiteCount] = useState(0);
+  const [juntaObservations, setJuntaObservations] = useState("");
   const [editState, setEditState] = useState<EditState>({ clientName: "", technicianId: "", observations: "" });
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [derivingEntryId, setDerivingEntryId] = useState<string | null>(null);
   const [derivingToTechId, setDerivingToTechId] = useState("");
 
-  const { entries, updateEntry, createEntry, removeEntry, technicians, currentUser, getNextRegistrationNumber } =
+  const { entries, updateEntry, createEntry, removeEntry, technicians, currentUser, getNextRegistrationNumber, juntas, createJunta } =
     useTramitesStore();
 
   const availableTechnicians = useMemo(
@@ -156,6 +160,17 @@ export default function SeguimientosPage() {
 
   function showMsg(text: string, type: "success" | "error" = "success") {
     setMessage(text); setMessageType(type); setTimeout(() => setMessage(""), 4000);
+  }
+
+  function handleCreateJunta() {
+    if (!juntaTechnicianId) return showMsg("⚠️ Selecciona un técnico", "error");
+    if (!juntaTramiteCount || juntaTramiteCount <= 0) return showMsg("⚠️ Ingresa cantidad de trámites", "error");
+    createJunta(juntaTechnicianId, juntaTramiteCount, juntaObservations.trim() || undefined);
+    showMsg(`✅ Junta registrada: ${juntaTramiteCount} trámites para ${technicians.find(t => t.id === juntaTechnicianId)?.name}`, "success");
+    setShowJuntaModal(false);
+    setJuntaTechnicianId("");
+    setJuntaTramiteCount(0);
+    setJuntaObservations("");
   }
 
   // Validación código trámite
@@ -867,6 +882,50 @@ export default function SeguimientosPage() {
           </div>
         )}
       </div>
+
+      {/* Botón flotante para juntas */}
+      <button onClick={() => setShowJuntaModal(true)}
+        className="fixed bottom-6 right-6 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full p-4 shadow-lg font-bold text-lg">
+        📦 Junta
+      </button>
+
+      {/* Modal de Junta */}
+      {showJuntaModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-6 w-96 shadow-lg space-y-4">
+            <h2 className="text-xl font-bold">Registrar Junta de Contribuyentes</h2>
+            <label className="grid gap-2">
+              <span className="text-sm font-semibold">Técnico *</span>
+              <select value={juntaTechnicianId} onChange={(e) => setJuntaTechnicianId(e.target.value)}
+                className="rounded-lg border-2 border-emerald-300 px-4 py-2 focus:border-emerald-500 focus:outline-none">
+                <option value="">Selecciona técnico</option>
+                {availableTechnicians.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+            </label>
+            <label className="grid gap-2">
+              <span className="text-sm font-semibold">Cantidad de Trámites *</span>
+              <input type="number" min="1" value={juntaTramiteCount || ""}
+                onChange={(e) => setJuntaTramiteCount(parseInt(e.target.value) || 0)}
+                className="rounded-lg border-2 border-emerald-300 px-4 py-2 focus:border-emerald-500 focus:outline-none"
+                placeholder="Ej: 15" />
+            </label>
+            <label className="grid gap-2">
+              <span className="text-sm font-semibold">Observaciones (opcional)</span>
+              <textarea value={juntaObservations} onChange={(e) => setJuntaObservations(e.target.value)}
+                className="rounded-lg border-2 border-emerald-300 px-4 py-2 focus:border-emerald-500 focus:outline-none text-sm"
+                rows={2} placeholder="Notas..." />
+            </label>
+            <div className="flex gap-2">
+              <button onClick={handleCreateJunta} className="flex-1 bg-emerald-600 text-white font-bold py-2 rounded-lg hover:bg-emerald-700">
+                ✅ Registrar
+              </button>
+              <button onClick={() => setShowJuntaModal(false)} className="flex-1 bg-gray-300 text-gray-800 font-bold py-2 rounded-lg hover:bg-gray-400">
+                ✕ Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </AppShell>
   );
 }
