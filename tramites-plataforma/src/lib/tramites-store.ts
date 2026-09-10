@@ -745,6 +745,34 @@ useEffect(() => {
   return () => { if (unsubscribe) unsubscribe(); };
 }, []);
 
+useEffect(() => {
+  (async () => {
+    try {
+      const { firestore } = await import('@/lib/firebase');
+      const { collection, onSnapshot } = await import('firebase/firestore');
+
+      const unsubscribeJuntas = onSnapshot(
+        collection(firestore, 'juntas'),
+        (snapshot) => {
+          if (!snapshot.empty) {
+            const firestoreJuntas = snapshot.docs.map((docSnap) => ({
+              ...docSnap.data(),
+              id: docSnap.id,
+            } as Junta));
+            setJuntas(firestoreJuntas);
+          }
+        },
+        (error) => {
+          console.warn('Firestore juntas listener error:', error);
+        }
+      );
+      return () => unsubscribeJuntas();
+    } catch (error) {
+      console.warn('Error setting up Firestore juntas listener:', error);
+    }
+  })();
+}, []);
+
   useEffect(() => {
     if (!hydrated) {
       return;
@@ -817,6 +845,30 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
         await deleteDoc(doc(firestore, 'entries', entryId));
       } catch (error) {
         console.error('Error eliminando de Firestore:', error);
+      }
+    })();
+  }
+
+  function firestoreSetJunta(juntaId: string, data: Junta) {
+    (async () => {
+      try {
+        const { firestore } = await import('@/lib/firebase');
+        const { doc, setDoc } = await import('firebase/firestore');
+        await setDoc(doc(firestore, 'juntas', juntaId), stripUndefined(data));
+      } catch (error) {
+        console.error('Error escribiendo junta en Firestore:', error);
+      }
+    })();
+  }
+
+  function firestoreDeleteJunta(juntaId: string) {
+    (async () => {
+      try {
+        const { firestore } = await import('@/lib/firebase');
+        const { doc, deleteDoc } = await import('firebase/firestore');
+        await deleteDoc(doc(firestore, 'juntas', juntaId));
+      } catch (error) {
+        console.error('Error eliminando junta de Firestore:', error);
       }
     })();
   }
@@ -901,7 +953,23 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
     const newJuntas = [...juntas, junta];
     setJuntas(newJuntas);
     localStorage.setItem('juntas', JSON.stringify(newJuntas));
+    firestoreSetJunta(junta.id, junta);
     return junta;
+  }
+
+  function updateJunta(juntaId: string, updates: Partial<Junta>) {
+    const newJuntas = juntas.map((j) => j.id === juntaId ? { ...j, ...updates } : j);
+    setJuntas(newJuntas);
+    localStorage.setItem('juntas', JSON.stringify(newJuntas));
+    const updatedJunta = newJuntas.find(j => j.id === juntaId);
+    if (updatedJunta) firestoreSetJunta(juntaId, updatedJunta);
+  }
+
+  function deleteJunta(juntaId: string) {
+    const newJuntas = juntas.filter(j => j.id !== juntaId);
+    setJuntas(newJuntas);
+    localStorage.setItem('juntas', JSON.stringify(newJuntas));
+    firestoreDeleteJunta(juntaId);
   }
 
   return {
@@ -938,5 +1006,7 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
     },
     juntas,
     createJunta,
+    updateJunta,
+    deleteJunta,
   };
 }

@@ -191,7 +191,7 @@ const AgendaRow = memo(function AgendaRow({
 });
 
 export default function AgendaTecnicoPage() {
-  const { entries, updateEntry, currentTechnicianId, loginTechnician, logoutTechnician, juntas } = useTramitesStore();
+  const { entries, updateEntry, currentTechnicianId, loginTechnician, logoutTechnician, juntas, updateJunta, removeEntry, deleteJunta } = useTramitesStore();
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
   const [selectedTechnicianId, setSelectedTechnicianId] = useState("");
   const [pinInput, setPinInput] = useState("");
@@ -695,7 +695,7 @@ export default function AgendaTecnicoPage() {
                           {isExpanded ? "▼" : "▶"} {junta.name}
                         </p>
                         <div className="text-sm text-emerald-700 mt-1 space-y-0.5">
-                          <p>📅 Ingresada: {new Date(junta.createdAt).toLocaleString("es-ES")}</p>
+                          <p>📅 Ingresada: {junta.date && new Date(junta.date + "T00:00:00").toLocaleDateString("es-ES")} {junta.createdAt && new Date(junta.createdAt).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}</p>
                           <p>📊 {junta.tramiteCount} trámites | Registrado por: {junta.registeredBy}</p>
                           {junta.observations && <p>📌 {junta.observations}</p>}
                           <p className={`font-semibold ${junta.status === "completado" ? "text-green-700" : junta.status === "en-proceso" ? "text-blue-700" : "text-amber-700"}`}>
@@ -706,20 +706,56 @@ export default function AgendaTecnicoPage() {
                       <span className="text-3xl ml-2">📦</span>
                     </button>
 
-                    {isExpanded && juntaEntries.length > 0 && (
-                      <div className="px-6 py-4 bg-white border-t border-emerald-100 space-y-2">
-                        <p className="text-sm font-semibold text-emerald-900 mb-3">Trámites en esta junta:</p>
-                        {juntaEntries.map((entry) => (
-                          <div key={entry.id} className="flex items-center justify-between text-sm bg-emerald-50 p-3 rounded-lg border border-emerald-200">
-                            <div className="flex-1">
-                              <p className="font-mono font-bold text-emerald-900">{entry.tramiteCode}</p>
-                              <p className="text-emerald-700">{entry.followUps?.[0]?.clientName || "—"}</p>
+                    {isExpanded && (
+                      <div className="px-6 py-4 bg-white border-t border-emerald-100 space-y-4">
+                        <div className="flex gap-2">
+                          <button onClick={() => { if (confirm("¿Eliminar esta junta?")) { juntaEntries.forEach(e => removeEntry(e.id)); deleteJunta(junta.id); } }}
+                            className="px-3 py-1.5 text-sm bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition font-semibold">
+                            🗑️ Eliminar junta
+                          </button>
+                        </div>
+                        {juntaEntries.length > 0 && (
+                          <>
+                            <p className="text-sm font-semibold text-emerald-900">Trámites por revisar:</p>
+                            <div className="space-y-3">
+                              {juntaEntries.map((entry) => {
+                                const fu = entry.followUps?.[0];
+                                const status = fu?.followUpStatus || "esperando";
+                                const statusColor = status === "completado" ? "green" : status === "en-revision" ? "blue" : "amber";
+                                const statusLabel = status === "completado" ? "✓ Revisado" : status === "en-revision" ? "🔄 En revisión" : "⏳ Pendiente";
+
+                                return (
+                                  <div key={entry.id} className="bg-emerald-50 p-4 rounded-lg border border-emerald-200 space-y-2">
+                                    <div className="flex items-start justify-between gap-3">
+                                      <div className="flex-1">
+                                        <p className="font-mono font-bold text-emerald-900">{entry.tramiteCode}</p>
+                                        <p className="text-sm text-emerald-700">{fu?.clientName || "—"}</p>
+                                        {fu?.observations && <p className="text-xs text-emerald-600 mt-1">📝 {fu.observations}</p>}
+                                      </div>
+                                      <span className={`text-xs whitespace-nowrap px-2.5 py-1 rounded font-semibold bg-${statusColor}-100 text-${statusColor}-800`}>
+                                        {statusLabel}
+                                      </span>
+                                    </div>
+                                    <div className="flex gap-2 pt-2">
+                                      {status === "esperando" && (
+                                        <button onClick={() => updateEntry(entry.id, { ...entry, followUps: [{ ...fu, followUpStatus: "en-revision" }] })}
+                                          className="px-3 py-1.5 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition font-semibold">
+                                          🔄 En revisión
+                                        </button>
+                                      )}
+                                      {status === "en-revision" && (
+                                        <button onClick={() => updateEntry(entry.id, { ...entry, followUps: [{ ...fu, followUpStatus: "completado" }] })}
+                                          className="px-3 py-1.5 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 transition font-semibold">
+                                          ✓ Marcar revisado
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
                             </div>
-                            <span className="text-xs bg-emerald-200 text-emerald-800 px-2 py-1 rounded">
-                              ⏳ Pendiente revisar
-                            </span>
-                          </div>
-                        ))}
+                          </>
+                        )}
                       </div>
                     )}
                   </div>

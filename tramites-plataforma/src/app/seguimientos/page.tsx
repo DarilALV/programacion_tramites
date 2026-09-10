@@ -58,12 +58,14 @@ export default function SeguimientosPage() {
   const [juntaTramites, setJuntaTramites] = useState<{ code: string; clientName: string }[]>([]);
   const [juntaObservations, setJuntaObservations] = useState("");
   const [expandedJuntaId, setExpandedJuntaId] = useState<string | null>(null);
+  const [editingJuntaId, setEditingJuntaId] = useState<string | null>(null);
+  const [editingJuntaTramites, setEditingJuntaTramites] = useState<{ code: string; clientName: string }[]>([]);
   const [editState, setEditState] = useState<EditState>({ clientName: "", technicianId: "", observations: "" });
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [derivingEntryId, setDerivingEntryId] = useState<string | null>(null);
   const [derivingToTechId, setDerivingToTechId] = useState("");
 
-  const { entries, updateEntry, createEntry, removeEntry, technicians, currentUser, getNextRegistrationNumber, juntas, createJunta } =
+  const { entries, updateEntry, createEntry, removeEntry, technicians, currentUser, getNextRegistrationNumber, juntas, createJunta, updateJunta, deleteJunta } =
     useTramitesStore();
 
   const availableTechnicians = useMemo(
@@ -235,6 +237,73 @@ export default function SeguimientosPage() {
     setJuntaName("");
     setJuntaTramites([]);
     setJuntaObservations("");
+  }
+
+  function handleEditJunta(juntaId: string) {
+    const junta = juntas.find(j => j.id === juntaId);
+    if (!junta || junta.status === "completado") return;
+    const tramitesOfJunta = entriesByJunta.get(juntaId) ?? [];
+    const tramitesData = tramitesOfJunta.map(e => ({
+      code: e.tramiteCode,
+      clientName: e.followUps?.[0]?.clientName || ""
+    }));
+    setEditingJuntaId(juntaId);
+    setEditingJuntaTramites(tramitesData);
+  }
+
+  function handleDeleteJunta(juntaId: string) {
+    if (!confirm("¿Eliminar esta junta y todos sus trámites?")) return;
+    const juntaEntries = entriesByJunta.get(juntaId) ?? [];
+    juntaEntries.forEach(e => removeEntry(e.id));
+    deleteJunta(juntaId);
+    showMsg("✅ Junta eliminada", "success");
+  }
+
+  async function handleSaveJuntaEdit(juntaId: string) {
+    if (editingJuntaTramites.length === 0) return showMsg("⚠️ Debe haber al menos un trámite", "error");
+    const invalid = editingJuntaTramites.find(t => !t.code.trim() || !t.clientName.trim());
+    if (invalid) return showMsg("⚠️ Todos los trámites deben tener código y cliente", "error");
+
+    const junta = juntas.find(j => j.id === juntaId);
+    if (!junta) return;
+
+    const juntaEntries = entriesByJunta.get(juntaId) ?? [];
+    const { iso } = await getServerNow();
+    const technicianObj = technicians.find(t => t.id === junta.technicianId);
+
+    juntaEntries.forEach(e => removeEntry(e.id));
+
+    editingJuntaTramites.forEach((tramite) => {
+      const newEntry: Entry = {
+        id: `entry-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        createdBy: currentUser.id,
+        createdByName: currentUser.name,
+        registrationNumber: getNextRegistrationNumber(),
+        tramiteCode: tramite.code,
+        technicianId: junta.technicianId,
+        technicianName: technicianObj?.name || "—",
+        technicianArea: technicianObj?.areaLabel || "Supervisor",
+        scheduleDate: junta.date,
+        registrationDate: iso.slice(0, 10),
+        observations: "",
+        status: "Registrado",
+        createdAt: iso,
+        juntaId: junta.id,
+        followUps: [{
+          type: "junta_ingreso",
+          juntaId: junta.id,
+          clientName: tramite.clientName.trim(),
+          followUpStatus: "esperando",
+          createdAt: iso,
+        }],
+      };
+      createEntry(newEntry);
+    });
+
+    updateJunta(juntaId, { tramiteCount: editingJuntaTramites.length });
+    setEditingJuntaId(null);
+    setEditingJuntaTramites([]);
+    showMsg("✅ Junta actualizada", "success");
   }
 
   // Validación código trámite
@@ -697,27 +766,43 @@ export default function SeguimientosPage() {
                         </p>
                         <div className="text-sm text-emerald-700 mt-1 space-y-0.5">
                           <p>👤 {junta.technicianName} | 📊 {junta.tramiteCount} trámites | 📝 {junta.registeredBy}</p>
-                          <p>📅 {new Date(junta.createdAt).toLocaleString("es-ES")}</p>
+                          <p>📅 {junta.date && new Date(junta.date + "T00:00:00").toLocaleDateString("es-ES")} {junta.createdAt && new Date(junta.createdAt).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}</p>
                           {junta.observations && <p>📌 {junta.observations}</p>}
                         </div>
                       </div>
                       <span className="text-2xl ml-2">📦</span>
                     </button>
 
-                    {isExpanded && juntaEntries.length > 0 && (
-                      <div className="px-6 py-4 bg-white border-t border-emerald-100 space-y-2">
-                        <p className="text-sm font-semibold text-emerald-900 mb-3">Trámites ingresados:</p>
-                        {juntaEntries.map((entry) => (
-                          <div key={entry.id} className="flex items-center justify-between text-sm bg-emerald-50 p-3 rounded-lg border border-emerald-200">
-                            <div className="flex-1">
-                              <p className="font-mono font-bold text-emerald-900">{entry.tramiteCode}</p>
-                              <p className="text-emerald-700">{entry.followUps?.[0]?.clientName || "—"}</p>
+                    {isExpanded && (
+                      <div className="px-6 py-4 bg-white border-t border-emerald-100 space-y-3">
+                        <div className="flex gap-2">
+                          {junta.status !== "completado" && (
+                            <button onClick={() => handleEditJunta(junta.id)}
+                              className="px-3 py-1.5 text-sm bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition font-semibold">
+                              ✏️ Editar
+                            </button>
+                          )}
+                          <button onClick={() => handleDeleteJunta(junta.id)}
+                            className="px-3 py-1.5 text-sm bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition font-semibold">
+                            🗑️ Eliminar
+                          </button>
+                        </div>
+                        <p className="text-sm font-semibold text-emerald-900">Trámites ingresados:</p>
+                        {juntaEntries.length === 0 ? (
+                          <p className="text-xs text-gray-500 italic">Sin trámites registrados aún</p>
+                        ) : (
+                          juntaEntries.map((entry) => (
+                            <div key={entry.id} className="flex items-center justify-between text-sm bg-emerald-50 p-3 rounded-lg border border-emerald-200">
+                              <div className="flex-1">
+                                <p className="font-mono font-bold text-emerald-900">{entry.tramiteCode}</p>
+                                <p className="text-emerald-700">{entry.followUps?.[0]?.clientName || "—"}</p>
+                              </div>
+                              <span className="text-xs bg-emerald-200 text-emerald-800 px-2 py-1 rounded">
+                                ⏳ Pendiente
+                              </span>
                             </div>
-                            <span className="text-xs bg-emerald-200 text-emerald-800 px-2 py-1 rounded">
-                              ⏳ Pendiente
-                            </span>
-                          </div>
-                        ))}
+                          ))
+                        )}
                       </div>
                     )}
                   </div>
@@ -1135,6 +1220,105 @@ export default function SeguimientosPage() {
                 }`}
               >
                 ✅ Registrar Junta
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Edición de Junta */}
+      {editingJuntaId && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 space-y-5">
+            <div>
+              <h2 className="text-2xl font-bold text-blue-900">✏️ Editar Trámites de Junta</h2>
+              <p className="text-sm text-gray-500 mt-1">Agregá o eliminá trámites según sea necesario</p>
+            </div>
+
+            {/* Trámites dinámicos */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold text-blue-900">Trámites ({editingJuntaTramites.length})</h3>
+                <button
+                  onClick={() => setEditingJuntaTramites([...editingJuntaTramites, { code: "", clientName: "" }])}
+                  className="flex items-center gap-1 text-xs bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg hover:bg-blue-200 cursor-pointer"
+                >
+                  ➕ Agregar
+                </button>
+              </div>
+
+              {editingJuntaTramites.length === 0 ? (
+                <p className="text-sm text-gray-400 italic py-4 text-center">Agrega trámites usando el botón de arriba</p>
+              ) : (
+                <div className="space-y-3">
+                  {editingJuntaTramites.map((tramite, idx) => (
+                    <div key={idx} className="flex gap-2 items-end bg-blue-50 p-3 rounded-lg border border-blue-200">
+                      <label className="flex-1 grid gap-1">
+                        <span className="text-xs font-semibold text-gray-600">Código trámite</span>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={tramite.code}
+                          onChange={(e) => {
+                            const newTramites = [...editingJuntaTramites];
+                            newTramites[idx].code = e.target.value.replace(/\D/g, "").slice(0, 10);
+                            setEditingJuntaTramites(newTramites);
+                          }}
+                          placeholder="Ej: 2026001234"
+                          className="rounded-lg border border-blue-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                        />
+                      </label>
+                      <label className="flex-1 grid gap-1">
+                        <span className="text-xs font-semibold text-gray-600">Nombre cliente</span>
+                        <input
+                          type="text"
+                          value={tramite.clientName}
+                          onChange={(e) => {
+                            const newTramites = [...editingJuntaTramites];
+                            newTramites[idx].clientName = e.target.value;
+                            setEditingJuntaTramites(newTramites);
+                          }}
+                          placeholder="Ej: Juan Pérez"
+                          className="rounded-lg border border-blue-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                        />
+                      </label>
+                      <button
+                        onClick={() => {
+                          const newTramites = editingJuntaTramites.filter((_, i) => i !== idx);
+                          setEditingJuntaTramites(newTramites);
+                        }}
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50 p-2 rounded-lg cursor-pointer"
+                        title="Eliminar"
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Botones */}
+            <div className="flex gap-2 pt-2">
+              <button
+                onClick={() => {
+                  setEditingJuntaId(null);
+                  setEditingJuntaTramites([]);
+                }}
+                className="flex-1 px-4 py-3 rounded-lg bg-gray-300 text-gray-800 font-semibold hover:bg-gray-400 cursor-pointer transition"
+              >
+                ✕ Cancelar
+              </button>
+              <button
+                onClick={() => handleSaveJuntaEdit(editingJuntaId)}
+                disabled={editingJuntaTramites.length === 0}
+                className={`flex-1 px-4 py-3 rounded-lg font-semibold transition cursor-pointer ${
+                  editingJuntaTramites.length > 0
+                    ? "bg-blue-600 text-white hover:bg-blue-700"
+                    : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                }`}
+              >
+                💾 Guardar Cambios
               </button>
             </div>
           </div>
