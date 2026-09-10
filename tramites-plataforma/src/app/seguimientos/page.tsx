@@ -132,16 +132,22 @@ export default function SeguimientosPage() {
     });
   }, [entries, today, currentUser.areaId, areas]);
 
+  const expandedFollowUps = useMemo(() => {
+    return todayFollowUps.flatMap((entry) =>
+      (entry.followUps ?? []).map((followUp) => ({ entry, followUp }))
+    );
+  }, [todayFollowUps]);
+
   const filteredFollowUps = useMemo(() => {
-    if (!debouncedSearch.trim()) return todayFollowUps;
+    if (!debouncedSearch.trim()) return expandedFollowUps;
     const q = debouncedSearch.toLowerCase();
-    return todayFollowUps.filter((e) => {
-      const clientName = e.followUps?.[0]?.clientName ?? "";
-      return e.tramiteCode.includes(q) ||
+    return expandedFollowUps.filter(({ entry, followUp }) => {
+      const clientName = followUp.clientName ?? "";
+      return entry.tramiteCode.includes(q) ||
         clientName.toLowerCase().includes(q) ||
-        e.technicianName.toLowerCase().includes(q);
+        entry.technicianName.toLowerCase().includes(q);
     });
-  }, [todayFollowUps, debouncedSearch]);
+  }, [expandedFollowUps, debouncedSearch]);
 
   const { techCountToday, programadosHoy, technicianLoad } = useMemo(() => {
     const countToday: Record<string, number> = {};
@@ -410,43 +416,41 @@ export default function SeguimientosPage() {
     setTramiteCode(""); setClientName(""); setSelectedGestion(""); setObservations("");
   }
 
-  async function handleMarkRegreso(entry: Entry) {
+  async function handleMarkRegreso(entry: Entry, followUp: FollowUp) {
     const { time } = await getServerNow();
-    const newFollowUps = [...(entry.followUps ?? [])];
-    if (newFollowUps.length === 0) return;
-    const last = newFollowUps[newFollowUps.length - 1];
-    newFollowUps[newFollowUps.length - 1] = { ...last, followUpStatus: "regreso", returnedTime: time } as FollowUp;
+    const newFollowUps = (entry.followUps ?? []).map((fu) =>
+      fu === followUp ? ({ ...fu, followUpStatus: "regreso" as const, returnedTime: time }) : fu
+    );
     updateEntry(entry.id, { ...entry, followUps: newFollowUps });
     showMsg(`↩️ Cliente regresó registrado a las ${time}`, "success");
   }
 
-  function handleStartEdit(entry: Entry) {
-    const lastFollowUp = entry.followUps?.[entry.followUps.length - 1];
-    setEditingFollowUpId(entry.id);
+  function handleStartEdit(entry: Entry, followUp: FollowUp) {
+    setEditingFollowUpId(`${entry.id}-${followUp.createdAt}`);
     setEditState({
-      clientName: lastFollowUp?.clientName ?? "",
+      clientName: followUp.clientName ?? "",
       technicianId: "",
-      observations: lastFollowUp?.observations ?? "",
+      observations: followUp.observations ?? "",
     });
     setConfirmDeleteId(null);
   }
 
   function handleSaveEdit(entry: Entry) {
-    const newFollowUps = [...(entry.followUps ?? [])];
-    if (newFollowUps.length === 0) return;
-    const last = newFollowUps[newFollowUps.length - 1];
-    newFollowUps[newFollowUps.length - 1] = { ...last, clientName: editState.clientName.trim(), observations: editState.observations.trim() || undefined };
+    const newFollowUps = (entry.followUps ?? []).map((fu) =>
+      fu.createdAt === `${editingFollowUpId?.split("-").slice(1).join("-")}`
+        ? { ...fu, clientName: editState.clientName.trim(), observations: editState.observations.trim() || undefined }
+        : fu
+    );
     updateEntry(entry.id, { ...entry, followUps: newFollowUps });
     setEditingFollowUpId(null);
     showMsg("✓ Seguimiento actualizado (cliente y observaciones)");
   }
 
-  function handleDeleteFollowUp(entry: Entry) {
-    const lastFollowUp = entry.followUps?.[entry.followUps.length - 1];
-    if (lastFollowUp?.isUnscheduled && entry.followUps?.length === 1) {
+  function handleDeleteFollowUp(entry: Entry, followUp: FollowUp) {
+    if (followUp.isUnscheduled && entry.followUps?.length === 1) {
       removeEntry(entry.id);
     } else if (entry.followUps && entry.followUps.length > 0) {
-      const newFollowUps = entry.followUps.slice(0, -1);
+      const newFollowUps = entry.followUps.filter((fu) => fu !== followUp);
       updateEntry(entry.id, { ...entry, followUps: newFollowUps.length > 0 ? newFollowUps : undefined });
     }
     setConfirmDeleteId(null);
@@ -856,9 +860,8 @@ export default function SeguimientosPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredFollowUps.map((entry, idx) => {
-                    const fu = entry.followUps?.[0];
-                    if (!fu) return null;
+                  {filteredFollowUps.map(({ entry, followUp: fu }, idx) => {
+                    const followUpKey = `${entry.id}-${fu.createdAt}`;
                     const tech = fu.actualTechnicianName ?? entry.technicianName;
                     const wait = fu.arrivalTime ? minutesDiff(fu.arrivalTime, fu.attendedTime) : null;
                     const st = fu.followUpStatus ?? "esperando";
@@ -881,9 +884,9 @@ export default function SeguimientosPage() {
                       "completado": "✅ Completado",
                     };
 
-                    if (editingFollowUpId === entry.id) {
+                    if (editingFollowUpId === followUpKey) {
                       return (
-                        <tr key={entry.id} className="bg-blue-50 border-b border-blue-200">
+                        <tr key={followUpKey} className="bg-blue-50 border-b border-blue-200">
                           <td colSpan={7} className="px-4 py-3">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                               <label className="grid gap-1">
@@ -912,7 +915,7 @@ export default function SeguimientosPage() {
                     }
 
                     return (
-                      <tr key={entry.id} className={`${rowBg} border-b border-gray-100`}>
+                      <tr key={followUpKey} className={`${rowBg} border-b border-gray-100`}>
                         <td className="px-3 py-3">
                           <p className="font-mono font-semibold">{entry.tramiteCode}</p>
                           <p className="text-xs text-gray-400">{entry.registrationNumber}</p>
@@ -945,24 +948,24 @@ export default function SeguimientosPage() {
                           {wait !== null && <span className={wait > 30 ? "text-red-600 font-semibold" : "text-gray-600"}>{fmtMin(wait)}</span>}
                         </td>
                         <td className="px-3 py-3">
-                          {confirmDeleteId === entry.id ? (
+                          {confirmDeleteId === followUpKey ? (
                             <div className="flex gap-1">
-                              <button onClick={() => handleDeleteFollowUp(entry)} className="px-2 py-1 bg-red-600 text-white rounded text-xs cursor-pointer">Sí</button>
+                              <button onClick={() => handleDeleteFollowUp(entry, fu)} className="px-2 py-1 bg-red-600 text-white rounded text-xs cursor-pointer">Sí</button>
                               <button onClick={() => setConfirmDeleteId(null)} className="px-2 py-1 bg-gray-400 text-white rounded text-xs cursor-pointer">No</button>
                             </div>
                           ) : (
                             <div className="flex flex-col gap-1">
                               {/* "Cliente regresó" solo si fue llamado y no escuchó */}
                               {st === "no-escucho" && (
-                                <button onClick={() => handleMarkRegreso(entry)} className="text-xs px-2 py-1 rounded bg-yellow-500 text-white hover:bg-yellow-600 cursor-pointer whitespace-nowrap">
+                                <button onClick={() => handleMarkRegreso(entry, fu)} className="text-xs px-2 py-1 rounded bg-yellow-500 text-white hover:bg-yellow-600 cursor-pointer whitespace-nowrap">
                                   ↩️ Regresó
                                 </button>
                               )}
                               <button onClick={() => { setDerivingEntryId(entry.id); setDerivingToTechId(""); }} className="text-xs px-2 py-1 rounded bg-purple-500 text-white hover:bg-purple-600 cursor-pointer whitespace-nowrap">
                                 ↗️ Derivar
                               </button>
-                              <button onClick={() => handleStartEdit(entry)} className="text-xs px-2 py-1 rounded bg-blue-500 text-white hover:bg-blue-600 cursor-pointer">✏️ Editar</button>
-                              <button onClick={() => setConfirmDeleteId(entry.id)} className="text-xs px-2 py-1 rounded bg-gray-300 text-gray-700 hover:bg-red-100 cursor-pointer">🗑️</button>
+                              <button onClick={() => handleStartEdit(entry, fu)} className="text-xs px-2 py-1 rounded bg-blue-500 text-white hover:bg-blue-600 cursor-pointer">✏️ Editar</button>
+                              <button onClick={() => setConfirmDeleteId(followUpKey)} className="text-xs px-2 py-1 rounded bg-gray-300 text-gray-700 hover:bg-red-100 cursor-pointer">🗑️</button>
                             </div>
                           )}
                         </td>
