@@ -109,6 +109,10 @@ export default function SeguimientosPage() {
 
   const todayFollowUps = useMemo(() => entries
     .filter((e) => {
+      // Excluir trámites de junta (type === "junta_ingreso")
+      const fu = e.followUps?.[0];
+      if (fu?.type === "junta_ingreso") return false;
+
       const hasFollowUpsToday = e.followUps?.some((fu) => fu.createdAt?.startsWith(today) || (e.scheduleDate === today && fu));
       if (!hasFollowUpsToday) return false;
       if (currentUser.areaId) {

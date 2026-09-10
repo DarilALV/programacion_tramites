@@ -687,7 +687,11 @@ export function groupEntriesByDateAndTechnician(entries: Entry[]) {
 export function useTramitesStore() {
   const [hydrated, setHydrated] = useState(false);
   const [entries, setEntries] = useState<Entry[]>(seedEntries);
-  const [juntas, setJuntas] = useState<Junta[]>([]);
+  const [juntas, setJuntas] = useState<Junta[]>(() => {
+    if (typeof window === "undefined") return [];
+    const saved = localStorage.getItem('juntas');
+    return saved ? JSON.parse(saved) : [];
+  });
   const [currentUserId, setCurrentUserId] = useState(plannerUsers[0].id);
   const [currentTechnicianId, setCurrentTechnicianId] = useState<string | undefined>(undefined);
 

@@ -318,6 +318,9 @@ export default function AgendaTecnicoPage() {
     return entries
       .filter((e) => {
         const fu = e.followUps?.[0];
+        // Excluir trámites de junta (van a sección separada)
+        if (fu?.type === "junta_ingreso") return false;
+
         if (fu?.createdAt?.startsWith(selectedDate)) {
           const isThisTech = e.technicianId === currentTechnicianId || fu.actualTechnicianId === currentTechnicianId;
           return isThisTech;
