@@ -909,7 +909,9 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
     };
 
     persistState([nextEntry, ...entries], currentUserId);
-    firestoreSet(nextEntry.id, nextEntry);
+    firestoreSet(nextEntry.id, nextEntry).catch((error) => {
+      console.error('Error saving entry to Firestore:', error);
+    });
   }
 
   function updateEntry(entryId: string, updatedEntry: Entry) {
@@ -917,7 +919,9 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
       entry.id === entryId ? updatedEntry : entry
     );
     persistState(nextEntries);
-    firestoreSet(entryId, updatedEntry);
+    firestoreSet(entryId, updatedEntry).catch((error) => {
+      console.error('Error updating entry in Firestore:', error);
+    });
   }
 
   function updateEntryStatus(entryId: string, nextStatus: EntryStatus) {
@@ -959,7 +963,9 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
     const newJuntas = [...juntas, junta];
     setJuntas(newJuntas);
     if (typeof window !== "undefined") localStorage.setItem('juntas', JSON.stringify(newJuntas));
-    firestoreSetJunta(junta.id, junta);
+    firestoreSetJunta(junta.id, junta).catch((error) => {
+      console.error('Error saving junta to Firestore:', error);
+    });
     return junta;
   }
 
@@ -968,14 +974,20 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
     setJuntas(newJuntas);
     if (typeof window !== "undefined") localStorage.setItem('juntas', JSON.stringify(newJuntas));
     const updatedJunta = newJuntas.find(j => j.id === juntaId);
-    if (updatedJunta) firestoreSetJunta(juntaId, updatedJunta);
+    if (updatedJunta) {
+      firestoreSetJunta(juntaId, updatedJunta).catch((error) => {
+        console.error('Error updating junta in Firestore:', error);
+      });
+    }
   }
 
   function deleteJunta(juntaId: string) {
     const newJuntas = juntas.filter(j => j.id !== juntaId);
     setJuntas(newJuntas);
     if (typeof window !== "undefined") localStorage.setItem('juntas', JSON.stringify(newJuntas));
-    firestoreDeleteJunta(juntaId);
+    firestoreDeleteJunta(juntaId).catch((error) => {
+      console.error('Error deleting junta from Firestore:', error);
+    });
   }
 
   return {
