@@ -56,6 +56,7 @@ export default function SeguimientosPage() {
   const [juntaTechnicianId, setJuntaTechnicianId] = useState("");
   const [juntaTramites, setJuntaTramites] = useState<{ code: string; clientName: string }[]>([]);
   const [juntaObservations, setJuntaObservations] = useState("");
+  const [expandedJuntaId, setExpandedJuntaId] = useState<string | null>(null);
   const [editState, setEditState] = useState<EditState>({ clientName: "", technicianId: "", observations: "" });
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [derivingEntryId, setDerivingEntryId] = useState<string | null>(null);
@@ -74,6 +75,22 @@ export default function SeguimientosPage() {
   );
 
   const today = new Date().toISOString().slice(0, 10);
+
+  const juntasHoy = useMemo(
+    () => juntas.filter((j) => j.date === today).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    [juntas, today],
+  );
+
+  const entriesByJunta = useMemo(() => {
+    const map = new Map<string, Entry[]>();
+    entries.forEach((e) => {
+      if (e.juntaId) {
+        if (!map.has(e.juntaId)) map.set(e.juntaId, []);
+        map.get(e.juntaId)!.push(e);
+      }
+    });
+    return map;
+  }, [entries]);
 
   // Debounce search: wait 300ms after user stops typing before filtering
   useEffect(() => {
@@ -647,6 +664,61 @@ export default function SeguimientosPage() {
           )}
         </section>
         ── FIN PROGRAMADOS OCULTOS ── */}
+
+        {/* ── JUNTAS INGRESADAS HOY ── */}
+        {juntasHoy.length > 0 && (
+          <section className="rounded-4xl border-2 border-emerald-200 overflow-hidden">
+            <div className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-6 py-4">
+              <h2 className="text-2xl font-bold">
+                📥 Juntas Ingresadas Hoy
+                <span className="text-sm font-normal ml-2">({juntasHoy.length})</span>
+              </h2>
+            </div>
+            <div className="divide-y-2 divide-emerald-100">
+              {juntasHoy.map((junta) => {
+                const juntaEntries = entriesByJunta.get(junta.id) ?? [];
+                const isExpanded = expandedJuntaId === junta.id;
+                return (
+                  <div key={junta.id} className="bg-emerald-50 border-b border-emerald-200">
+                    <button
+                      onClick={() => setExpandedJuntaId(isExpanded ? null : junta.id)}
+                      className="w-full text-left px-6 py-4 hover:bg-emerald-100 transition cursor-pointer flex items-center justify-between"
+                    >
+                      <div className="flex-1">
+                        <p className="font-bold text-emerald-900">
+                          {isExpanded ? "▼" : "▶"} Junta {junta.id.slice(-6).toUpperCase()}
+                        </p>
+                        <div className="text-sm text-emerald-700 mt-1 space-y-0.5">
+                          <p>👤 {junta.technicianName} | 📊 {junta.tramiteCount} trámites | 📝 {junta.registeredBy}</p>
+                          <p>📅 {new Date(junta.createdAt).toLocaleString("es-ES")}</p>
+                          {junta.observations && <p>📌 {junta.observations}</p>}
+                        </div>
+                      </div>
+                      <span className="text-2xl ml-2">📦</span>
+                    </button>
+
+                    {isExpanded && juntaEntries.length > 0 && (
+                      <div className="px-6 py-4 bg-white border-t border-emerald-100 space-y-2">
+                        <p className="text-sm font-semibold text-emerald-900 mb-3">Trámites ingresados:</p>
+                        {juntaEntries.map((entry) => (
+                          <div key={entry.id} className="flex items-center justify-between text-sm bg-emerald-50 p-3 rounded-lg border border-emerald-200">
+                            <div className="flex-1">
+                              <p className="font-mono font-bold text-emerald-900">{entry.tramiteCode}</p>
+                              <p className="text-emerald-700">{entry.followUps?.[0]?.clientName || "—"}</p>
+                            </div>
+                            <span className="text-xs bg-emerald-200 text-emerald-800 px-2 py-1 rounded">
+                              ⏳ Pendiente
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
 
         {/* ── SEGUIMIENTOS DE HOY ── */}
         <section className="rounded-4xl border-2 border-pink-200 overflow-hidden">

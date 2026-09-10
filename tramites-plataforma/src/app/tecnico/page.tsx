@@ -191,7 +191,7 @@ const AgendaRow = memo(function AgendaRow({
 });
 
 export default function AgendaTecnicoPage() {
-  const { entries, updateEntry, currentTechnicianId, loginTechnician, logoutTechnician } = useTramitesStore();
+  const { entries, updateEntry, currentTechnicianId, loginTechnician, logoutTechnician, juntas } = useTramitesStore();
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
   const [selectedTechnicianId, setSelectedTechnicianId] = useState("");
   const [pinInput, setPinInput] = useState("");
@@ -200,6 +200,7 @@ export default function AgendaTecnicoPage() {
   const [notifAllowed, setNotifAllowed] = useState(false);
   const [toastShow, setToastShow] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
+  const [expandedJuntaId, setExpandedJuntaId] = useState<string | null>(null);
 
   const currentTechnician = technicians.find((t) => t.id === currentTechnicianId);
   const today = new Date().toISOString().slice(0, 10);
@@ -293,6 +294,24 @@ export default function AgendaTecnicoPage() {
       localStorage.setItem(`notifIds-${currentTechnicianId}`, JSON.stringify(Array.from(knownIdsRef.current)));
     }
   }, [entries, currentTechnicianId, today]);
+
+  const misJuntas = useMemo(() => {
+    if (!currentTechnicianId) return [];
+    return juntas
+      .filter((j) => j.technicianId === currentTechnicianId)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }, [juntas, currentTechnicianId]);
+
+  const entriesByJunta = useMemo(() => {
+    const map = new Map<string, Entry[]>();
+    entries.forEach((e) => {
+      if (e.juntaId) {
+        if (!map.has(e.juntaId)) map.set(e.juntaId, []);
+        map.get(e.juntaId)!.push(e);
+      }
+    });
+    return map;
+  }, [entries]);
 
   const agendaHoy = useMemo(() => {
     if (!currentTechnicianId) return [];
@@ -648,6 +667,64 @@ export default function AgendaTecnicoPage() {
             </div>
           )}
         </section>
+
+        {/* ── MIS JUNTAS ASIGNADAS ── */}
+        {misJuntas.length > 0 && (
+          <section className="rounded-4xl border-2 border-emerald-200 overflow-hidden">
+            <div className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-6 py-4">
+              <h2 className="text-2xl font-bold">
+                📥 Mis Juntas Asignadas
+                <span className="text-sm font-normal ml-2">({misJuntas.length})</span>
+              </h2>
+            </div>
+            <div className="divide-y-2 divide-emerald-100">
+              {misJuntas.map((junta) => {
+                const juntaEntries = entriesByJunta.get(junta.id) ?? [];
+                const isExpanded = expandedJuntaId === junta.id;
+                return (
+                  <div key={junta.id} className="bg-emerald-50">
+                    <button
+                      onClick={() => setExpandedJuntaId(isExpanded ? null : junta.id)}
+                      className="w-full text-left px-6 py-4 hover:bg-emerald-100 transition cursor-pointer flex items-center justify-between"
+                    >
+                      <div className="flex-1">
+                        <p className="font-bold text-emerald-900">
+                          {isExpanded ? "▼" : "▶"} Junta {junta.id.slice(-6).toUpperCase()}
+                        </p>
+                        <div className="text-sm text-emerald-700 mt-1 space-y-0.5">
+                          <p>📅 Ingresada: {new Date(junta.createdAt).toLocaleString("es-ES")}</p>
+                          <p>📊 {junta.tramiteCount} trámites | Registrado por: {junta.registeredBy}</p>
+                          {junta.observations && <p>📌 {junta.observations}</p>}
+                          <p className={`font-semibold ${junta.status === "completado" ? "text-green-700" : junta.status === "en-proceso" ? "text-blue-700" : "text-amber-700"}`}>
+                            Status: {junta.status === "completado" ? "✓ Revisada" : junta.status === "en-proceso" ? "🔄 En revisión" : "⏳ Pendiente"}
+                          </p>
+                        </div>
+                      </div>
+                      <span className="text-3xl ml-2">📦</span>
+                    </button>
+
+                    {isExpanded && juntaEntries.length > 0 && (
+                      <div className="px-6 py-4 bg-white border-t border-emerald-100 space-y-2">
+                        <p className="text-sm font-semibold text-emerald-900 mb-3">Trámites en esta junta:</p>
+                        {juntaEntries.map((entry) => (
+                          <div key={entry.id} className="flex items-center justify-between text-sm bg-emerald-50 p-3 rounded-lg border border-emerald-200">
+                            <div className="flex-1">
+                              <p className="font-mono font-bold text-emerald-900">{entry.tramiteCode}</p>
+                              <p className="text-emerald-700">{entry.followUps?.[0]?.clientName || "—"}</p>
+                            </div>
+                            <span className="text-xs bg-emerald-200 text-emerald-800 px-2 py-1 rounded">
+                              ⏳ Pendiente revisar
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
 
         {/* ── REPORTES ── */}
         <section className="rounded-4xl border-2 border-pink-200 p-6 space-y-4">
