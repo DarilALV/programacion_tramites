@@ -471,12 +471,20 @@ export default function SeguimientosPage() {
     const newTech = technicians.find((t) => t.id === newTechId);
     if (!newTech) return;
 
-    // Actualizar technicianId y technicianName
+    // Actualizar technicianId, technicianName Y el followUp con quién lo atiende
+    const currentFollowUps = entry.followUps ?? [];
+    const updatedFollowUps = currentFollowUps.map((fu, idx) =>
+      idx === currentFollowUps.length - 1
+        ? { ...fu, actualTechnicianId: newTechId, actualTechnicianName: newTech.name }
+        : fu
+    );
+
     updateEntry(entryId, {
       ...entry,
       technicianId: newTechId,
       technicianName: newTech.name,
       technicianArea: newTech.areaLabel,
+      followUps: updatedFollowUps,
     });
 
     showMsg(`✅ Trámite derivado a ${newTech.name}`);
