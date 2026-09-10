@@ -21,6 +21,18 @@ export type PlannerUser = {
   areaId?: AreaId; // si se define, solo ve los técnicos de esa área
 };
 
+export type Junta = {
+  id: string;
+  date: string; // "2026-09-10"
+  technicianId: string;
+  technicianName: string;
+  tramiteCount: number; // 15, 20, etc.
+  registeredBy: string; // usuario que registró la junta
+  status: "pendiente" | "en-proceso" | "completado";
+  observations?: string;
+  createdAt: string;
+};
+
 export type TechnicianOption = {
   id: string;
   name: string;
@@ -635,6 +647,7 @@ export function groupEntriesByDateAndTechnician(entries: Entry[]) {
 export function useTramitesStore() {
   const [hydrated, setHydrated] = useState(false);
   const [entries, setEntries] = useState<Entry[]>(seedEntries);
+  const [juntas, setJuntas] = useState<Junta[]>([]);
   const [currentUserId, setCurrentUserId] = useState(plannerUsers[0].id);
   const [currentTechnicianId, setCurrentTechnicianId] = useState<string | undefined>(undefined);
 
@@ -827,7 +840,23 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
     setCurrentUserId(plannerUsers[0].id);
   }
 
-  
+  function createJunta(technicianId: string, tramiteCount: number, observations?: string) {
+    const junta: Junta = {
+      id: `junta-${Date.now()}`,
+      date: new Date().toISOString().slice(0, 10),
+      technicianId,
+      technicianName: technicians.find(t => t.id === technicianId)?.name || technicianId,
+      tramiteCount,
+      registeredBy: currentUser.name,
+      status: "pendiente",
+      observations,
+      createdAt: new Date().toISOString(),
+    };
+    const newJuntas = [...juntas, junta];
+    setJuntas(newJuntas);
+    localStorage.setItem('juntas', JSON.stringify(newJuntas));
+    return junta;
+  }
 
   return {
     hydrated,
@@ -861,5 +890,7 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
       setCurrentTechnicianId(undefined);
       localStorage.removeItem('currentTechnicianId');
     },
+    juntas,
+    createJunta,
   };
 }
