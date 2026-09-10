@@ -33,6 +33,26 @@ export type Junta = {
   createdAt: string;
 };
 
+export type FollowUpType = "normal" | "junta_ingreso" | "derivado" | "legalización";
+
+export type FollowUp = {
+  type?: FollowUpType; // nuevo
+  juntaId?: string; // nuevo - vinculo a junta si es de junta
+  clientName?: string;
+  arrivalTime?: string;
+  attendedTime?: string;
+  completedTime?: string;
+  calledTime?: string;
+  returnedTime?: string;
+  actualTechnicianId?: string;
+  actualTechnicianName?: string;
+  attended?: boolean;
+  followUpStatus?: "esperando" | "en-revision" | "llamado" | "no-escucho" | "regreso" | "atendiendo" | "completado";
+  observations?: string;
+  createdAt?: string;
+  isUnscheduled?: boolean;
+};
+
 export type TechnicianOption = {
   id: string;
   name: string;
@@ -58,22 +78,9 @@ export type Entry = {
    // NUEVOS CAMPOS:
   scheduledTime?: string;  // Hora programada (ej: "10:00")
   scheduledEndTime?: string; //Hora fin estimada
-  // Datos de seguimiento:
-  followUp?: {
-    clientName?: string;
-    arrivalTime?: string;
-    attendedTime?: string;
-    completedTime?: string;
-    calledTime?: string;
-    returnedTime?: string;
-    actualTechnicianId?: string;
-    actualTechnicianName?: string;
-    attended?: boolean;
-    followUpStatus?: "esperando" | "en-revision" | "llamado" | "no-escucho" | "regreso" | "atendiendo" | "completado";
-    observations?: string;
-    createdAt?: string;
-    isUnscheduled?: boolean;
-  };
+  juntaId?: string; // vinculo a junta si es de una
+  // Array de seguimientos (múltiples visitas)
+  followUps?: FollowUp[];
 };
 
 export type EntryFormValues = {
