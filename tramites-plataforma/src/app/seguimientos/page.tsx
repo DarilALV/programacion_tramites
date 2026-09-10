@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect } from "react";
 import { AppShell } from "@/components/app-shell";
 import { useTramitesStore, areas, type Entry, type FollowUp } from "@/lib/tramites-store";
 import { getServerNow } from "@/lib/server-time";
-import { Search } from "lucide-react";
+import { Search, Plus, Trash2 } from "lucide-react";
 
 const LIMITE = 15;
 
@@ -54,7 +54,7 @@ export default function SeguimientosPage() {
   const [editingFollowUpId, setEditingFollowUpId] = useState<string | null>(null);
   const [showJuntaModal, setShowJuntaModal] = useState(false);
   const [juntaTechnicianId, setJuntaTechnicianId] = useState("");
-  const [juntaTramiteCount, setJuntaTramiteCount] = useState(0);
+  const [juntaTramites, setJuntaTramites] = useState<{ code: string; clientName: string }[]>([]);
   const [juntaObservations, setJuntaObservations] = useState("");
   const [editState, setEditState] = useState<EditState>({ clientName: "", technicianId: "", observations: "" });
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -166,14 +166,50 @@ export default function SeguimientosPage() {
     setMessage(text); setMessageType(type); setTimeout(() => setMessage(""), 4000);
   }
 
-  function handleCreateJunta() {
+  async function handleCreateJunta() {
     if (!juntaTechnicianId) return showMsg("⚠️ Selecciona un técnico", "error");
-    if (!juntaTramiteCount || juntaTramiteCount <= 0) return showMsg("⚠️ Ingresa cantidad de trámites", "error");
-    createJunta(juntaTechnicianId, juntaTramiteCount, juntaObservations.trim() || undefined);
-    showMsg(`✅ Junta registrada: ${juntaTramiteCount} trámites para ${technicians.find(t => t.id === juntaTechnicianId)?.name}`, "success");
+    if (juntaTramites.length === 0) return showMsg("⚠️ Agrega al menos un trámite", "error");
+
+    // Validar que todos tengan código y cliente
+    const invalid = juntaTramites.find(t => !t.code.trim() || !t.clientName.trim());
+    if (invalid) return showMsg("⚠️ Todos los trámites deben tener código y nombre de cliente", "error");
+
+    // Crear la junta primero
+    const junta = createJunta(juntaTechnicianId, juntaTramites.length, juntaObservations.trim() || undefined);
+
+    // Crear Entry para cada trámite
+    const { iso } = await getServerNow();
+    juntaTramites.forEach((tramite) => {
+      const newEntry: Entry = {
+        id: `junta-${junta.id}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        createdBy: currentUser.id,
+        createdByName: currentUser.name,
+        registrationNumber: getNextRegistrationNumber(),
+        tramiteCode: tramite.code.trim(),
+        technicianId: juntaTechnicianId,
+        technicianName: technicians.find(t => t.id === juntaTechnicianId)?.name ?? juntaTechnicianId,
+        technicianArea: technicians.find(t => t.id === juntaTechnicianId)?.areaLabel ?? "",
+        scheduleDate: today,
+        registrationDate: today,
+        observations: `Junta: ${juntaObservations || "sin observaciones"}`,
+        status: "Registrado",
+        createdAt: iso,
+        juntaId: junta.id,
+        followUps: [{
+          type: "junta_ingreso",
+          juntaId: junta.id,
+          clientName: tramite.clientName.trim(),
+          followUpStatus: "esperando",
+          createdAt: iso,
+        }],
+      };
+      createEntry(newEntry);
+    });
+
+    showMsg(`✅ Junta registrada: ${juntaTramites.length} trámites para ${technicians.find(t => t.id === juntaTechnicianId)?.name}`, "success");
     setShowJuntaModal(false);
     setJuntaTechnicianId("");
-    setJuntaTramiteCount(0);
+    setJuntaTramites([]);
     setJuntaObservations("");
   }
 
@@ -896,36 +932,117 @@ export default function SeguimientosPage() {
 
       {/* Modal de Junta */}
       {showJuntaModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-6 w-96 shadow-lg space-y-4">
-            <h2 className="text-xl font-bold">Registrar Junta de Contribuyentes</h2>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 space-y-5">
+            <div>
+              <h2 className="text-2xl font-bold text-emerald-900">📦 Registrar Junta de Contribuyentes</h2>
+              <p className="text-sm text-gray-500 mt-1">Ingresa los datos de cada trámite de la junta</p>
+            </div>
+
+            {/* Técnico */}
             <label className="grid gap-2">
               <span className="text-sm font-semibold">Técnico *</span>
               <select value={juntaTechnicianId} onChange={(e) => setJuntaTechnicianId(e.target.value)}
-                className="rounded-lg border-2 border-emerald-300 px-4 py-2 focus:border-emerald-500 focus:outline-none">
+                className="rounded-lg border-2 border-emerald-300 px-4 py-3 focus:border-emerald-500 focus:outline-none">
                 <option value="">Selecciona técnico</option>
                 {availableTechnicians.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
             </label>
-            <label className="grid gap-2">
-              <span className="text-sm font-semibold">Cantidad de Trámites *</span>
-              <input type="number" min="1" value={juntaTramiteCount || ""}
-                onChange={(e) => setJuntaTramiteCount(parseInt(e.target.value) || 0)}
-                className="rounded-lg border-2 border-emerald-300 px-4 py-2 focus:border-emerald-500 focus:outline-none"
-                placeholder="Ej: 15" />
-            </label>
+
+            {/* Observaciones */}
             <label className="grid gap-2">
               <span className="text-sm font-semibold">Observaciones (opcional)</span>
               <textarea value={juntaObservations} onChange={(e) => setJuntaObservations(e.target.value)}
-                className="rounded-lg border-2 border-emerald-300 px-4 py-2 focus:border-emerald-500 focus:outline-none text-sm"
-                rows={2} placeholder="Notas..." />
+                className="rounded-lg border-2 border-emerald-300 px-4 py-3 focus:border-emerald-500 focus:outline-none text-sm"
+                rows={2} placeholder="Notas sobre la junta..." />
             </label>
-            <div className="flex gap-2">
-              <button onClick={handleCreateJunta} className="flex-1 bg-emerald-600 text-white font-bold py-2 rounded-lg hover:bg-emerald-700">
-                ✅ Registrar
-              </button>
-              <button onClick={() => setShowJuntaModal(false)} className="flex-1 bg-gray-300 text-gray-800 font-bold py-2 rounded-lg hover:bg-gray-400">
+
+            {/* Trámites dinámicos */}
+            <div className="border-t-2 border-emerald-100 pt-4">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-semibold text-emerald-900">Trámites ({juntaTramites.length})</h3>
+                <button
+                  onClick={() => setJuntaTramites([...juntaTramites, { code: "", clientName: "" }])}
+                  className="flex items-center gap-1 text-xs bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-lg hover:bg-emerald-200 cursor-pointer"
+                >
+                  ➕ Agregar
+                </button>
+              </div>
+
+              {juntaTramites.length === 0 ? (
+                <p className="text-sm text-gray-400 italic py-4 text-center">Agrega trámites usando el botón de arriba</p>
+              ) : (
+                <div className="space-y-3">
+                  {juntaTramites.map((tramite, idx) => (
+                    <div key={idx} className="flex gap-2 items-end bg-emerald-50 p-3 rounded-lg border border-emerald-200">
+                      <label className="flex-1 grid gap-1">
+                        <span className="text-xs font-semibold text-gray-600">Código trámite</span>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={tramite.code}
+                          onChange={(e) => {
+                            const newTramites = [...juntaTramites];
+                            newTramites[idx].code = e.target.value.replace(/\D/g, "").slice(0, 10);
+                            setJuntaTramites(newTramites);
+                          }}
+                          placeholder="Ej: 2026001234"
+                          className="rounded-lg border border-emerald-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                        />
+                      </label>
+                      <label className="flex-1 grid gap-1">
+                        <span className="text-xs font-semibold text-gray-600">Nombre cliente</span>
+                        <input
+                          type="text"
+                          value={tramite.clientName}
+                          onChange={(e) => {
+                            const newTramites = [...juntaTramites];
+                            newTramites[idx].clientName = e.target.value;
+                            setJuntaTramites(newTramites);
+                          }}
+                          placeholder="Ej: Juan Pérez"
+                          className="rounded-lg border border-emerald-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                        />
+                      </label>
+                      <button
+                        onClick={() => {
+                          const newTramites = juntaTramites.filter((_, i) => i !== idx);
+                          setJuntaTramites(newTramites);
+                        }}
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50 p-2 rounded-lg cursor-pointer"
+                        title="Eliminar"
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Botones */}
+            <div className="flex gap-2 pt-2">
+              <button
+                onClick={() => {
+                  setShowJuntaModal(false);
+                  setJuntaTechnicianId("");
+                  setJuntaTramites([]);
+                  setJuntaObservations("");
+                }}
+                className="flex-1 px-4 py-3 rounded-lg bg-gray-300 text-gray-800 font-semibold hover:bg-gray-400 cursor-pointer transition"
+              >
                 ✕ Cancelar
+              </button>
+              <button
+                onClick={handleCreateJunta}
+                disabled={!juntaTechnicianId || juntaTramites.length === 0}
+                className={`flex-1 px-4 py-3 rounded-lg font-semibold transition cursor-pointer ${
+                  juntaTechnicianId && juntaTramites.length > 0
+                    ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                    : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                }`}
+              >
+                ✅ Registrar Junta
               </button>
             </div>
           </div>
