@@ -361,8 +361,9 @@ export default function AgendaTecnicoPage() {
       const isThisTech = e.technicianId === currentTechnicianId || fu.actualTechnicianId === currentTechnicianId;
       if (!isThisTech) return false;
 
-      const d = fu.arrivalTime ? fu.createdAt?.slice(0, 10) ?? e.scheduleDate ?? "" :
-                e.scheduleDate ?? fu.createdAt?.slice(0, 10) ?? "";
+      const lastFollowUp = e.followUps?.[e.followUps.length - 1];
+      const d = lastFollowUp?.arrivalTime ? lastFollowUp.createdAt?.slice(0, 10) ?? e.scheduleDate ?? "" :
+                e.scheduleDate ?? lastFollowUp?.createdAt?.slice(0, 10) ?? "";
 
       return d >= from && d <= to;
     });
