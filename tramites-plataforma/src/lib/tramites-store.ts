@@ -717,10 +717,13 @@ useEffect(() => {
   (async () => {
     try {
       const { firestore } = await import('@/lib/firebase');
-      const { collection, onSnapshot } = await import('firebase/firestore');
+      const { collection, onSnapshot, query, where } = await import('firebase/firestore');
 
       unsubscribe = onSnapshot(
-        collection(firestore, 'entries'),
+        query(
+          collection(firestore, 'entries'),
+          where('scheduleDate', '==', todayString)
+        ),
         (snapshot) => {
           if (!snapshot.empty) {
             const firestoreEntries = snapshot.docs
@@ -756,10 +759,13 @@ useEffect(() => {
   (async () => {
     try {
       const { firestore } = await import('@/lib/firebase');
-      const { collection, onSnapshot } = await import('firebase/firestore');
+      const { collection, onSnapshot, query, where } = await import('firebase/firestore');
 
       unsubscribeJuntas = onSnapshot(
-        collection(firestore, 'juntas'),
+        query(
+          collection(firestore, 'juntas'),
+          where('date', '==', todayString)
+        ),
         (snapshot) => {
           if (!snapshot.empty) {
             const firestoreJuntas = snapshot.docs.map((docSnap) => ({
