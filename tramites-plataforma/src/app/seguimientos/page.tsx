@@ -134,14 +134,16 @@ export default function SeguimientosPage() {
 
   const expandedFollowUps = useMemo(() => {
     const expanded = todayFollowUps.flatMap((entry) =>
-      (entry.followUps ?? []).map((followUp) => ({ entry, followUp }))
+      (entry.followUps ?? [])
+        .filter((followUp) => followUp.createdAt?.startsWith(today))
+        .map((followUp) => ({ entry, followUp }))
     );
     return expanded.sort((a, b) => {
       const timeA = a.followUp.arrivalTime ?? "";
       const timeB = b.followUp.arrivalTime ?? "";
       return timeB.localeCompare(timeA);
     });
-  }, [todayFollowUps]);
+  }, [todayFollowUps, today]);
 
   const filteredFollowUps = useMemo(() => {
     if (!debouncedSearch.trim()) return expandedFollowUps;
