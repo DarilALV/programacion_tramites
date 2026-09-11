@@ -719,10 +719,11 @@ useEffect(() => {
       const { firestore } = await import('@/lib/firebase');
       const { collection, onSnapshot, query, where } = await import('firebase/firestore');
 
+      const sevenDaysAgo = new Date(new Date().getTime() - 7 * 86400000).toISOString().slice(0, 10);
       unsubscribe = onSnapshot(
         query(
           collection(firestore, 'entries'),
-          where('scheduleDate', '==', todayString)
+          where('scheduleDate', '>=', sevenDaysAgo)
         ),
         (snapshot) => {
           if (!snapshot.empty) {
@@ -761,10 +762,11 @@ useEffect(() => {
       const { firestore } = await import('@/lib/firebase');
       const { collection, onSnapshot, query, where } = await import('firebase/firestore');
 
+      const sevenDaysAgo = new Date(new Date().getTime() - 7 * 86400000).toISOString().slice(0, 10);
       unsubscribeJuntas = onSnapshot(
         query(
           collection(firestore, 'juntas'),
-          where('date', '==', todayString)
+          where('date', '>=', sevenDaysAgo)
         ),
         (snapshot) => {
           if (!snapshot.empty) {
