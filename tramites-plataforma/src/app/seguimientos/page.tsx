@@ -822,12 +822,12 @@ export default function SeguimientosPage() {
           <div className="bg-gradient-to-r from-pink-600 to-purple-600 text-white px-6 py-4 flex items-center justify-between flex-wrap gap-3">
             <h2 className="text-2xl font-bold">
               Seguimientos de Hoy
-              <span className="text-sm font-normal ml-2">({todayFollowUps.length})</span>
+              <span className="text-sm font-normal ml-2">({filteredFollowUps.length})</span>
             </h2>
             <div className="flex items-center gap-3 flex-wrap">
-              <span className="text-sm">🟢 {todayFollowUps.filter((e) => !e.followUps?.[0]?.attendedTime).length} en espera</span>
-              <span className="text-sm">✅ {todayFollowUps.filter((e) => e.followUps?.[0]?.completedTime).length} completados</span>
-              {todayFollowUps.length > 0 && (
+              <span className="text-sm">🟢 {filteredFollowUps.filter(({ followUp }) => !followUp?.attendedTime).length} en espera</span>
+              <span className="text-sm">✅ {filteredFollowUps.filter(({ followUp }) => followUp?.completedTime).length} completados</span>
+              {filteredFollowUps.length > 0 && (
                 <button onClick={exportarReporte} className="bg-white text-pink-700 font-semibold text-sm px-4 py-1.5 rounded-lg hover:bg-pink-50 transition cursor-pointer">
                   📥 Exportar Excel
                 </button>
