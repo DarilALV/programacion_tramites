@@ -133,9 +133,14 @@ export default function SeguimientosPage() {
   }, [entries, today, currentUser.areaId, areas]);
 
   const expandedFollowUps = useMemo(() => {
-    return todayFollowUps.flatMap((entry) =>
+    const expanded = todayFollowUps.flatMap((entry) =>
       (entry.followUps ?? []).map((followUp) => ({ entry, followUp }))
     );
+    return expanded.sort((a, b) => {
+      const timeA = a.followUp.arrivalTime ?? "";
+      const timeB = b.followUp.arrivalTime ?? "";
+      return timeB.localeCompare(timeA);
+    });
   }, [todayFollowUps]);
 
   const filteredFollowUps = useMemo(() => {
