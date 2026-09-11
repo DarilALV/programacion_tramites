@@ -342,9 +342,11 @@ export default function AgendaTecnicoPage() {
 
   const expandedAgendaHoy = useMemo(() => {
     return agendaHoy.flatMap((entry) =>
-      (entry.followUps ?? []).map((followUp) => ({ entry, followUp }))
+      (entry.followUps ?? [])
+        .filter((followUp) => followUp.createdAt?.startsWith(selectedDate))
+        .map((followUp) => ({ entry, followUp }))
     );
-  }, [agendaHoy]);
+  }, [agendaHoy, selectedDate]);
 
   // Report data
   const reportEntries = useMemo(() => {
