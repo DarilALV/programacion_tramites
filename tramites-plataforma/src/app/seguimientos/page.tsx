@@ -172,14 +172,15 @@ export default function SeguimientosPage() {
     });
 
     todayFollowUps.forEach((e) => {
-      const tid = e.followUps?.[0]?.actualTechnicianId ?? e.technicianId;
-      const tn = e.followUps?.[0]?.actualTechnicianName ?? e.technicianName;
-      countToday[tid] = (countToday[tid] ?? 0) + 1;
-      if (!load[tid]) load[tid] = { name: tn, programados: 0, llegadas: 0, atendidos: 0, completados: 0 };
-      load[tid].llegadas++;
-      const fu = e.followUps?.[0];
-      if (fu?.attendedTime) load[tid].atendidos++;
-      if (fu?.completedTime) load[tid].completados++;
+      (e.followUps ?? []).forEach((fu) => {
+        const tid = fu.actualTechnicianId ?? e.technicianId;
+        const tn = fu.actualTechnicianName ?? e.technicianName;
+        countToday[tid] = (countToday[tid] ?? 0) + 1;
+        if (!load[tid]) load[tid] = { name: tn, programados: 0, llegadas: 0, atendidos: 0, completados: 0 };
+        load[tid].llegadas++;
+        if (fu.attendedTime) load[tid].atendidos++;
+        if (fu.completedTime) load[tid].completados++;
+      });
     });
 
     return { techCountToday: countToday, programadosHoy: programados, technicianLoad: load };
