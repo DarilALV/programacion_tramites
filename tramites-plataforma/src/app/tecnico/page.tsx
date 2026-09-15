@@ -372,22 +372,24 @@ export default function AgendaTecnicoPage() {
   }, [entries, currentTechnicianId, selectedDate, reportePeriodo]);
 
   const reportStats = useMemo(() => {
-    const completados = reportEntries.filter((e) => e.followUps?.[0]?.followUpStatus === "completado");
-    const noEscucho = reportEntries.filter((e) => e.followUps?.[0]?.followUpStatus === "no-escucho");
+    const getLastFollowUp = (e: Entry) => e.followUps?.[e.followUps.length - 1];
+
+    const completados = reportEntries.filter((e) => getLastFollowUp(e)?.followUpStatus === "completado");
+    const noEscucho = reportEntries.filter((e) => getLastFollowUp(e)?.followUpStatus === "no-escucho");
     const enProceso = reportEntries.filter((e) => {
-      const st = e.followUps?.[0]?.followUpStatus;
+      const st = getLastFollowUp(e)?.followUpStatus;
       return st && ["esperando", "en-revision", "llamado", "regreso"].includes(st);
     });
 
     const waitTimes = completados
       .map((e) => {
-        const fu = e.followUps?.[0];
+        const fu = getLastFollowUp(e);
         return fu?.arrivalTime && fu?.attendedTime ? minDiff(fu.arrivalTime, fu.attendedTime) : null;
       })
       .filter((v): v is number => v !== null && v >= 0);
     const attnTimes = completados
       .map((e) => {
-        const fu = e.followUps?.[0];
+        const fu = getLastFollowUp(e);
         return fu?.attendedTime && fu?.completedTime ? minDiff(fu.attendedTime, fu.completedTime) : null;
       })
       .filter((v): v is number => v !== null && v >= 0);
