@@ -387,7 +387,7 @@ export default function SeguimientosPage() {
         type: "normal",
         clientName: clientName.trim(),
         arrivalTime: arrival,
-        followUpStatus: "completado",
+        followUpStatus: "esperando",
         observations: (observations.trim() ? `[${selectedGestion}] ${observations.trim()}` : `[${selectedGestion}]`),
         createdAt: iso,
         isUnscheduled: false,
@@ -414,7 +414,7 @@ export default function SeguimientosPage() {
           type: "normal",
           clientName: clientName.trim(),
           arrivalTime: arrival,
-          followUpStatus: "completado",
+          followUpStatus: "esperando",
           observations: (observations.trim() ? `[${selectedGestion}] ${observations.trim()}` : `[${selectedGestion}]`),
           createdAt: iso,
           isUnscheduled: true,
@@ -477,7 +477,7 @@ export default function SeguimientosPage() {
     const currentFollowUps = entry.followUps ?? [];
     const updatedFollowUps = currentFollowUps.map((fu, idx) =>
       idx === currentFollowUps.length - 1
-        ? { ...fu, actualTechnicianId: newTechId, actualTechnicianName: newTech.name }
+        ? { ...fu, actualTechnicianId: newTechId, actualTechnicianName: newTech.name, followUpStatus: "esperando" as const }
         : fu
     );
 

@@ -2,6 +2,33 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+const isDev = () => typeof window !== "undefined" && (new URL(window.location.href).searchParams.get("debug") === "1");
+const devLog = (msg: string, err?: any) => { if (isDev()) console.error(msg, err); };
+const devWarn = (msg: string, err?: any) => { if (isDev()) console.warn(msg, err); };
+
+// Auditoría de cambios
+const logAudit = (operation: "create" | "update" | "delete", entityType: "entry" | "junta", entityId: string, entityCode: string | undefined, userId: string, userName: string, savedTo: ("localStorage" | "firestore")[], status: "success" | "partial" | "failed", details?: string) => {
+  if (typeof window === "undefined") return;
+  const log: AuditLog = {
+    id: `audit-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    timestamp: new Date().toISOString(),
+    operation,
+    entityType,
+    entityId,
+    entityCode,
+    userId,
+    userName,
+    savedTo,
+    status,
+    details,
+  };
+  const stored = localStorage.getItem("gmc-tramites-audit");
+  const logs: AuditLog[] = stored ? JSON.parse(stored) : [];
+  logs.push(log);
+  localStorage.setItem("gmc-tramites-audit", JSON.stringify(logs.slice(-500))); // Guardar últimos 500
+  if (isDev()) console.log("📋 AUDIT:", log);
+};
+
 export type AreaId = "supervisor" | "ruat" | "legal" | "revision-plano" | "tunari";
 export type EntryStatus = "Registrado" | "En revisión" | "Aprobado";
 export type FollowUpType = "normal" | "junta_ingreso" | "derivado" | "legalización";
@@ -88,10 +115,25 @@ export type EntryFormValues = {
   observations: string;
 };
 
+export type AuditLog = {
+  id: string;
+  timestamp: string;
+  operation: "create" | "update" | "delete";
+  entityType: "entry" | "junta";
+  entityId: string;
+  entityCode?: string;
+  userId: string;
+  userName: string;
+  savedTo: ("localStorage" | "firestore")[];
+  status: "success" | "partial" | "failed";
+  details?: string;
+};
+
 type PersistedState = {
   currentUserId: string;
   currentTechnicianId?: string;
   entries: Entry[];
+  auditLogs?: AuditLog[];
 };
 
 export const plannerUsers: PlannerUser[] = [
@@ -613,7 +655,7 @@ export function getNextRegistrationNumber(entries: Entry[]) {
 }
 
 export function countEntriesForTechnicianOnDate(entries: Entry[], technicianId: string, date: string) {
-  return entries.filter((entry) => entry.technicianId === technicianId && entry.scheduleDate === date).length;
+  return entries.filter((entry) => entry.technicianId === technicianId && entry.scheduleDate === date && !entry.deleted).length;
 }
 
 export function groupEntriesByTechnician(entries: Entry[]) {
@@ -658,6 +700,12 @@ export function groupEntriesByDateAndCreator(entries: Entry[]) {
 }
 
 //registro por fecha y tecnico
+export function getAuditLogs(): AuditLog[] {
+  if (typeof window === "undefined") return [];
+  const stored = localStorage.getItem("gmc-tramites-audit");
+  return stored ? JSON.parse(stored) : [];
+}
+
 export function groupEntriesByDateAndTechnician(entries: Entry[]) {
   const map = new Map<string, { date: string; byTechnician: Record<string, number>; total: number }>();
 
@@ -694,7 +742,7 @@ export function useTramitesStore() {
       const saved = localStorage.getItem('juntas');
       return saved ? JSON.parse(saved) : [];
     } catch (e) {
-      console.error('Error parsing juntas from localStorage:', e);
+      devLog('Error parsing juntas from localStorage:', e);
       return [];
     }
   });
@@ -739,13 +787,13 @@ useEffect(() => {
           setHydrated(true);
         },
         (error) => {
-          console.warn('Firestore listener error:', error);
+          devWarn('Firestore listener error:', error);
           setEntries(seedEntries);
           setHydrated(true);
         }
       );
     } catch (error) {
-      console.warn('Error setting up Firestore listener:', error);
+      devWarn('Error setting up Firestore listener:', error);
       setEntries(seedEntries);
       setHydrated(true);
     }
@@ -778,11 +826,11 @@ useEffect(() => {
           }
         },
         (error) => {
-          console.warn('Firestore juntas listener error:', error);
+          devWarn('Firestore juntas listener error:', error);
         }
       );
     } catch (error) {
-      console.warn('Error setting up Firestore juntas listener:', error);
+      devWarn('Error setting up Firestore juntas listener:', error);
     }
   })();
 
@@ -849,7 +897,7 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
       const { doc, setDoc } = await import('firebase/firestore');
       await setDoc(doc(firestore, 'entries', entryId), stripUndefined(data));
     } catch (error) {
-      console.error('Error escribiendo en Firestore:', error);
+      devLog('Error escribiendo en Firestore:', error);
       throw error;
     }
   }
@@ -860,7 +908,7 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
       const { doc, deleteDoc } = await import('firebase/firestore');
       await deleteDoc(doc(firestore, 'entries', entryId));
     } catch (error) {
-      console.error('Error eliminando de Firestore:', error);
+      devLog('Error eliminando de Firestore:', error);
       throw error;
     }
   }
@@ -871,7 +919,7 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
       const { doc, setDoc } = await import('firebase/firestore');
       await setDoc(doc(firestore, 'juntas', juntaId), stripUndefined(data));
     } catch (error) {
-      console.error('Error escribiendo junta en Firestore:', error);
+      devLog('Error escribiendo junta en Firestore:', error);
       throw error;
     }
   }
@@ -882,7 +930,7 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
       const { doc, deleteDoc } = await import('firebase/firestore');
       await deleteDoc(doc(firestore, 'juntas', juntaId));
     } catch (error) {
-      console.error('Error eliminando junta de Firestore:', error);
+      devLog('Error eliminando junta de Firestore:', error);
       throw error;
     }
   }
@@ -890,6 +938,8 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
   function createEntry(form: EntryFormValues | Partial<Entry>) {
     if ('id' in form && form.id) {
       persistState([form as Entry, ...entries]);
+      const creator = plannerUsers.find((user) => user.id === currentUserId) ?? plannerUsers[0];
+      logAudit("create", "entry", (form as Entry).id, (form as Entry).tramiteCode, creator.id, creator.name, ["localStorage"], "success");
       firestoreSet(form.id, form as Entry);
       return;
     }
@@ -917,8 +967,10 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
     };
 
     persistState([nextEntry, ...entries], currentUserId);
+    logAudit("create", "entry", nextEntry.id, nextEntry.tramiteCode, creator.id, creator.name, ["localStorage"], "success");
     firestoreSet(nextEntry.id, nextEntry).catch((error) => {
-      console.error('Error saving entry to Firestore:', error);
+      devLog('Error saving entry to Firestore:', error);
+      logAudit("create", "entry", nextEntry.id, nextEntry.tramiteCode, creator.id, creator.name, ["localStorage"], "partial", `Firestore error: ${error}`);
     });
   }
 
@@ -927,8 +979,11 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
       entry.id === entryId ? updatedEntry : entry
     );
     persistState(nextEntries);
+    const creator = plannerUsers.find((user) => user.id === currentUserId) ?? plannerUsers[0];
+    logAudit("update", "entry", entryId, updatedEntry.tramiteCode, creator.id, creator.name, ["localStorage"], "success");
     firestoreSet(entryId, updatedEntry).catch((error) => {
-      console.error('Error updating entry in Firestore:', error);
+      devLog('Error updating entry in Firestore:', error);
+      logAudit("update", "entry", entryId, updatedEntry.tramiteCode, creator.id, creator.name, ["localStorage"], "partial", `Firestore error: ${error}`);
     });
   }
 
@@ -946,6 +1001,8 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
     const softDeleted = { ...entry, deleted: true };
     const nextEntries = entries.filter((e) => e.id !== entryId);
     persistState(nextEntries);
+    const creator = plannerUsers.find((user) => user.id === currentUserId) ?? plannerUsers[0];
+    logAudit("delete", "entry", entryId, entry.tramiteCode, creator.id, creator.name, ["localStorage"], "success");
     firestoreSet(entryId, softDeleted);
   }
 
@@ -971,8 +1028,10 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
     const newJuntas = [...juntas, junta];
     setJuntas(newJuntas);
     if (typeof window !== "undefined") localStorage.setItem('juntas', JSON.stringify(newJuntas));
+    logAudit("create", "junta", junta.id, name, currentUserId, currentUser.name, ["localStorage"], "success");
     firestoreSetJunta(junta.id, junta).catch((error) => {
-      console.error('Error saving junta to Firestore:', error);
+      devLog('Error saving junta to Firestore:', error);
+      logAudit("create", "junta", junta.id, name, currentUserId, currentUser.name, ["localStorage"], "partial", `Firestore error: ${error}`);
     });
     return junta;
   }
@@ -983,18 +1042,22 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
     if (typeof window !== "undefined") localStorage.setItem('juntas', JSON.stringify(newJuntas));
     const updatedJunta = newJuntas.find(j => j.id === juntaId);
     if (updatedJunta) {
+      logAudit("update", "junta", juntaId, updatedJunta.name, currentUserId, currentUser.name, ["localStorage"], "success");
       firestoreSetJunta(juntaId, updatedJunta).catch((error) => {
-        console.error('Error updating junta in Firestore:', error);
+        devLog('Error updating junta in Firestore:', error);
+        logAudit("update", "junta", juntaId, updatedJunta.name, currentUserId, currentUser.name, ["localStorage"], "partial", `Firestore error: ${error}`);
       });
     }
   }
 
   function deleteJunta(juntaId: string) {
+    const junta = juntas.find(j => j.id === juntaId);
     const newJuntas = juntas.filter(j => j.id !== juntaId);
     setJuntas(newJuntas);
     if (typeof window !== "undefined") localStorage.setItem('juntas', JSON.stringify(newJuntas));
+    logAudit("delete", "junta", juntaId, junta?.name || "unknown", currentUserId, currentUser.name, ["localStorage"], "success");
     firestoreDeleteJunta(juntaId).catch((error) => {
-      console.error('Error deleting junta from Firestore:', error);
+      devLog('Error deleting junta from Firestore:', error);
     });
   }
 
