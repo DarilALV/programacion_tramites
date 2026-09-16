@@ -161,6 +161,18 @@ const AgendaRow = memo(function AgendaRow({
             </div>
           )}
 
+          {st === "atendiendo" && (
+            <div className="space-y-2">
+              <div className="rounded-lg bg-blue-50 border border-blue-300 p-2">
+                <p className="text-xs text-blue-800 font-semibold">👤 Atendiendo al cliente...</p>
+              </div>
+              <button onClick={() => onTermineDeAtender(entry.id, fu?.createdAt)}
+                className="w-full px-3 py-2 bg-green-600 text-white text-sm font-bold rounded-lg hover:bg-green-700 cursor-pointer shadow">
+                ✅ Terminé de atender
+              </button>
+            </div>
+          )}
+
           {st === "no-escucho" && (
             <div className="rounded-lg bg-orange-50 border border-orange-200 p-3">
               <p className="text-xs text-orange-800 font-semibold">⏳ Esperando regreso</p>
@@ -438,9 +450,8 @@ export default function AgendaTecnicoPage() {
     const { time } = await getServerNow();
     const newFollowUps = (entry.followUps ?? []).map(f => f === fu ? {
       ...fu,
-      followUpStatus: "completado" as const,
+      followUpStatus: "atendiendo" as const,
       attendedTime: fu.calledTime ?? fu.returnedTime ?? time,
-      completedTime: time,
     } : f);
     updateEntry(entryId, { ...entry, followUps: newFollowUps });
   }, [entries, updateEntry]);
@@ -467,7 +478,6 @@ export default function AgendaTecnicoPage() {
     const newFollowUps = (entry.followUps ?? []).map(f => f === fu ? {
       ...fu,
       followUpStatus: "completado" as const,
-      attendedTime: fu.returnedTime ?? time,
       completedTime: time,
     } : f);
     updateEntry(entryId, { ...entry, followUps: newFollowUps });
