@@ -223,6 +223,15 @@ export default function SeguimientosPage() {
     const programados: Record<string, { name: string; area: string; entries: Entry[] }> = {};
     const load: Record<string, { name: string; programados: number; llegadas: number; atendidos: number; completados: number }> = {};
 
+    // Inicializar todos los técnicos (incluso sin seguimientos)
+    const relevantTechs = currentUser.areaId
+      ? technicians.filter((t) => areas.some((a) => a.id === currentUser.areaId && a.label === t.areaLabel))
+      : technicians;
+
+    relevantTechs.forEach((tech) => {
+      load[tech.id] = { name: tech.name, programados: 0, llegadas: 0, atendidos: 0, completados: 0 };
+    });
+
     entries.forEach((e) => {
       const isToday = e.scheduleDate === today;
       const inArea = !currentUser.areaId || areas.some((a) => a.id === currentUser.areaId && a.label === e.technicianArea);
@@ -250,7 +259,7 @@ export default function SeguimientosPage() {
     });
 
     return { techCountToday: countToday, programadosHoy: programados, technicianLoad: load };
-  }, [entries, todayFollowUps, today, currentUser.areaId, areas]);
+  }, [entries, todayFollowUps, today, currentUser.areaId, areas, technicians]);
 
   function showMsg(text: string, type: "success" | "error" = "success") {
     setMessage(text); setMessageType(type); setTimeout(() => setMessage(""), 4000);
