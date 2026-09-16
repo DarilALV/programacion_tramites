@@ -48,6 +48,7 @@ export default function SeguimientosPage() {
   const [observations, setObservations] = useState("");
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState<"success" | "error">("success");
+  const [autoDownloadedToday, setAutoDownloadedToday] = useState(false);
   // const [programadosExpanded, setProgramadosExpanded] = useState(false); // Oculto de momento para no confundir
   const [searchFollowUps, setSearchFollowUps] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -102,6 +103,67 @@ export default function SeguimientosPage() {
     }, 300);
     return () => clearTimeout(timer);
   }, [searchFollowUps]);
+
+  // Auto-descarga de auditoría y reportes a las 16:30
+  useEffect(() => {
+    const checkAndDownload = async () => {
+      if (autoDownloadedToday) return;
+      const { time } = await getServerNow();
+      if (time === "16:30") {
+        await descargarReportesAutomatico();
+        setAutoDownloadedToday(true);
+      }
+    };
+    const interval = setInterval(checkAndDownload, 60000);
+    return () => clearInterval(interval);
+  }, [autoDownloadedToday, entries, todayFollowUps]);
+
+  const descargarReportesAutomatico = async () => {
+    const XLSX = await import("xlsx");
+    const { date } = await getServerNow();
+    const today = new Date().toISOString().slice(0, 10);
+
+    // CSV Auditoría
+    const logs = localStorage.getItem("gmc-tramites-audit");
+    if (logs) {
+      const allLogs = JSON.parse(logs);
+      const todayLogs = allLogs.filter((l: any) => l.timestamp?.startsWith(today));
+      const csv = [
+        ["Timestamp", "Operation", "Type", "Entity ID", "Code", "User", "Saved To", "Status", "Details"].join(","),
+        ...todayLogs.map((log: any) =>
+          [log.timestamp, log.operation, log.entityType, log.entityId, log.entityCode || "", log.userName,
+            log.savedTo.join("|"), log.status, (log.details || "").replace(/"/g, '""')].join(",")
+        ),
+      ].join("\n");
+      const blob = new Blob([csv], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `reportes_auditoria_${date}.csv`;
+      a.click();
+    }
+
+    // Excel Reportes Registradores (calcular sobre la marcha)
+    const todayEntries = entries.filter((e) => {
+      const hasFollowUpsToday = e.followUps?.some((fu) => fu.createdAt?.startsWith(today));
+      return hasFollowUpsToday;
+    });
+    const rows = todayEntries.flatMap((entry) =>
+      (entry.followUps ?? [])
+        .filter((fu) => fu.createdAt?.startsWith(today))
+        .map((followUp) => ({
+          Hora: followUp.arrivalTime ?? "", Trámite: entry.tramiteCode, Registro: entry.registrationNumber,
+          Cliente: followUp.clientName ?? "", Técnico: entry.technicianName, Estado: followUp.followUpStatus ?? "",
+          Observaciones: followUp.observations ?? "",
+        }))
+    );
+    if (rows.length > 0) {
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Registros");
+      XLSX.writeFile(wb, `reportes_registradores_${date}.xlsx`);
+    }
+  };
 
   const foundEntry = useMemo(() => {
     if (!tramiteCode.trim()) return null;

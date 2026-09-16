@@ -215,6 +215,7 @@ export default function AgendaTecnicoPage() {
   const [toastShow, setToastShow] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
   const [expandedJuntaId, setExpandedJuntaId] = useState<string | null>(null);
+  const [autoDownloadedToday, setAutoDownloadedToday] = useState(false);
 
   const currentTechnician = technicians.find((t) => t.id === currentTechnicianId);
   const today = new Date().toISOString().slice(0, 10);
@@ -308,6 +309,70 @@ export default function AgendaTecnicoPage() {
       localStorage.setItem(`notifIds-${currentTechnicianId}`, JSON.stringify(Array.from(knownIdsRef.current)));
     }
   }, [entries, currentTechnicianId, today]);
+
+  // Auto-descarga de auditoría y reportes a las 16:30
+  useEffect(() => {
+    const checkAndDownload = async () => {
+      if (autoDownloadedToday) return;
+      const { time } = await getServerNow();
+      if (time === "16:30") {
+        await descargarReportesAutomatico();
+        setAutoDownloadedToday(true);
+      }
+    };
+    const interval = setInterval(checkAndDownload, 60000);
+    return () => clearInterval(interval);
+  }, [autoDownloadedToday, currentTechnicianId, entries, today]);
+
+  const descargarReportesAutomatico = async () => {
+    if (!currentTechnicianId) return;
+    const XLSX = await import("xlsx");
+    const { date } = await getServerNow();
+
+    // CSV Auditoría
+    const logs = localStorage.getItem("gmc-tramites-audit");
+    if (logs) {
+      const allLogs = JSON.parse(logs);
+      const todayLogs = allLogs.filter((l: any) => l.timestamp?.startsWith(today));
+      const csv = [
+        ["Timestamp", "Operation", "Type", "Entity ID", "Code", "User", "Saved To", "Status", "Details"].join(","),
+        ...todayLogs.map((log: any) =>
+          [log.timestamp, log.operation, log.entityType, log.entityId, log.entityCode || "", log.userName,
+            log.savedTo.join("|"), log.status, (log.details || "").replace(/"/g, '""')].join(",")
+        ),
+      ].join("\n");
+      const blob = new Blob([csv], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `reportes_auditoria_${date}.csv`;
+      a.click();
+    }
+
+    // Excel Reportes Técnicos (calcular sobre la marcha)
+    const todayEntries = entries.filter((e) => {
+      const isThisTech = e.technicianId === currentTechnicianId;
+      const hasFollowUpsToday = e.followUps?.some((fu) => fu.createdAt?.startsWith(today));
+      return isThisTech && hasFollowUpsToday;
+    });
+    const rows = todayEntries.flatMap((entry) =>
+      (entry.followUps ?? [])
+        .filter((fu) => fu.createdAt?.startsWith(today))
+        .map((followUp) => ({
+          Hora: followUp.arrivalTime ?? "", Trámite: entry.tramiteCode, Registro: entry.registrationNumber,
+          Cliente: followUp.clientName ?? "", Estado: followUp.followUpStatus ?? "",
+          "Espera (min)": followUp.arrivalTime && followUp.attendedTime ? Math.round((new Date(`2000-01-01T${followUp.attendedTime}`).getTime() - new Date(`2000-01-01T${followUp.arrivalTime}`).getTime()) / 60000) : "",
+          "Atención (min)": followUp.attendedTime && followUp.completedTime ? Math.round((new Date(`2000-01-01T${followUp.completedTime}`).getTime() - new Date(`2000-01-01T${followUp.attendedTime}`).getTime()) / 60000) : "",
+          Observaciones: followUp.observations ?? "",
+        }))
+    );
+    if (rows.length > 0) {
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Atenciones");
+      XLSX.writeFile(wb, `reportes_tecnicos_${date}.xlsx`);
+    }
+  };
 
   const misJuntas = useMemo(() => {
     if (!currentTechnicianId) return [];
