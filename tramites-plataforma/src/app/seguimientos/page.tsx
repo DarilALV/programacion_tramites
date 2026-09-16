@@ -116,7 +116,7 @@ export default function SeguimientosPage() {
     };
     const interval = setInterval(checkAndDownload, 60000);
     return () => clearInterval(interval);
-  }, [autoDownloadedToday, entries, todayFollowUps]);
+  }, [autoDownloadedToday, entries]);
 
   const descargarReportesAutomatico = async () => {
     const XLSX = await import("xlsx");
