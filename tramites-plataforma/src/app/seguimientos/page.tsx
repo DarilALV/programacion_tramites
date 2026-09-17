@@ -258,6 +258,23 @@ export default function SeguimientosPage() {
         });
     });
 
+    // Contar también trámites de junta (junta_ingreso)
+    entries.forEach((e) => {
+      const inArea = !currentUser.areaId || areas.some((a) => a.id === currentUser.areaId && a.label === e.technicianArea);
+      if (!inArea) return;
+
+      (e.followUps ?? [])
+        .filter((fu) => fu.type === "junta_ingreso" && fu.createdAt?.startsWith(today))
+        .forEach((fu) => {
+          const tid = e.technicianId;
+          const tn = e.technicianName;
+          if (!load[tid]) load[tid] = { name: tn, programados: 0, llegadas: 0, atendidos: 0, completados: 0 };
+          load[tid].llegadas++;
+          if (fu.attendedTime) load[tid].atendidos++;
+          if (fu.completedTime) load[tid].completados++;
+        });
+    });
+
     return { techCountToday: countToday, programadosHoy: programados, technicianLoad: load };
   }, [entries, todayFollowUps, today, currentUser.areaId, areas, technicians]);
 
