@@ -267,7 +267,6 @@ export default function SeguimientosPage() {
 
   async function handleCreateJunta() {
     if (!juntaTechnicianId) return showMsg("⚠️ Selecciona un técnico", "error");
-    if (!juntaName.trim()) return showMsg("⚠️ Ingresa un nombre para la junta", "error");
     if (juntaTramites.length === 0) return showMsg("⚠️ Agrega al menos un trámite", "error");
 
     // Validar que todos tengan código y cliente
@@ -1193,7 +1192,7 @@ export default function SeguimientosPage() {
 
             {/* Nombre de Junta */}
             <label className="grid gap-2">
-              <span className="text-sm font-semibold">Nombre de la Junta *</span>
+              <span className="text-sm font-semibold">Nombre de la junta (opcional)</span>
               <input
                 type="text"
                 value={juntaName}
