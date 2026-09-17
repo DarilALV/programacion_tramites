@@ -269,9 +269,9 @@ export default function SeguimientosPage() {
     if (!juntaTechnicianId) return showMsg("⚠️ Selecciona un técnico", "error");
     if (juntaTramites.length === 0) return showMsg("⚠️ Agrega al menos un trámite", "error");
 
-    // Validar que todos tengan código y cliente
-    const invalid = juntaTramites.find(t => !t.code.trim() || !t.clientName.trim());
-    if (invalid) return showMsg("⚠️ Todos los trámites deben tener código y nombre de cliente", "error");
+    // Validar que todos tengan código (nombre es opcional)
+    const invalid = juntaTramites.find(t => !t.code.trim());
+    if (invalid) return showMsg("⚠️ Todos los trámites deben tener código", "error");
 
     // Crear la junta primero
     const junta = createJunta(juntaTechnicianId, juntaName.trim(), juntaTramites.length, juntaObservations.trim() || undefined);
@@ -1244,7 +1244,7 @@ export default function SeguimientosPage() {
                         />
                       </label>
                       <label className="flex-1 grid gap-1">
-                        <span className="text-xs font-semibold text-gray-600">Nombre cliente</span>
+                        <span className="text-xs font-semibold text-gray-600">Nombre cliente (opcional)</span>
                         <input
                           type="text"
                           value={tramite.clientName}
@@ -1346,7 +1346,7 @@ export default function SeguimientosPage() {
                         />
                       </label>
                       <label className="flex-1 grid gap-1">
-                        <span className="text-xs font-semibold text-gray-600">Nombre cliente</span>
+                        <span className="text-xs font-semibold text-gray-600">Nombre cliente (opcional)</span>
                         <input
                           type="text"
                           value={tramite.clientName}
