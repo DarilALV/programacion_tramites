@@ -158,6 +158,8 @@ export default function AuditoriaPage() {
                 <th className="px-4 py-3 text-left font-semibold">Operación</th>
                 <th className="px-4 py-3 text-left font-semibold">Tipo</th>
                 <th className="px-4 py-3 text-left font-semibold">Código</th>
+                <th className="px-4 py-3 text-left font-semibold">Cliente</th>
+                <th className="px-4 py-3 text-left font-semibold">Técnico</th>
                 <th className="px-4 py-3 text-left font-semibold">Usuario</th>
                 <th className="px-4 py-3 text-left font-semibold">Guardado en</th>
                 <th className="px-4 py-3 text-left font-semibold">Estado</th>
@@ -166,38 +168,44 @@ export default function AuditoriaPage() {
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-6 text-center text-gray-500">
+                  <td colSpan={9} className="px-4 py-6 text-center text-gray-500">
                     No hay registros
                   </td>
                 </tr>
               ) : (
-                filtered.map((log) => (
-                  <tr key={log.id} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="px-4 py-3 text-xs text-gray-600">
-                      {new Date(log.timestamp).toLocaleTimeString("es-ES")}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`px-2 py-1 rounded text-xs font-bold ${
-                          log.operation === "create"
-                            ? "bg-green-100 text-green-800"
+                filtered.map((log) => {
+                  const entry = entries.find((e) => e.id === log.entityId);
+                  const clientName = entry?.followUps?.[0]?.clientName || "—";
+                  const technicianName = entry?.technicianName || "—";
+                  return (
+                    <tr key={log.id} className="border-b border-gray-100 hover:bg-gray-50">
+                      <td className="px-4 py-3 text-xs text-gray-600">
+                        {new Date(log.timestamp).toLocaleTimeString("es-ES")}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`px-2 py-1 rounded text-xs font-bold ${
+                            log.operation === "create"
+                              ? "bg-green-100 text-green-800"
+                              : log.operation === "update"
+                                ? "bg-blue-100 text-blue-800"
+                                : "bg-red-100 text-red-800"
+                          }`}
+                        >
+                          {log.operation === "create"
+                            ? "➕ Crear"
                             : log.operation === "update"
-                              ? "bg-blue-100 text-blue-800"
-                              : "bg-red-100 text-red-800"
-                        }`}
-                      >
-                        {log.operation === "create"
-                          ? "➕ Crear"
-                          : log.operation === "update"
-                            ? "✏️ Editar"
-                            : "🗑️ Eliminar"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-sm">
-                      {log.entityType === "entry" ? "📋 Trámite" : "📦 Junta"}
-                    </td>
-                    <td className="px-4 py-3 font-mono text-sm">{log.entityCode || "—"}</td>
-                    <td className="px-4 py-3 text-sm">{log.userName}</td>
+                              ? "✏️ Editar"
+                              : "🗑️ Eliminar"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        {log.entityType === "entry" ? "📋 Trámite" : "📦 Junta"}
+                      </td>
+                      <td className="px-4 py-3 font-mono text-sm">{log.entityCode || "—"}</td>
+                      <td className="px-4 py-3 text-sm">{clientName}</td>
+                      <td className="px-4 py-3 text-sm">{technicianName}</td>
+                      <td className="px-4 py-3 text-sm">{log.userName}</td>
                     <td className="px-4 py-3">
                       <div className="flex gap-1">
                         {log.savedTo.includes("localStorage") && (
@@ -235,7 +243,8 @@ export default function AuditoriaPage() {
                       )}
                     </td>
                   </tr>
-                ))
+                  );
+                })
               )}
             </tbody>
           </table>
