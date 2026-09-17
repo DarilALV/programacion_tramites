@@ -2,11 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { AppShell } from "@/components/app-shell";
-import { getAuditLogs, type AuditLog } from "@/lib/tramites-store";
+import { getAuditLogs, type AuditLog, useTramitesStore } from "@/lib/tramites-store";
 
 export default function AuditoriaPage() {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [filter, setFilter] = useState<"all" | "create" | "update" | "delete">("all");
+  const { entries, updateEntry } = useTramitesStore();
 
   useEffect(() => {
     const allLogs = getAuditLogs();
@@ -57,6 +58,15 @@ export default function AuditoriaPage() {
       setLogs([]);
     }
   };
+
+  const handleRecoverEntry = (entryId: string) => {
+    const entry = entries.find((e) => e.id === entryId);
+    if (!entry) return;
+    updateEntry(entryId, { ...entry, deleted: undefined });
+  };
+
+  const deletedEntries = entries.filter((e) => e.deleted === true);
+  const today = new Date().toISOString().slice(0, 10);
 
   return (
     <AppShell title="Auditoría" description="Registro de cambios en la BD" eyebrow="AUDITORÍA">
@@ -228,6 +238,53 @@ export default function AuditoriaPage() {
             </tbody>
           </table>
         </div>
+
+        {/* TRÁMITES BORRADOS */}
+        {deletedEntries.length > 0 && (
+          <section className="rounded-4xl border-2 border-red-200 p-6">
+            <h2 className="text-2xl font-bold mb-4">🗑️ Trámites Borrados</h2>
+            <div className="rounded-lg border-2 border-red-200 overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-red-100 border-b-2 border-red-200">
+                  <tr>
+                    <th className="px-4 py-3 text-left font-semibold">Hora Borrado</th>
+                    <th className="px-4 py-3 text-left font-semibold">Trámite</th>
+                    <th className="px-4 py-3 text-left font-semibold">Cliente</th>
+                    <th className="px-4 py-3 text-left font-semibold">Técnico</th>
+                    <th className="px-4 py-3 text-left font-semibold">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {deletedEntries.map((entry) => {
+                    const deleteLog = logs.find(
+                      (l) => l.operation === "delete" && l.entityId === entry.id
+                    );
+                    const deleteTime = deleteLog ? new Date(deleteLog.timestamp).toLocaleTimeString("es-ES") : "—";
+
+                    return (
+                      <tr key={entry.id} className="border-b border-red-100 hover:bg-red-50">
+                        <td className="px-4 py-3 text-xs text-gray-600">{deleteTime}</td>
+                        <td className="px-4 py-3 font-mono font-semibold">{entry.tramiteCode}</td>
+                        <td className="px-4 py-3 text-sm">
+                          {entry.followUps?.[0]?.clientName ?? "—"}
+                        </td>
+                        <td className="px-4 py-3 text-sm">{entry.technicianName}</td>
+                        <td className="px-4 py-3">
+                          <button
+                            onClick={() => handleRecoverEntry(entry.id)}
+                            className="px-3 py-1.5 bg-green-600 text-white text-xs font-semibold rounded hover:bg-green-700 cursor-pointer"
+                          >
+                            ↩️ Recuperar
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
 
         {/* INFO */}
         <div className="rounded-lg bg-blue-50 border-2 border-blue-200 p-4">
