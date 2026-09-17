@@ -664,7 +664,7 @@ export default function SeguimientosPage() {
 
             {/* Nombre */}
             <label className="grid gap-2 md:col-span-2">
-              <span className="text-sm font-semibold text-gray-700">Nombre de Quién Viene *</span>
+              <span className="text-sm font-semibold text-gray-700">Contribuyente (opcional)</span>
               <input type="text" value={clientName}
                 onChange={(e) => setClientName(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && (formMode === "tecnico" ? handleRegisterArrival() : handleRegisterGestionInterna())}
