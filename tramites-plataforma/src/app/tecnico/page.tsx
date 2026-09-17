@@ -436,12 +436,14 @@ export default function AgendaTecnicoPage() {
     return entries.flatMap((e) => {
       if (!e.followUps?.length) return [];
 
-      const isThisTech = e.technicianId === currentTechnicianId;
-      if (!isThisTech) return [];
-
-      // Retornar solo los followUps que caen en el rango
+      // Retornar solo los followUps que caen en el rango Y son de este técnico
       return (e.followUps ?? [])
         .filter((fu) => {
+          // Verificar si es este técnico (directo o derivado)
+          const isThisTech = e.technicianId === currentTechnicianId || fu.actualTechnicianId === currentTechnicianId;
+          if (!isThisTech) return false;
+
+          // Verificar rango de fechas
           const d = fu.createdAt?.slice(0, 10) ?? e.scheduleDate ?? "";
           return d >= from && d <= to;
         })
