@@ -28,20 +28,22 @@ export default function AuditoriaPage() {
 
   const downloadLogs = () => {
     const csv = [
-      ["Timestamp", "Operation", "Type", "Entity ID", "Code", "User", "Saved To", "Status", "Details"].join(","),
-      ...logs.map((log) =>
-        [
+      ["Timestamp", "Operation", "Type", "Code", "Cliente", "Usuario", "Guardado en", "Estado", "Detalles"].join(","),
+      ...logs.map((log) => {
+        const entry = entries.find((e) => e.id === log.entityId);
+        const clientName = entry?.followUps?.[0]?.clientName || "";
+        return [
           log.timestamp,
           log.operation,
-          log.entityType,
-          log.entityId,
+          log.entityType === "entry" ? "Trámite" : "Junta",
           log.entityCode || "",
+          clientName,
           log.userName,
           log.savedTo.join("|"),
           log.status,
           (log.details || "").replace(/"/g, '""'),
-        ].join(",")
-      ),
+        ].join(",");
+      }),
     ].join("\n");
 
     const blob = new Blob([csv], { type: "text/csv" });
