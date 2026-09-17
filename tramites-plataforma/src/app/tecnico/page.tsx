@@ -433,18 +433,19 @@ export default function AgendaTecnicoPage() {
     else if (reportePeriodo === "semana") { const r = weekRange(selectedDate); from = r.from; to = r.to; }
     else { const r = monthRange(selectedDate); from = r.from; to = r.to; }
 
-    return entries.filter((e) => {
-      const fu = e.followUps?.[0];
-      if (!fu) return false;
+    return entries.flatMap((e) => {
+      if (!e.followUps?.length) return [];
 
-      const isThisTech = e.technicianId === currentTechnicianId || fu.actualTechnicianId === currentTechnicianId;
-      if (!isThisTech) return false;
+      const isThisTech = e.technicianId === currentTechnicianId;
+      if (!isThisTech) return [];
 
-      const lastFollowUp = e.followUps?.[e.followUps.length - 1];
-      const d = lastFollowUp?.arrivalTime ? lastFollowUp.createdAt?.slice(0, 10) ?? e.scheduleDate ?? "" :
-                e.scheduleDate ?? lastFollowUp?.createdAt?.slice(0, 10) ?? "";
-
-      return d >= from && d <= to;
+      // Retornar solo los followUps que caen en el rango
+      return (e.followUps ?? [])
+        .filter((fu) => {
+          const d = fu.createdAt?.slice(0, 10) ?? e.scheduleDate ?? "";
+          return d >= from && d <= to;
+        })
+        .map(() => e); // Retornar la entrada una vez por cada followUp en el rango
     });
   }, [entries, currentTechnicianId, selectedDate, reportePeriodo]);
 
