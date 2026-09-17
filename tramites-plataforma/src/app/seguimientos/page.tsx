@@ -393,7 +393,6 @@ export default function SeguimientosPage() {
   async function handleRegisterArrival() {
     const codeErr = validateCode(tramiteCode);
     if (codeErr) return showMsg(`⚠️ ${codeErr}`, "error");
-    if (!clientName.trim()) return showMsg("⚠️ Ingresa el nombre de la persona", "error");
     if (!selectedTechnicianId) return showMsg("⚠️ Selecciona el técnico", "error");
 
     const count = techCountToday[selectedTechnicianId] ?? 0;
@@ -444,7 +443,6 @@ export default function SeguimientosPage() {
   async function handleRegisterGestionInterna() {
     const codeErr = validateCode(tramiteCode);
     if (codeErr) return showMsg(`⚠️ ${codeErr}`, "error");
-    if (!clientName.trim()) return showMsg("⚠️ Ingresa el nombre de la persona", "error");
     if (!selectedGestion) return showMsg("⚠️ Selecciona el tipo de gestión", "error");
 
     const { time: arrival, iso } = await getServerNow();

@@ -800,8 +800,8 @@ export default function AgendaTecnicoPage() {
                           <p>📅 Ingresada: {junta.date && new Date(junta.date + "T00:00:00").toLocaleDateString("es-ES")} {junta.createdAt && new Date(junta.createdAt).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}</p>
                           <p>📊 {junta.tramiteCount} trámites | Registrado por: {junta.registeredBy}</p>
                           {junta.observations && <p>📌 {junta.observations}</p>}
-                          <p className={`font-semibold ${junta.status === "completado" ? "text-green-700" : junta.status === "en-proceso" ? "text-blue-700" : "text-amber-700"}`}>
-                            Status: {junta.status === "completado" ? "✓ Revisada" : junta.status === "en-proceso" ? "🔄 En revisión" : "⏳ Pendiente"}
+                          <p className={`font-semibold ${junta.status === "completado" ? "text-green-700" : junta.status === "en-proceso" ? "text-blue-700" : "text-green-700"}`}>
+                            Status: {junta.status === "completado" ? "✓ Revisada" : junta.status === "en-proceso" ? "🔄 En revisión" : "✓ Recibida"}
                           </p>
                         </div>
                       </div>
