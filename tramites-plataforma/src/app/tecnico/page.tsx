@@ -810,15 +810,9 @@ export default function AgendaTecnicoPage() {
 
                     {isExpanded && (
                       <div className="px-6 py-4 bg-white border-t border-emerald-100 space-y-4">
-                        <div className="flex gap-2">
-                          <button onClick={() => { if (confirm("¿Eliminar esta junta?")) { juntaEntries.forEach(e => removeEntry(e.id)); deleteJunta(junta.id); } }}
-                            className="px-3 py-1.5 text-sm bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition font-semibold">
-                            🗑️ Eliminar junta
-                          </button>
-                        </div>
                         {juntaEntries.length > 0 && (
                           <>
-                            <p className="text-sm font-semibold text-emerald-900">Trámites por revisar:</p>
+                            <p className="text-sm font-semibold text-emerald-900">Trámites:</p>
                             <div className="space-y-3">
                               {juntaEntries.map((entry) => {
                                 const fu = entry.followUps?.[0];
@@ -827,7 +821,7 @@ export default function AgendaTecnicoPage() {
                                 const statusLabel = status === "completado" ? "✓ Revisado" : status === "en-revision" ? "🔄 En revisión" : "⏳ Pendiente";
 
                                 return (
-                                  <div key={entry.id} className="bg-emerald-50 p-4 rounded-lg border border-emerald-200 space-y-2">
+                                  <div key={entry.id} className="bg-emerald-50 p-4 rounded-lg border border-emerald-200">
                                     <div className="flex items-start justify-between gap-3">
                                       <div className="flex-1">
                                         <p className="font-mono font-bold text-emerald-900">{entry.tramiteCode}</p>
@@ -837,26 +831,6 @@ export default function AgendaTecnicoPage() {
                                       <span className={`text-xs whitespace-nowrap px-2.5 py-1 rounded font-semibold bg-${statusColor}-100 text-${statusColor}-800`}>
                                         {statusLabel}
                                       </span>
-                                    </div>
-                                    <div className="flex gap-2 pt-2">
-                                      {status === "esperando" && (
-                                        <button onClick={() => {
-                                          const updatedFollowUps = entry.followUps?.map((f) => f === fu ? { ...fu, followUpStatus: "en-revision" as const } : f) ?? [];
-                                          updateEntry(entry.id, { ...entry, followUps: updatedFollowUps });
-                                        }}
-                                          className="px-3 py-1.5 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition font-semibold">
-                                          🔄 En revisión
-                                        </button>
-                                      )}
-                                      {status === "en-revision" && (
-                                        <button onClick={() => {
-                                          const updatedFollowUps = entry.followUps?.map((f) => f === fu ? { ...fu, followUpStatus: "completado" as const } : f) ?? [];
-                                          updateEntry(entry.id, { ...entry, followUps: updatedFollowUps });
-                                        }}
-                                          className="px-3 py-1.5 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 transition font-semibold">
-                                          ✓ Marcar revisado
-                                        </button>
-                                      )}
                                     </div>
                                   </div>
                                 );
