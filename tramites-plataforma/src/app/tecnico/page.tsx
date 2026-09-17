@@ -397,7 +397,6 @@ export default function AgendaTecnicoPage() {
     return entries
       .filter((e) => {
         const hasTodayFollowUp = (e.followUps ?? []).some((fu) => {
-          if (fu.type === "junta_ingreso") return false;
           if (fu.createdAt?.startsWith(selectedDate)) {
             const isThisTech = e.technicianId === currentTechnicianId || fu.actualTechnicianId === currentTechnicianId;
             return isThisTech;
