@@ -1010,14 +1010,16 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
 
   function removeEntry(entryId: string) {
     // Borrado suave: marca deleted=true en Firestore, filtra en UI
-    // Para recuperar: ir a Firestore Console y cambiar deleted a false
+    // Para recuperar: usar botón en auditoría o cambiar deleted a false
     const entry = entries.find((e) => e.id === entryId);
     if (!entry) return;
     const softDeleted = { ...entry, deleted: true };
     const nextEntries = entries.filter((e) => e.id !== entryId);
     persistState(nextEntries);
     const creator = plannerUsers.find((user) => user.id === currentUserId) ?? plannerUsers[0];
-    logAudit("delete", "entry", entryId, entry.tramiteCode, creator.id, creator.name, ["localStorage"], "success");
+    const clientName = entry.followUps?.[0]?.clientName || "Sin cliente";
+    const details = `Borrado: Cliente=${clientName}, Técnico=${entry.technicianName}`;
+    logAudit("delete", "entry", entryId, entry.tramiteCode, creator.id, creator.name, ["localStorage"], "success", details);
     firestoreSet(entryId, softDeleted);
   }
 
@@ -1176,9 +1178,8 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
 
       updateEntry(entryId, {
         ...entry,
-        technicianId: newTechnicianId,
-        technicianName: newTechnicianName,
-        technicianArea: newTechnicianArea,
+        // NO cambiar technicianId principal - las etapas son un historial
+        // El entry sigue siendo del técnico original
         stages: updatedStages,
         currentStageIndex: newStageIndex,
         followUps: [...(entry.followUps ?? []), newFollowUp],
