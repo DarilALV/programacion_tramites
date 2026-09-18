@@ -251,9 +251,11 @@ export default function AuditoriaPage() {
         </div>
 
         {/* TRÁMITES BORRADOS */}
-        {deletedEntries.length > 0 && (
-          <section className="rounded-4xl border-2 border-red-200 p-6">
-            <h2 className="text-2xl font-bold mb-4">🗑️ Trámites Borrados</h2>
+        <section className="rounded-4xl border-2 border-red-200 p-6">
+          <h2 className="text-2xl font-bold mb-4">🗑️ Trámites Borrados ({deletedEntries.length})</h2>
+          {deletedEntries.length === 0 ? (
+            <p className="text-gray-500">No hay trámites borrados</p>
+          ) : (
             <div className="rounded-lg border-2 border-red-200 overflow-hidden">
               <table className="w-full text-sm">
                 <thead className="bg-red-100 border-b-2 border-red-200">
@@ -294,8 +296,8 @@ export default function AuditoriaPage() {
                 </tbody>
               </table>
             </div>
-          </section>
-        )}
+          )}
+        </section>
 
         {/* INFO */}
         <div className="rounded-lg bg-blue-50 border-2 border-blue-200 p-4">
