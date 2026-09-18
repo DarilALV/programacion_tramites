@@ -1174,6 +1174,8 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
         followUpStatus: "esperando",
         createdAt: new Date().toISOString(),
         stageId: newStage.id,
+        actualTechnicianId: newTechnicianId,
+        actualTechnicianName: newTechnicianName,
       };
 
       updateEntry(entryId, {
