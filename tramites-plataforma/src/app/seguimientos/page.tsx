@@ -542,11 +542,16 @@ export default function SeguimientosPage() {
   }
 
   function handleDeleteFollowUp(entry: Entry, followUp: FollowUp) {
-    if (followUp.isUnscheduled && entry.followUps?.length === 1) {
-      removeEntry(entry.id);
-    } else if (entry.followUps && entry.followUps.length > 0) {
+    if (entry.followUps && entry.followUps.length > 0) {
       const newFollowUps = entry.followUps.filter((fu) => fu !== followUp);
-      updateEntry(entry.id, { ...entry, followUps: newFollowUps.length > 0 ? newFollowUps : undefined });
+
+      // Si no quedan followUps, borrar el entry completo (soft delete)
+      if (newFollowUps.length === 0) {
+        removeEntry(entry.id);
+      } else {
+        // Si quedan followUps, solo actualizar la lista
+        updateEntry(entry.id, { ...entry, followUps: newFollowUps });
+      }
     }
     setConfirmDeleteId(null);
     showMsg(`Seguimiento de ${entry.tramiteCode} eliminado`);
