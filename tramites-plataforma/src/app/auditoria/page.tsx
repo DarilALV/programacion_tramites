@@ -179,8 +179,8 @@ export default function AuditoriaPage() {
                   const technicianName = entry?.technicianName || "—";
                   return (
                     <tr key={log.id} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="px-4 py-3 text-xs text-gray-600">
-                        {new Date(log.timestamp).toLocaleTimeString("es-ES")}
+                      <td className="px-4 py-3 text-xs text-gray-600 whitespace-nowrap">
+                        {new Date(log.timestamp).toLocaleString("es-ES")}
                       </td>
                       <td className="px-4 py-3">
                         <span
