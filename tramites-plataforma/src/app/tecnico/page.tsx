@@ -57,6 +57,7 @@ interface AgendaRowProps {
   onAtendi: (id: string, followUpCreatedAt?: string) => void;
   onNoRespondio: (id: string, followUpCreatedAt?: string) => void;
   onTermineDeAtender: (id: string, followUpCreatedAt?: string) => void;
+  onContinuarEtapa?: (id: string) => void;
 }
 
 const AgendaRow = memo(function AgendaRow({
@@ -67,6 +68,7 @@ const AgendaRow = memo(function AgendaRow({
   onAtendi,
   onNoRespondio,
   onTermineDeAtender,
+  onContinuarEtapa,
 }: AgendaRowProps) {
   const fu = propsFollowUp ?? entry.followUps?.[0];
   const st = (fu?.followUpStatus ?? (fu ? "esperando" : undefined)) as FollowUpStatus | undefined;
@@ -192,7 +194,15 @@ const AgendaRow = memo(function AgendaRow({
           )}
 
           {st === "completado" && (
-            <span className="text-sm text-green-700 font-bold">✓ Finalizado</span>
+            <div className="space-y-2">
+              <span className="text-sm text-green-700 font-bold">✓ Finalizado</span>
+              {onContinuarEtapa && (
+                <button onClick={() => onContinuarEtapa(entry.id)}
+                  className="w-full px-3 py-2 bg-purple-600 text-white text-sm font-bold rounded-lg hover:bg-purple-700 cursor-pointer shadow">
+                  ➡️ Continuar en...
+                </button>
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -205,7 +215,7 @@ const AgendaRow = memo(function AgendaRow({
 });
 
 export default function AgendaTecnicoPage() {
-  const { entries, updateEntry, currentTechnicianId, loginTechnician, logoutTechnician, juntas, updateJunta, removeEntry, deleteJunta } = useTramitesStore();
+  const { entries, updateEntry, currentTechnicianId, loginTechnician, logoutTechnician, juntas, updateJunta, removeEntry, deleteJunta, crearSiguienteEtapa } = useTramitesStore();
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
   const [selectedTechnicianId, setSelectedTechnicianId] = useState("");
   const [pinInput, setPinInput] = useState("");
@@ -216,6 +226,8 @@ export default function AgendaTecnicoPage() {
   const [toastMessage, setToastMessage] = useState("");
   const [expandedJuntaId, setExpandedJuntaId] = useState<string | null>(null);
   const [autoDownloadedToday, setAutoDownloadedToday] = useState(false);
+  const [continuingEntryId, setContinuingEntryId] = useState<string | null>(null);
+  const [continuingToTechId, setContinuingToTechId] = useState("");
 
   const currentTechnician = technicians.find((t) => t.id === currentTechnicianId);
   const today = new Date().toISOString().slice(0, 10);
@@ -372,6 +384,18 @@ export default function AgendaTecnicoPage() {
       XLSX.utils.book_append_sheet(wb, ws, "Atenciones");
       XLSX.writeFile(wb, `reportes_tecnicos_${date}.xlsx`);
     }
+  };
+
+  const handleContinuarEtapa = (entryId: string, newTechId: string) => {
+    const newTech = technicians.find((t) => t.id === newTechId);
+    if (!newTech) return;
+
+    crearSiguienteEtapa(entryId, newTechId, newTech.name, newTech.areaLabel);
+
+    setToastMessage(`✅ Trámite derivado a ${newTech.name}`);
+    setToastShow(true);
+    setContinuingEntryId(null);
+    setContinuingToTechId("");
   };
 
   const misJuntas = useMemo(() => {
@@ -766,6 +790,7 @@ export default function AgendaTecnicoPage() {
                   onAtendi={marcarLeAtendi}
                   onNoRespondio={marcarNoRespondio}
                   onTermineDeAtender={marcarTermineDeAtender}
+                  onContinuarEtapa={(id) => setContinuingEntryId(id)}
                 />
               ))}
             </div>
@@ -886,6 +911,64 @@ export default function AgendaTecnicoPage() {
             <p className="text-gray-500 text-sm text-center py-4">Sin seguimientos en el periodo.</p>
           )}
         </section>
+
+        {/* ── MODAL CONTINUAR ETAPA ── */}
+        {continuingEntryId && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 space-y-6">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-800">Continuar en...</h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  Selecciona a quién le pasas el trámite
+                </p>
+              </div>
+
+              {entries.find((e) => e.id === continuingEntryId) && (() => {
+                const e = entries.find((e) => e.id === continuingEntryId)!;
+                return (
+                  <div className="rounded-xl bg-purple-50 border-2 border-purple-200 p-4">
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div>
+                        <p className="text-xs text-gray-600">Trámite</p>
+                        <p className="font-bold">{e.tramiteCode}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-600">Cliente</p>
+                        <p className="font-bold">{e.followUps?.[0]?.clientName ?? "—"}</p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              <label className="block">
+                <p className="text-sm font-semibold text-gray-700 mb-2">Técnico destino</p>
+                <select value={continuingToTechId} onChange={(e) => setContinuingToTechId(e.target.value)}
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-purple-500 focus:outline-none font-medium">
+                  <option value="">Seleccionar técnico...</option>
+                  {technicians.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name} ({t.areaLabel})
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              {/* Botones */}
+              <div className="flex gap-3">
+                <button onClick={() => { setContinuingEntryId(null); setContinuingToTechId(""); }}
+                  className="flex-1 px-4 py-3 rounded-lg bg-gray-300 text-gray-700 font-semibold hover:bg-gray-400 cursor-pointer transition">
+                  Cancelar
+                </button>
+                <button onClick={() => handleContinuarEtapa(continuingEntryId, continuingToTechId)}
+                  disabled={!continuingToTechId}
+                  className={`flex-1 px-4 py-3 rounded-lg font-semibold transition cursor-pointer ${continuingToTechId ? "bg-purple-600 text-white hover:bg-purple-700" : "bg-gray-300 text-gray-500 cursor-not-allowed"}`}>
+                  ➡️ Continuar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </AppShell>
   );
