@@ -69,6 +69,17 @@ export type TechnicianOption = {
   areaLabel: string;
 };
 
+export type Stage = {
+  id: string;
+  stageIndex: number; // 1 = Plano, 2 = RUAT, 3 = Legal, etc.
+  technicianId: string;
+  technicianName: string;
+  technicianArea: string;
+  startedAt: string;
+  completedAt?: string;
+  observations?: string;
+};
+
 export type FollowUp = {
   type?: FollowUpType;
   juntaId?: string;
@@ -85,6 +96,7 @@ export type FollowUp = {
   observations?: string;
   createdAt?: string;
   isUnscheduled?: boolean;
+  stageId?: string; // Referencia a la etapa actual
 };
 
 export type Entry = {
@@ -106,6 +118,8 @@ export type Entry = {
   scheduledEndTime?: string;
   juntaId?: string;
   followUps?: FollowUp[];
+  stages?: Stage[]; // Nueva: etapas del trámite (Plano → RUAT → Legal)
+  currentStageIndex?: number; // Índice de la etapa actual
 };
 
 export type EntryFormValues = {
@@ -1126,6 +1140,62 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
         ["localStorage"],
         "success",
         `Derivado de ${entry.technicianName} a ${newTechnicianName}`
+      );
+    },
+    crearSiguienteEtapa: (entryId: string, newTechnicianId: string, newTechnicianName: string, newTechnicianArea: string) => {
+      const entry = entries.find((e) => e.id === entryId);
+      if (!entry) return;
+
+      const currentStageIndex = entry.currentStageIndex ?? 0;
+      const newStageIndex = currentStageIndex + 1;
+
+      // Marcar la etapa anterior como completada
+      const updatedStages = [...(entry.stages ?? [])];
+      if (updatedStages[currentStageIndex]) {
+        updatedStages[currentStageIndex].completedAt = new Date().toISOString();
+      }
+
+      // Crear nueva etapa
+      const newStage: Stage = {
+        id: `stage-${entryId}-${newStageIndex}-${Date.now()}`,
+        stageIndex: newStageIndex,
+        technicianId: newTechnicianId,
+        technicianName: newTechnicianName,
+        technicianArea: newTechnicianArea,
+        startedAt: new Date().toISOString(),
+      };
+      updatedStages.push(newStage);
+
+      // Crear nuevo followUp para la etapa
+      const newFollowUp: FollowUp = {
+        type: "normal",
+        followUpStatus: "esperando",
+        createdAt: new Date().toISOString(),
+        stageId: newStage.id,
+      };
+
+      updateEntry(entryId, {
+        ...entry,
+        technicianId: newTechnicianId,
+        technicianName: newTechnicianName,
+        technicianArea: newTechnicianArea,
+        stages: updatedStages,
+        currentStageIndex: newStageIndex,
+        followUps: [...(entry.followUps ?? []), newFollowUp],
+      });
+
+      const creator = plannerUsers.find((user) => user.id === currentUserId) ?? plannerUsers[0];
+      const prevTech = updatedStages[currentStageIndex]?.technicianName ?? "Desconocido";
+      logAudit(
+        "update",
+        "entry",
+        entryId,
+        entry.tramiteCode,
+        creator.id,
+        creator.name,
+        ["localStorage"],
+        "success",
+        `Etapa ${newStageIndex}: Continuado de ${prevTech} a ${newTechnicianName}`
       );
     },
     juntas,
