@@ -1009,12 +1009,12 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
   }
 
   function removeEntry(entryId: string) {
-    // Borrado suave: marca deleted=true en Firestore, filtra en UI
-    // Para recuperar: usar botón en auditoría o cambiar deleted a false
+    // Borrado suave: marca deleted=true, NO quita del array
+    // Permite: recuperar, ver en auditoría, calcular estadísticas
     const entry = entries.find((e) => e.id === entryId);
     if (!entry) return;
     const softDeleted = { ...entry, deleted: true };
-    const nextEntries = entries.filter((e) => e.id !== entryId);
+    const nextEntries = entries.map((e) => e.id === entryId ? softDeleted : e);
     persistState(nextEntries);
     const creator = plannerUsers.find((user) => user.id === currentUserId) ?? plannerUsers[0];
     const clientName = entry.followUps?.[0]?.clientName || "Sin cliente";
