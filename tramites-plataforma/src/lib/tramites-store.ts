@@ -122,6 +122,7 @@ export type AuditLog = {
   entityType: "entry" | "junta";
   entityId: string;
   entityCode?: string;
+  clientName?: string;
   userId: string;
   userName: string;
   savedTo: ("localStorage" | "firestore")[];
@@ -1092,6 +1093,40 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
     logoutTechnician: () => {
       setCurrentTechnicianId(undefined);
       localStorage.removeItem('currentTechnicianId');
+    },
+    derivarTramite: (entryId: string, newTechnicianId: string, newTechnicianName: string) => {
+      const entry = entries.find((e) => e.id === entryId);
+      if (!entry) return;
+      const newTech = technicians.find((t) => t.id === newTechnicianId);
+      if (!newTech) return;
+
+      const currentFollowUps = entry.followUps ?? [];
+      const updatedFollowUps = currentFollowUps.map((fu, idx) =>
+        idx === currentFollowUps.length - 1
+          ? { ...fu, actualTechnicianId: newTechnicianId, actualTechnicianName: newTechnicianName, followUpStatus: "esperando" as const }
+          : fu
+      );
+
+      updateEntry(entryId, {
+        ...entry,
+        technicianId: newTechnicianId,
+        technicianName: newTechnicianName,
+        technicianArea: newTech.areaLabel,
+        followUps: updatedFollowUps,
+      });
+
+      const creator = plannerUsers.find((user) => user.id === currentUserId) ?? plannerUsers[0];
+      logAudit(
+        "update",
+        "entry",
+        entryId,
+        entry.tramiteCode,
+        creator.id,
+        creator.name,
+        ["localStorage"],
+        "success",
+        `Derivado de ${entry.technicianName} a ${newTechnicianName}`
+      );
     },
     juntas,
     createJunta,

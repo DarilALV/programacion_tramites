@@ -66,7 +66,7 @@ export default function SeguimientosPage() {
   const [derivingEntryId, setDerivingEntryId] = useState<string | null>(null);
   const [derivingToTechId, setDerivingToTechId] = useState("");
 
-  const { entries, updateEntry, createEntry, removeEntry, technicians, currentUser, getNextRegistrationNumber, juntas, createJunta, updateJunta, deleteJunta } =
+  const { entries, updateEntry, createEntry, removeEntry, technicians, currentUser, getNextRegistrationNumber, juntas, createJunta, updateJunta, deleteJunta, derivarTramite } =
     useTramitesStore();
 
   const availableTechnicians = useMemo(
@@ -553,26 +553,10 @@ export default function SeguimientosPage() {
   }
 
   async function handleDerivar(entryId: string, newTechId: string) {
-    const entry = entries.find((e) => e.id === entryId);
-    if (!entry) return;
     const newTech = technicians.find((t) => t.id === newTechId);
     if (!newTech) return;
 
-    // Actualizar technicianId, technicianName Y el followUp con quién lo atiende
-    const currentFollowUps = entry.followUps ?? [];
-    const updatedFollowUps = currentFollowUps.map((fu, idx) =>
-      idx === currentFollowUps.length - 1
-        ? { ...fu, actualTechnicianId: newTechId, actualTechnicianName: newTech.name, followUpStatus: "esperando" as const }
-        : fu
-    );
-
-    updateEntry(entryId, {
-      ...entry,
-      technicianId: newTechId,
-      technicianName: newTech.name,
-      technicianArea: newTech.areaLabel,
-      followUps: updatedFollowUps,
-    });
+    derivarTramite(entryId, newTechId, newTech.name);
 
     showMsg(`✅ Trámite derivado a ${newTech.name}`);
     setDerivingEntryId(null);
