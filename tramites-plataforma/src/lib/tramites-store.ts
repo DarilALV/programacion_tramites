@@ -793,8 +793,8 @@ useEffect(() => {
             const firestoreEntries = snapshot.docs
               .map((docSnap, i) =>
                 normalizeStoredEntry({ ...docSnap.data(), id: docSnap.id } as Record<string, unknown>, i)
-              )
-              .filter((e) => !e.deleted);   // ocultar borrados suaves
+              );
+            // NO filtrar borrados aquí - cada vista decide qué mostrar
             setEntries(firestoreEntries);
           } else {
             setEntries(seedEntries);
