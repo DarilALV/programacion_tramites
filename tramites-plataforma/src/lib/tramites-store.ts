@@ -1169,6 +1169,7 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
       updatedStages.push(newStage);
 
       // Crear nuevo followUp para la etapa
+      const clientName = entry.followUps?.[0]?.clientName || "";
       const newFollowUp: FollowUp = {
         type: "normal",
         followUpStatus: "esperando",
@@ -1176,6 +1177,7 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
         stageId: newStage.id,
         actualTechnicianId: newTechnicianId,
         actualTechnicianName: newTechnicianName,
+        clientName: clientName,
       };
 
       updateEntry(entryId, {

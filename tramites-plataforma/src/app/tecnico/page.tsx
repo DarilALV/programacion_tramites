@@ -441,11 +441,12 @@ export default function AgendaTecnicoPage() {
   }, [entries, selectedDate, currentTechnicianId]);
 
   const expandedAgendaHoy = useMemo(() => {
-    return agendaHoy.flatMap((entry) =>
-      (entry.followUps ?? [])
-        .filter((followUp) => followUp.createdAt?.startsWith(selectedDate))
-        .map((followUp) => ({ entry, followUp }))
-    );
+    return agendaHoy.flatMap((entry) => {
+      const todayFollowUps = (entry.followUps ?? []).filter((followUp) => followUp.createdAt?.startsWith(selectedDate));
+      // Solo mostrar el último followUp de hoy (más reciente)
+      if (todayFollowUps.length === 0) return [];
+      return [{ entry, followUp: todayFollowUps[todayFollowUps.length - 1] }];
+    });
   }, [agendaHoy, selectedDate]);
 
   // Report data
