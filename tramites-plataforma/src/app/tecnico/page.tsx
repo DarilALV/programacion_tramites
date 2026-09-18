@@ -443,7 +443,7 @@ export default function AgendaTecnicoPage() {
   const expandedAgendaHoy = useMemo(() => {
     return agendaHoy.flatMap((entry) =>
       (entry.followUps ?? [])
-        .filter((followUp) => followUp.createdAt?.startsWith(selectedDate) && followUp.followUpStatus !== "completado")
+        .filter((followUp) => followUp.createdAt?.startsWith(selectedDate))
         .map((followUp) => ({ entry, followUp }))
     );
   }, [agendaHoy, selectedDate]);
