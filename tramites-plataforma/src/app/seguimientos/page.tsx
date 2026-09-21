@@ -424,7 +424,14 @@ export default function SeguimientosPage() {
       // Si técnico cambió, marcar todos los followUps anteriores con quién los atendió
       const updatedFollowUps = techChanged
         ? (foundEntry.followUps ?? []).map((fu) =>
-            fu.actualTechnicianId ? fu : { ...fu, actualTechnicianId: foundEntry.technicianId, actualTechnicianName: foundEntry.technicianName }
+            fu.actualTechnicianId
+              ? fu
+              : {
+                  ...fu,
+                  technicianName: foundEntry.technicianName,
+                  actualTechnicianId: foundEntry.technicianId,
+                  actualTechnicianName: foundEntry.technicianName
+                }
           )
         : (foundEntry.followUps ?? []);
 
@@ -479,7 +486,14 @@ export default function SeguimientosPage() {
     if (foundEntry) {
       // Marcar todos los followUps anteriores con el técnico anterior si se deriva a Archivos
       const updatedFollowUps = (foundEntry.followUps ?? []).map((fu) =>
-        fu.actualTechnicianId ? fu : { ...fu, actualTechnicianId: foundEntry.technicianId, actualTechnicianName: foundEntry.technicianName }
+        fu.actualTechnicianId
+          ? fu
+          : {
+              ...fu,
+              technicianName: foundEntry.technicianName,
+              actualTechnicianId: foundEntry.technicianId,
+              actualTechnicianName: foundEntry.technicianName
+            }
       );
 
       const newFollowUp: FollowUp = {
