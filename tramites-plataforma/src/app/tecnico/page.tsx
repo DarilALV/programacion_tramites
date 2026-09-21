@@ -6,7 +6,7 @@ import { ToastAlert } from "@/components/toast-alert";
 import { technicians, useTramitesStore, type Entry, type FollowUp } from "@/lib/tramites-store";
 import { getServerNow } from "@/lib/server-time";
 
-type FollowUpStatus = "esperando" | "en-revision" | "llamado" | "no-escucho" | "regreso" | "atendiendo" | "completado";
+type FollowUpStatus = "esperando" | "llamado" | "no-escucho" | "regreso" | "completado";
 
 function minDiff(from: string, to?: string) {
   const [fh, fm] = from.split(":").map(Number);
@@ -41,18 +41,15 @@ function notifyBrowser(title: string, body: string) {
 
 const STATUS_LABEL: Record<FollowUpStatus, string> = {
   "esperando":    "⏳ Esperando",
-  "en-revision":  "📋 En revisión",
   "llamado":      "📣 Llamado",
   "no-escucho":   "🔇 No escuchó",
   "regreso":      "↩️ Regresó",
-  "atendiendo":   "👤 Atendiendo",
   "completado":   "✅ Completado",
 };
 
 interface AgendaRowProps {
   entry: Entry;
   followUp?: FollowUp;
-  onRevisando: (id: string, followUpCreatedAt?: string) => void;
   onSaliALlamar: (id: string, followUpCreatedAt?: string) => void;
   onAtendi: (id: string, followUpCreatedAt?: string) => void;
   onNoRespondio: (id: string, followUpCreatedAt?: string) => void;
@@ -63,7 +60,6 @@ interface AgendaRowProps {
 const AgendaRow = memo(function AgendaRow({
   entry,
   followUp: propsFollowUp,
-  onRevisando,
   onSaliALlamar,
   onAtendi,
   onNoRespondio,
@@ -78,7 +74,6 @@ const AgendaRow = memo(function AgendaRow({
     st === "llamado"      ? "bg-purple-50 border-purple-400" :
     st === "regreso"      ? "bg-yellow-50 border-yellow-400" :
     st === "no-escucho"   ? "bg-orange-50 border-orange-300" :
-    st === "en-revision"  ? "bg-indigo-50 border-indigo-300" :
     st === "esperando"    ? "bg-red-100 border-red-500 animate-pulse" :
     "bg-white border-gray-200";
 
@@ -134,19 +129,11 @@ const AgendaRow = memo(function AgendaRow({
             <p className="text-xs text-gray-400 italic">Sin llegada registrada</p>
           )}
 
-          {(st === "esperando" || st === "en-revision") && (
-            <>
-              {st === "esperando" && (
-                <button onClick={() => onRevisando(entry.id, fu?.createdAt)}
-                  className="px-3 py-2 bg-indigo-100 text-indigo-800 text-xs font-bold rounded-lg hover:bg-indigo-200 cursor-pointer border border-indigo-300">
-                  📋 Revisando
-                </button>
-              )}
-              <button onClick={() => onSaliALlamar(entry.id, fu?.createdAt)}
-                className="px-3 py-2 bg-purple-600 text-white text-sm font-bold rounded-lg hover:bg-purple-700 cursor-pointer shadow">
-                🚶 Salgo a llamar
-              </button>
-            </>
+          {st === "esperando" && (
+            <button onClick={() => onSaliALlamar(entry.id, fu?.createdAt)}
+              className="px-3 py-2 bg-purple-600 text-white text-sm font-bold rounded-lg hover:bg-purple-700 cursor-pointer shadow">
+              🚶 Salgo a llamar
+            </button>
           )}
 
           {st === "llamado" && (
@@ -159,18 +146,6 @@ const AgendaRow = memo(function AgendaRow({
               <button onClick={() => onNoRespondio(entry.id, fu?.createdAt)}
                 className="w-full px-3 py-2 bg-orange-500 text-white text-sm font-bold rounded-lg hover:bg-orange-600 cursor-pointer shadow">
                 ↩️ No respondió
-              </button>
-            </div>
-          )}
-
-          {st === "atendiendo" && (
-            <div className="space-y-2">
-              <div className="rounded-lg bg-blue-50 border border-blue-300 p-2">
-                <p className="text-xs text-blue-800 font-semibold">👤 Atendiendo al cliente...</p>
-              </div>
-              <button onClick={() => onTermineDeAtender(entry.id, fu?.createdAt)}
-                className="w-full px-3 py-2 bg-green-600 text-white text-sm font-bold rounded-lg hover:bg-green-700 cursor-pointer shadow">
-                ✅ Terminé de atender
               </button>
             </div>
           )}
@@ -515,17 +490,6 @@ export default function AgendaTecnicoPage() {
     };
   }, [reportEntries]);
 
-  const marcarRevisando = useCallback(async (entryId: string, followUpCreatedAt?: string) => {
-    const entry = entries.find((e) => e.id === entryId);
-    if (!entry) return;
-    const fu = followUpCreatedAt
-      ? entry.followUps?.find(f => f.createdAt === followUpCreatedAt)
-      : entry.followUps?.[0];
-    if (!fu) return;
-    const newFollowUps = (entry.followUps ?? []).map(f => f === fu ? { ...fu, followUpStatus: "en-revision" as const } : f);
-    updateEntry(entryId, { ...entry, followUps: newFollowUps });
-  }, [entries, updateEntry]);
-
   const marcarSaliALlamar = useCallback(async (entryId: string, followUpCreatedAt?: string) => {
     const entry = entries.find((e) => e.id === entryId);
     if (!entry) return;
@@ -548,8 +512,9 @@ export default function AgendaTecnicoPage() {
     const { time } = await getServerNow();
     const newFollowUps = (entry.followUps ?? []).map(f => f === fu ? {
       ...fu,
-      followUpStatus: "atendiendo" as const,
+      followUpStatus: "completado" as const,
       attendedTime: fu.calledTime ?? fu.returnedTime ?? time,
+      completedTime: time,
     } : f);
     updateEntry(entryId, { ...entry, followUps: newFollowUps });
   }, [entries, updateEntry]);
@@ -792,7 +757,6 @@ export default function AgendaTecnicoPage() {
                   key={`${entry.id}-${followUp.createdAt}`}
                   entry={entry}
                   followUp={followUp}
-                  onRevisando={marcarRevisando}
                   onSaliALlamar={marcarSaliALlamar}
                   onAtendi={marcarLeAtendi}
                   onNoRespondio={marcarNoRespondio}
