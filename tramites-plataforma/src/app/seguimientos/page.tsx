@@ -195,14 +195,14 @@ export default function SeguimientosPage() {
   }, [entries, today, currentUser.areaId, areas]);
 
   const expandedFollowUps = useMemo(() => {
-    const expanded = todayFollowUps.flatMap((entry) =>
-      (entry.followUps ?? [])
-        .filter((followUp) => followUp.createdAt?.startsWith(today))
-        .map((followUp) => ({ entry, followUp }))
-    );
+    const expanded = todayFollowUps.map((entry) => {
+      const todayFollowUps = (entry.followUps ?? []).filter((fu) => fu.createdAt?.startsWith(today));
+      const latestFollowUp = todayFollowUps[todayFollowUps.length - 1];
+      return latestFollowUp ? { entry, followUp: latestFollowUp } : null;
+    }).filter((x) => x !== null);
     return expanded.sort((a, b) => {
-      const timeA = a.followUp.arrivalTime ?? "";
-      const timeB = b.followUp.arrivalTime ?? "";
+      const timeA = a!.followUp.arrivalTime ?? "";
+      const timeB = b!.followUp.arrivalTime ?? "";
       return timeB.localeCompare(timeA);
     });
   }, [todayFollowUps, today]);
