@@ -89,6 +89,8 @@ export type FollowUp = {
   completedTime?: string;
   calledTime?: string;
   returnedTime?: string;
+  technicianId?: string; // Quién registró este followUp
+  technicianName?: string; // Nombre del técnico que registró
   actualTechnicianId?: string;
   actualTechnicianName?: string;
   attended?: boolean;

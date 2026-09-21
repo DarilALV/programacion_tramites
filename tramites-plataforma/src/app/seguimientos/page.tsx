@@ -433,6 +433,8 @@ export default function SeguimientosPage() {
         clientName: clientName.trim(),
         arrivalTime: arrival,
         followUpStatus: "esperando",
+        technicianId: selectedTechnicianId,
+        technicianName: effectiveTechnician?.name ?? selectedTechnicianId,
         observations: observations.trim() || undefined,
         createdAt: iso,
       };
@@ -485,6 +487,8 @@ export default function SeguimientosPage() {
         clientName: clientName.trim(),
         arrivalTime: arrival,
         followUpStatus: "esperando",
+        technicianId: archivosId,
+        technicianName: archivosName,
         observations: (observations.trim() ? `[${selectedGestion}] ${observations.trim()}` : `[${selectedGestion}]`),
         createdAt: iso,
         isUnscheduled: false,
@@ -959,7 +963,7 @@ export default function SeguimientosPage() {
                 <tbody>
                   {filteredFollowUps.map(({ entry, followUp: fu }, idx) => {
                     const followUpKey = `${entry.id}-${fu.createdAt}`;
-                    const tech = fu.actualTechnicianName ?? entry.technicianName;
+                    const tech = fu.technicianName ?? fu.actualTechnicianName ?? entry.technicianName;
                     const wait = fu.arrivalTime ? minutesDiff(fu.arrivalTime, fu.attendedTime) : null;
                     const st = fu.followUpStatus ?? "esperando";
 
