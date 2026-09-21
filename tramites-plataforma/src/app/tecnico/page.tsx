@@ -6,7 +6,7 @@ import { ToastAlert } from "@/components/toast-alert";
 import { technicians, useTramitesStore, type Entry, type FollowUp } from "@/lib/tramites-store";
 import { getServerNow } from "@/lib/server-time";
 
-type FollowUpStatus = "esperando" | "llamado" | "no-escucho" | "regreso" | "completado";
+type FollowUpStatus = "esperando" | "llamado" | "no-escucho" | "regreso" | "completado" | "atendiendo" | "en-revision";
 
 function minDiff(from: string, to?: string) {
   const [fh, fm] = from.split(":").map(Number);
@@ -45,6 +45,8 @@ const STATUS_LABEL: Record<FollowUpStatus, string> = {
   "no-escucho":   "🔇 No escuchó",
   "regreso":      "↩️ Regresó",
   "completado":   "✅ Completado",
+  "atendiendo":   "👤 Atendiendo (antiguo)",
+  "en-revision":  "📋 En revisión (antiguo)",
 };
 
 interface AgendaRowProps {
@@ -178,6 +180,18 @@ const AgendaRow = memo(function AgendaRow({
                   ➡️ Continuar en...
                 </button>
               )}
+            </div>
+          )}
+
+          {(st === "atendiendo" || st === "en-revision") && (
+            <div className="space-y-2">
+              <p className="text-xs text-gray-600 bg-yellow-50 px-2 py-1 rounded">
+                ⚠️ Estado antiguo, haz clic para completar
+              </p>
+              <button onClick={() => onTermineDeAtender(entry.id, fu?.createdAt)}
+                className="w-full px-3 py-2 bg-green-600 text-white text-sm font-bold rounded-lg hover:bg-green-700 cursor-pointer shadow">
+                ✅ Completar
+              </button>
             </div>
           )}
         </div>
