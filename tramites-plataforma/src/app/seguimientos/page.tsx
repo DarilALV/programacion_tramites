@@ -420,22 +420,29 @@ export default function SeguimientosPage() {
 
     if (foundEntry) {
       const techChanged = selectedTechnicianId !== foundEntry.technicianId;
+
+      // Si técnico cambió, marcar todos los followUps anteriores con quién los atendió
+      const updatedFollowUps = techChanged
+        ? (foundEntry.followUps ?? []).map((fu) =>
+            fu.actualTechnicianId ? fu : { ...fu, actualTechnicianId: foundEntry.technicianId, actualTechnicianName: foundEntry.technicianName }
+          )
+        : (foundEntry.followUps ?? []);
+
       const newFollowUp: FollowUp = {
         type: "normal",
         clientName: clientName.trim(),
         arrivalTime: arrival,
         followUpStatus: "esperando",
-        actualTechnicianId: techChanged ? foundEntry.technicianId : undefined,
-        actualTechnicianName: techChanged ? foundEntry.technicianName : undefined,
         observations: observations.trim() || undefined,
         createdAt: iso,
       };
+
       updateEntry(foundEntry.id, {
         ...foundEntry,
         technicianId: selectedTechnicianId,
         technicianName: effectiveTechnician?.name ?? selectedTechnicianId,
         technicianArea: effectiveTechnician?.areaLabel ?? foundEntry.technicianArea,
-        followUps: [...(foundEntry.followUps ?? []), newFollowUp],
+        followUps: [...updatedFollowUps, newFollowUp],
       });
     } else {
       const newEntry: Entry = {
@@ -468,6 +475,11 @@ export default function SeguimientosPage() {
     const archivosArea = "Archivos";
 
     if (foundEntry) {
+      // Marcar todos los followUps anteriores con el técnico anterior si se deriva a Archivos
+      const updatedFollowUps = (foundEntry.followUps ?? []).map((fu) =>
+        fu.actualTechnicianId ? fu : { ...fu, actualTechnicianId: foundEntry.technicianId, actualTechnicianName: foundEntry.technicianName }
+      );
+
       const newFollowUp: FollowUp = {
         type: "normal",
         clientName: clientName.trim(),
@@ -477,12 +489,13 @@ export default function SeguimientosPage() {
         createdAt: iso,
         isUnscheduled: false,
       };
+
       updateEntry(foundEntry.id, {
         ...foundEntry,
         technicianId: archivosId,
         technicianName: archivosName,
         technicianArea: archivosArea,
-        followUps: [...(foundEntry.followUps ?? []), newFollowUp],
+        followUps: [...updatedFollowUps, newFollowUp],
       });
     } else {
       const newEntry: Entry = {
