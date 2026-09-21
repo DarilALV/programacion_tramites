@@ -196,7 +196,8 @@ const AgendaRow = memo(function AgendaRow({
           {st === "completado" && (
             <div className="space-y-2">
               <span className="text-sm text-green-700 font-bold">✓ Finalizado</span>
-              {onContinuarEtapa && (
+              {/* TEMPORALMENTE DESHABILITADO: Continuar en (en desarrollo) */}
+              {false && onContinuarEtapa && (
                 <button onClick={() => onContinuarEtapa(entry.id)}
                   className="w-full px-3 py-2 bg-purple-600 text-white text-sm font-bold rounded-lg hover:bg-purple-700 cursor-pointer shadow">
                   ➡️ Continuar en...
