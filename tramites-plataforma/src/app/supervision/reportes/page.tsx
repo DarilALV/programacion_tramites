@@ -62,57 +62,55 @@ export default function ReportesSupervisionPage() {
     });
 
     entries.forEach((e) => {
-      const fu = e.followUps?.[0];
-      if (!fu) return;
-      const d = fu.arrivalTime ?
-        fu.createdAt?.slice(0, 10) ?? e.scheduleDate ?? "" :
-        e.scheduleDate ?? fu.createdAt?.slice(0, 10) ?? "";
-      if (!d || d < from || d > to) return;
+      (e.followUps ?? []).forEach((fu) => {
+        const d = fu.createdAt?.slice(0, 10) ?? e.scheduleDate ?? "";
+        if (!d || d < from || d > to) return;
 
-      const tid = fu.actualTechnicianId ?? e.technicianId;
-      const tech = technicians.find((t) => t.id === tid);
-      if (!tech) return;
+        const tid = fu.actualTechnicianId ?? e.technicianId;
+        const tech = technicians.find((t) => t.id === tid);
+        if (!tech) return;
 
-      if (!techMap[tid]) {
-        techMap[tid] = {
-          techId: tid,
-          techName: tech.name,
-          area: tech.areaLabel,
-          total: 0,
-          completados: 0,
-          noEscucho: 0,
-          waitTimes: [] as number[],
-          attnTimes: [] as number[],
-          tramites: [] as any[],
-        };
-      }
+        if (!techMap[tid]) {
+          techMap[tid] = {
+            techId: tid,
+            techName: tech.name,
+            area: tech.areaLabel,
+            total: 0,
+            completados: 0,
+            noEscucho: 0,
+            waitTimes: [] as number[],
+            attnTimes: [] as number[],
+            tramites: [] as any[],
+          };
+        }
 
-      const st = fu.followUpStatus ?? "esperando";
-      techMap[tid].total++;
+        const st = fu.followUpStatus ?? "esperando";
+        techMap[tid].total++;
 
-      const esperaMin = fu.arrivalTime && fu.attendedTime ? minDiff(fu.arrivalTime, fu.attendedTime) : null;
-      const attnMin = fu.attendedTime && fu.completedTime ? minDiff(fu.attendedTime, fu.completedTime) : null;
+        const esperaMin = fu.arrivalTime && fu.attendedTime ? minDiff(fu.arrivalTime, fu.attendedTime) : null;
+        const attnMin = fu.attendedTime && fu.completedTime ? minDiff(fu.attendedTime, fu.completedTime) : null;
 
-      techMap[tid].tramites.push({
-        tramiteCode: e.tramiteCode,
-        registrationNumber: e.registrationNumber,
-        clientName: fu.clientName ?? "—",
-        status: st,
-        arrivalTime: fu.arrivalTime ?? "—",
-        calledTime: fu.calledTime ?? "—",
-        attendedTime: fu.attendedTime ?? "—",
-        completedTime: fu.completedTime ?? "—",
-        returnedTime: fu.returnedTime ?? "—",
-        esperaMin,
-        attnMin,
-        observations: fu.observations ?? "—",
+        techMap[tid].tramites.push({
+          tramiteCode: e.tramiteCode,
+          registrationNumber: e.registrationNumber,
+          clientName: fu.clientName ?? "—",
+          status: st,
+          arrivalTime: fu.arrivalTime ?? "—",
+          calledTime: fu.calledTime ?? "—",
+          attendedTime: fu.attendedTime ?? "—",
+          completedTime: fu.completedTime ?? "—",
+          returnedTime: fu.returnedTime ?? "—",
+          esperaMin,
+          attnMin,
+          observations: fu.observations ?? "—",
+        });
+
+        if (st === "completado") {
+          techMap[tid].completados++;
+          if (esperaMin !== null && esperaMin >= 0) techMap[tid].waitTimes.push(esperaMin);
+          if (attnMin !== null && attnMin >= 0) techMap[tid].attnTimes.push(attnMin);
+        } else if (st === "no-escucho") techMap[tid].noEscucho++;
       });
-
-      if (st === "completado") {
-        techMap[tid].completados++;
-        if (esperaMin !== null && esperaMin >= 0) techMap[tid].waitTimes.push(esperaMin);
-        if (attnMin !== null && attnMin >= 0) techMap[tid].attnTimes.push(attnMin);
-      } else if (st === "no-escucho") techMap[tid].noEscucho++;
     });
 
     return Object.values(techMap)
