@@ -435,12 +435,9 @@ export default function AgendaTecnicoPage() {
       const todayFollowUps = (entry.followUps ?? []).filter((followUp) => followUp.createdAt?.startsWith(selectedDate));
       if (todayFollowUps.length === 0) return [];
 
-      // Prioridad: mostrar el followUp que le pertenece a este técnico (no derivado)
-      // Si hay múltiples (completado + derivado a otro), mostrar el principal
-      const relevantFU = todayFollowUps.find((fu) => !fu.actualTechnicianId || fu.actualTechnicianId === currentTechnicianId)
-        || todayFollowUps[todayFollowUps.length - 1];
-
-      return [{ entry, followUp: relevantFU }];
+      // Mostrar TODOS los seguimientos del día para que el técnico vea el contexto completo
+      // (p.ej., completado en mañana + regresó en tarde)
+      return todayFollowUps.map((followUp) => ({ entry, followUp }));
     });
   }, [agendaHoy, selectedDate, currentTechnicianId]);
 
