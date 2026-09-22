@@ -626,25 +626,6 @@ const seedEntries: Entry[] = [
   },
 ];
 
-/*const seedEntries: Entry[] = [
-  makeSeedEntry({
-    createdBy: "wayra",
-    tramiteCode: "2026016618",
-    technicianId: "vanesa-c",
-    scheduleDate: "2026-08-11",
-    observations: "Registro inicial de ejemplo.",
-    index: 0,
-  }),
-  makeSeedEntry({
-    createdBy: "jaqueline",
-    tramiteCode: "202501359",
-    technicianId: "huascar-a",
-    scheduleDate: "2026-08-11",
-    observations: "Registro inicial de ejemplo.",
-    index: 1,
-  }),
-]; */
-
 export function formatDate(dateString: string) {
   const normalized = normalizeDateInput(dateString, "2026-08-11");
   return new Intl.DateTimeFormat("es-ES", {

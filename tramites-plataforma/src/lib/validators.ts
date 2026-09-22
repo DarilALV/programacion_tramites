@@ -27,14 +27,12 @@ export const EntryFormSchema = z.object({
   scheduleDate: z
     .string()
     .min(1, "La fecha de programación es requerida")
-    //.refine(
-      //(date) => {
-        //const selected = new Date(date);
-        //const today = new Date();
-        //today.setHours(0, 0, 0, 0);
-        //return selected >= today;
-        .refine((date) => {
-        return true;
+    .refine(
+      (date) => {
+        const selected = new Date(date);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        return selected >= today;
       },
       "La fecha no puede ser en el pasado"
     ),
@@ -109,10 +107,6 @@ export function validateScheduleDate(dateString: string): { valid: boolean; erro
   if (isNaN(selected.getTime())) {
     return { valid: false, error: "La fecha es inválida" };
   }
-
- // if (selected < today) {
-   // return { valid: false, error: "La fecha no puede ser en el pasado" };
-  //}
 
   return { valid: true };
 }
