@@ -817,6 +817,12 @@ export default function AgendaTecnicoPage() {
 
                     {isExpanded && (
                       <div className="px-6 py-4 bg-white border-t border-emerald-100 space-y-4">
+                        {junta.status !== "completado" && (
+                          <button onClick={() => updateJunta(junta.id, { status: "completado" })}
+                            className="w-full px-4 py-2 rounded-lg bg-green-600 text-white font-semibold hover:bg-green-700 transition">
+                            ✓ Marcar como Completado
+                          </button>
+                        )}
                         {juntaEntries.length > 0 && (
                           <>
                             <p className="text-sm font-semibold text-emerald-900">Trámites:</p>
