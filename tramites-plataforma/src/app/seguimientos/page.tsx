@@ -589,8 +589,14 @@ export default function SeguimientosPage() {
   }
 
   async function handleDerivar(entryId: string, newTechId: string) {
+    console.log("handleDerivar - newTechId:", newTechId);
+    console.log("handleDerivar - technicians:", technicians.map(t => ({ id: t.id, name: t.name })));
     const newTech = technicians.find((t) => t.id === newTechId);
-    if (!newTech) return;
+    console.log("handleDerivar - newTech encontrado:", newTech);
+    if (!newTech) {
+      console.error("❌ Técnico no encontrado!");
+      return;
+    }
 
     derivarTramite(entryId, newTechId, newTech.name);
 
