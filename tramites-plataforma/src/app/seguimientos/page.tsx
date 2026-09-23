@@ -253,7 +253,7 @@ export default function SeguimientosPage() {
           countToday[tid] = (countToday[tid] ?? 0) + 1;
           if (!load[tid]) load[tid] = { name: tn, programados: 0, llegadas: 0, atendidos: 0, completados: 0 };
           load[tid].llegadas++;
-          if (fu.attendedTime) load[tid].atendidos++;
+          if (fu.attendedTime || fu.returnedTime || fu.calledTime) load[tid].atendidos++;
           if (fu.completedTime) load[tid].completados++;
         });
     });
@@ -270,7 +270,7 @@ export default function SeguimientosPage() {
           const tn = e.technicianName;
           if (!load[tid]) load[tid] = { name: tn, programados: 0, llegadas: 0, atendidos: 0, completados: 0 };
           load[tid].llegadas++;
-          if (fu.attendedTime) load[tid].atendidos++;
+          if (fu.attendedTime || fu.returnedTime || fu.calledTime) load[tid].atendidos++;
           if (fu.completedTime) load[tid].completados++;
         });
     });
