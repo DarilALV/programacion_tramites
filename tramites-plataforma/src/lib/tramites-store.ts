@@ -1099,19 +1099,28 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
       const newTech = technicians.find((t) => t.id === newTechnicianId);
       if (!newTech) return;
 
+      // Marcar el últimofollow-up como completado
       const currentFollowUps = entry.followUps ?? [];
       const updatedFollowUps = currentFollowUps.map((fu, idx) =>
         idx === currentFollowUps.length - 1
-          ? { ...fu, actualTechnicianId: newTechnicianId, actualTechnicianName: newTechnicianName, followUpStatus: "esperando" as const }
+          ? { ...fu, followUpStatus: "completado" as const, completedTime: new Date().toISOString().slice(11, 16) }
           : fu
       );
 
-      updateEntry(entryId, {
-        ...entry,
+      // Crear NUEVO followUp para el nuevo técnico
+      const newFollowUp: any = {
+        type: "normal",
+        clientName: currentFollowUps[currentFollowUps.length - 1]?.clientName ?? "",
+        arrivalTime: new Date().toISOString().slice(11, 16),
+        followUpStatus: "esperando" as const,
         technicianId: newTechnicianId,
         technicianName: newTechnicianName,
-        technicianArea: newTech.areaLabel,
-        followUps: updatedFollowUps,
+        createdAt: new Date().toISOString(),
+      };
+
+      updateEntry(entryId, {
+        ...entry,
+        followUps: [...updatedFollowUps, newFollowUp],
       });
 
       const creator = plannerUsers.find((user) => user.id === currentUserId) ?? plannerUsers[0];
