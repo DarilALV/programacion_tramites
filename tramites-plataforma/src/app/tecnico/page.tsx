@@ -412,7 +412,7 @@ export default function AgendaTecnicoPage() {
       .filter((e) => {
         const hasTodayFollowUp = (e.followUps ?? []).some((fu) => {
           if (fu.createdAt?.startsWith(selectedDate)) {
-            const isThisTech = e.technicianId === currentTechnicianId || fu.actualTechnicianId === currentTechnicianId;
+            const isThisTech = e.technicianId === currentTechnicianId || fu.actualTechnicianId === currentTechnicianId || fu.technicianId === currentTechnicianId;
             return isThisTech;
           }
           return false;
