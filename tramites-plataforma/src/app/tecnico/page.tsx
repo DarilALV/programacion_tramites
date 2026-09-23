@@ -432,11 +432,11 @@ export default function AgendaTecnicoPage() {
 
   const expandedAgendaHoy = useMemo(() => {
     return agendaHoy.flatMap((entry) => {
-      const todayFollowUps = (entry.followUps ?? []).filter((followUp) => followUp.createdAt?.startsWith(selectedDate));
+      const todayFollowUps = (entry.followUps ?? []).filter((followUp) => {
+        if (!followUp.createdAt?.startsWith(selectedDate)) return false;
+        return entry.technicianId === currentTechnicianId || followUp.technicianId === currentTechnicianId;
+      });
       if (todayFollowUps.length === 0) return [];
-
-      // Mostrar TODOS los seguimientos del día para que el técnico vea el contexto completo
-      // (p.ej., completado en mañana + regresó en tarde)
       return todayFollowUps.map((followUp) => ({ entry, followUp }));
     });
   }, [agendaHoy, selectedDate, currentTechnicianId]);
