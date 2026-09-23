@@ -1094,10 +1094,11 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
       localStorage.removeItem('currentTechnicianId');
     },
     derivarTramite: (entryId: string, newTechnicianId: string, newTechnicianName: string) => {
+      console.log("derivarTramite - newTechnicianId:", newTechnicianId, "newTechnicianName:", newTechnicianName);
       const entry = entries.find((e) => e.id === entryId);
-      if (!entry) return;
+      if (!entry) return console.error("Entry no encontrada");
       const newTech = technicians.find((t) => t.id === newTechnicianId);
-      if (!newTech) return;
+      if (!newTech) return console.error("Técnico no encontrado en derivarTramite");
 
       // Marcar el últimofollow-up como completado
       const currentFollowUps = entry.followUps ?? [];
@@ -1118,6 +1119,7 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
         createdAt: new Date().toISOString(),
       };
 
+      console.log("derivarTramite - newFollowUp creado:", newFollowUp);
       updateEntry(entryId, {
         ...entry,
         followUps: [...updatedFollowUps, newFollowUp],
