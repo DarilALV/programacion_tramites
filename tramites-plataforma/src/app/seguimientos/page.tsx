@@ -1170,8 +1170,8 @@ export default function SeguimientosPage() {
                 <select value={derivingToTechId} onChange={(e) => setDerivingToTechId(e.target.value)}
                   className="rounded-lg border-2 border-purple-300 px-4 py-3 focus:border-purple-500 focus:outline-none bg-white">
                   <option value="">— Selecciona técnico —</option>
-                  {availableAreas.map((area) => {
-                    const techsInArea = availableTechnicians.filter((t) => t.areaId === area.id);
+                  {areas.map((area) => {
+                    const techsInArea = technicians.filter((t) => t.areaId === area.id);
                     return (
                       <optgroup key={area.id} label={`── ${area.label.toUpperCase()} ──`}>
                         {techsInArea.map((t) => (
