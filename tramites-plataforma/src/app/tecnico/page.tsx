@@ -435,8 +435,7 @@ export default function AgendaTecnicoPage() {
       const todayFollowUps = (entry.followUps ?? []).filter((followUp) => {
         if (!followUp.createdAt?.startsWith(selectedDate)) return false;
         const belongsToThisTech =
-          entry.technicianId === currentTechnicianId ||
-          followUp.technicianId === currentTechnicianId ||
+          (followUp.technicianId ? followUp.technicianId === currentTechnicianId : entry.technicianId === currentTechnicianId) ||
           followUp.actualTechnicianId === currentTechnicianId;
         return belongsToThisTech;
       });
