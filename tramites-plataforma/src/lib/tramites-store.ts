@@ -1101,17 +1101,10 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
       const newTech = technicians.find((t) => t.id === newTechnicianId);
       if (!newTech) return console.error("Técnico no encontrado en derivarTramite");
 
-      // Marcar el último followUp como completado y con actualTechnicianId del técnico anterior
+      // Marcar anteriores con actualTechnicianId (SIN marcar como completado automáticamente)
       const currentFollowUps = entry.followUps ?? [];
-      const updatedFollowUps = currentFollowUps.map((fu, idx) =>
-        idx === currentFollowUps.length - 1
-          ? {
-              ...fu,
-              followUpStatus: "completado" as const,
-              completedTime: new Date().toISOString().slice(11, 16),
-              ...(fu.actualTechnicianId ? {} : { actualTechnicianId: entry.technicianId, actualTechnicianName: entry.technicianName })
-            }
-          : fu.actualTechnicianId
+      const updatedFollowUps = currentFollowUps.map((fu) =>
+        fu.actualTechnicianId
           ? fu
           : { ...fu, actualTechnicianId: entry.technicianId, actualTechnicianName: entry.technicianName }
       );
