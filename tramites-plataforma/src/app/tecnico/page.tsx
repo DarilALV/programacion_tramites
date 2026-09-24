@@ -556,9 +556,26 @@ export default function AgendaTecnicoPage() {
       ? entry.followUps?.find(f => f.createdAt === followUpCreatedAt)
       : entry.followUps?.[0];
     if (!fu) return;
-    const { time } = await getServerNow();
-    const newFollowUps = (entry.followUps ?? []).map(f => f === fu ? { ...fu, followUpStatus: "esperando" as const, returnedTime: time } : f);
-    updateEntry(entryId, { ...entry, followUps: newFollowUps });
+    const { time, iso } = await getServerNow();
+
+    // Marcar el anterior como completado con returnedTime
+    const updatedFollowUps = (entry.followUps ?? []).map(f =>
+      f === fu ? { ...f, followUpStatus: "completado" as const, completedTime: time, returnedTime: time } : f
+    );
+
+    // Crear nuevo followUp con estado "llamado" (reintento)
+    const newFollowUp: FollowUp = {
+      type: "normal",
+      clientName: fu.clientName ?? "",
+      arrivalTime: time,
+      followUpStatus: "llamado" as const,
+      technicianId: entry.technicianId,
+      technicianName: entry.technicianName,
+      calledTime: time,
+      createdAt: iso,
+    };
+
+    updateEntry(entryId, { ...entry, followUps: [...updatedFollowUps, newFollowUp] });
   }, [entries, updateEntry]);
 
   const marcarTermineDeAtender = useCallback(async (entryId: string, followUpCreatedAt?: string) => {
