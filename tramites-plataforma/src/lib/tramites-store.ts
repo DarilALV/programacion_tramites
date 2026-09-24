@@ -1093,8 +1093,8 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
       setCurrentTechnicianId(undefined);
       localStorage.removeItem('currentTechnicianId');
     },
-    derivarTramite: (entryId: string, newTechnicianId: string, newTechnicianName: string) => {
-      console.log("derivarTramite - newTechnicianId:", newTechnicianId, "newTechnicianName:", newTechnicianName);
+    derivarTramite: (entryId: string, newTechnicianId: string, newTechnicianName: string, arrivalTime: string) => {
+      console.log("derivarTramite - newTechnicianId:", newTechnicianId, "newTechnicianName:", newTechnicianName, "arrivalTime:", arrivalTime);
       const entry = entries.find((e) => e.id === entryId);
       if (!entry) return console.error("Entry no encontrada");
       const newTech = technicians.find((t) => t.id === newTechnicianId);
@@ -1114,7 +1114,7 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
       const newFollowUp: any = {
         type: "normal",
         clientName: currentFollowUps[currentFollowUps.length - 1]?.clientName ?? "",
-        arrivalTime: new Date().toISOString().slice(11, 16),
+        arrivalTime: arrivalTime,
         followUpStatus: "esperando" as const,
         technicianId: newTechnicianId,
         technicianName: newTechnicianName,

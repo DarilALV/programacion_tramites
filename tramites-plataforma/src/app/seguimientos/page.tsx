@@ -599,7 +599,8 @@ export default function SeguimientosPage() {
       return;
     }
 
-    derivarTramite(entryId, newTechId, newTech.name);
+    const { time: arrival } = await getServerNow();
+    derivarTramite(entryId, newTechId, newTech.name, arrival);
 
     showMsg(`✅ Trámite derivado a ${newTech.name}`);
     setDerivingEntryId(null);
