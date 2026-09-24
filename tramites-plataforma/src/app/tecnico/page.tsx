@@ -549,14 +549,15 @@ export default function AgendaTecnicoPage() {
     updateEntry(entryId, { ...entry, followUps: newFollowUps });
   }, [entries, updateEntry]);
 
-  const marcarRegreso = useCallback((entryId: string, followUpCreatedAt?: string) => {
+  const marcarRegreso = useCallback(async (entryId: string, followUpCreatedAt?: string) => {
     const entry = entries.find((e) => e.id === entryId);
     if (!entry) return;
     const fu = followUpCreatedAt
       ? entry.followUps?.find(f => f.createdAt === followUpCreatedAt)
       : entry.followUps?.[0];
     if (!fu) return;
-    const newFollowUps = (entry.followUps ?? []).map(f => f === fu ? { ...fu, followUpStatus: "regreso" as const, returnedTime: new Date().toISOString().slice(11, 16) } : f);
+    const { time } = await getServerNow();
+    const newFollowUps = (entry.followUps ?? []).map(f => f === fu ? { ...fu, followUpStatus: "esperando" as const, returnedTime: time } : f);
     updateEntry(entryId, { ...entry, followUps: newFollowUps });
   }, [entries, updateEntry]);
 
