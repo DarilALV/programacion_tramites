@@ -462,7 +462,9 @@ export default function AgendaTecnicoPage() {
         return belongsToThisTech;
       });
       if (todayFollowUps.length === 0) return [];
-      return todayFollowUps.map((followUp) => ({ entry, followUp }));
+      // Solo mostrar el ÚLTIMO followUp del día para evitar duplicados
+      const latestFollowUp = todayFollowUps[todayFollowUps.length - 1];
+      return [{ entry, followUp: latestFollowUp }];
     });
   }, [agendaHoy, selectedDate, currentTechnicianId]);
 
