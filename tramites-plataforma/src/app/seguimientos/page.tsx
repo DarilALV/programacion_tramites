@@ -411,6 +411,7 @@ export default function SeguimientosPage() {
     if (codeErr) return showMsg(`⚠️ ${codeErr}`, "error");
     if (!selectedTechnicianId) return showMsg("⚠️ Selecciona el técnico", "error");
 
+    console.log("handleRegisterArrival - selectedTechnicianId:", selectedTechnicianId, "effectiveTechnician:", effectiveTechnician);
     const count = techCountToday[selectedTechnicianId] ?? 0;
     if (count >= LIMITE) {
       showMsg(`⚠️ ${effectiveTechnician?.name} ya atendió ${count} (límite: ${LIMITE}). Continuará registrando.`, "success");
