@@ -114,6 +114,9 @@ const AgendaRow = memo(function AgendaRow({
         <div>
           <p className="text-xs text-gray-500 uppercase mb-1">Estado</p>
           <p className="font-bold">{st ? STATUS_LABEL[st] : "🕐 Sin llegada"}</p>
+          {fu?.attemptCount && fu.attemptCount > 1 && (
+            <p className="text-xs text-amber-600 font-semibold mt-1">🔄 Intento: {fu.attemptCount}</p>
+          )}
           {llamadoHaceMin !== null && llamadoHaceMin >= 0 && (
             <p className={`text-xs mt-1 font-semibold ${llamadoHaceMin > 10 ? "text-red-600" : "text-purple-700"}`}>
               Salí hace {fmtMin(llamadoHaceMin)}
@@ -556,26 +559,20 @@ export default function AgendaTecnicoPage() {
       ? entry.followUps?.find(f => f.createdAt === followUpCreatedAt)
       : entry.followUps?.[0];
     if (!fu) return;
-    const { time, iso } = await getServerNow();
+    const { time } = await getServerNow();
 
-    // Marcar el anterior como completado con returnedTime
-    const updatedFollowUps = (entry.followUps ?? []).map(f =>
-      f === fu ? { ...f, followUpStatus: "completado" as const, completedTime: time, returnedTime: time } : f
+    // Incrementar contador de intentos y cambiar a "llamado"
+    const newFollowUps = (entry.followUps ?? []).map(f =>
+      f === fu ? {
+        ...f,
+        followUpStatus: "llamado" as const,
+        returnedTime: time,
+        calledTime: time,
+        attemptCount: (f.attemptCount ?? 1) + 1
+      } : f
     );
 
-    // Crear nuevo followUp con estado "llamado" (reintento)
-    const newFollowUp: FollowUp = {
-      type: "normal",
-      clientName: fu.clientName ?? "",
-      arrivalTime: time,
-      followUpStatus: "llamado" as const,
-      technicianId: entry.technicianId,
-      technicianName: entry.technicianName,
-      calledTime: time,
-      createdAt: iso,
-    };
-
-    updateEntry(entryId, { ...entry, followUps: [...updatedFollowUps, newFollowUp] });
+    updateEntry(entryId, { ...entry, followUps: newFollowUps });
   }, [entries, updateEntry]);
 
   const marcarTermineDeAtender = useCallback(async (entryId: string, followUpCreatedAt?: string) => {

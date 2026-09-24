@@ -99,6 +99,7 @@ export type FollowUp = {
   createdAt?: string;
   isUnscheduled?: boolean;
   stageId?: string; // Referencia a la etapa actual
+  attemptCount?: number; // Contador de reintentos después de no-escucho
 };
 
 export type Entry = {
