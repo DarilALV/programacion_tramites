@@ -55,6 +55,7 @@ interface AgendaRowProps {
   onSaliALlamar: (id: string, followUpCreatedAt?: string) => void;
   onAtendi: (id: string, followUpCreatedAt?: string) => void;
   onNoRespondio: (id: string, followUpCreatedAt?: string) => void;
+  onRegreso: (id: string, followUpCreatedAt?: string) => void;
   onTermineDeAtender: (id: string, followUpCreatedAt?: string) => void;
   onContinuarEtapa?: (id: string) => void;
 }
@@ -65,6 +66,7 @@ const AgendaRow = memo(function AgendaRow({
   onSaliALlamar,
   onAtendi,
   onNoRespondio,
+  onRegreso,
   onTermineDeAtender,
   onContinuarEtapa,
 }: AgendaRowProps) {
@@ -153,8 +155,14 @@ const AgendaRow = memo(function AgendaRow({
           )}
 
           {st === "no-escucho" && (
-            <div className="rounded-lg bg-orange-50 border border-orange-200 p-3">
-              <p className="text-xs text-orange-800 font-semibold">⏳ Esperando regreso</p>
+            <div className="space-y-2">
+              <div className="rounded-lg bg-orange-50 border border-orange-200 p-2">
+                <p className="text-xs text-orange-800 font-semibold">⏳ Esperando regreso</p>
+              </div>
+              <button onClick={() => onRegreso(entry.id, fu?.createdAt)}
+                className="w-full px-3 py-2 bg-yellow-600 text-white text-sm font-bold rounded-lg hover:bg-yellow-700 cursor-pointer shadow">
+                ↩️ Volví a salir
+              </button>
             </div>
           )}
 
@@ -541,6 +549,17 @@ export default function AgendaTecnicoPage() {
     updateEntry(entryId, { ...entry, followUps: newFollowUps });
   }, [entries, updateEntry]);
 
+  const marcarRegreso = useCallback((entryId: string, followUpCreatedAt?: string) => {
+    const entry = entries.find((e) => e.id === entryId);
+    if (!entry) return;
+    const fu = followUpCreatedAt
+      ? entry.followUps?.find(f => f.createdAt === followUpCreatedAt)
+      : entry.followUps?.[0];
+    if (!fu) return;
+    const newFollowUps = (entry.followUps ?? []).map(f => f === fu ? { ...fu, followUpStatus: "regreso" as const, returnedTime: new Date().toISOString().slice(11, 16) } : f);
+    updateEntry(entryId, { ...entry, followUps: newFollowUps });
+  }, [entries, updateEntry]);
+
   const marcarTermineDeAtender = useCallback(async (entryId: string, followUpCreatedAt?: string) => {
     const entry = entries.find((e) => e.id === entryId);
     if (!entry) return;
@@ -771,6 +790,7 @@ export default function AgendaTecnicoPage() {
                   onSaliALlamar={marcarSaliALlamar}
                   onAtendi={marcarLeAtendi}
                   onNoRespondio={marcarNoRespondio}
+                  onRegreso={marcarRegreso}
                   onTermineDeAtender={marcarTermineDeAtender}
                   onContinuarEtapa={(id) => setContinuingEntryId(id)}
                 />
