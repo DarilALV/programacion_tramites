@@ -448,9 +448,6 @@ export default function SeguimientosPage() {
 
       updateEntry(foundEntry.id, {
         ...foundEntry,
-        technicianId: selectedTechnicianId,
-        technicianName: effectiveTechnician?.name ?? selectedTechnicianId,
-        technicianArea: effectiveTechnician?.areaLabel ?? foundEntry.technicianArea,
         followUps: [...updatedFollowUps, newFollowUp],
       });
     } else {
