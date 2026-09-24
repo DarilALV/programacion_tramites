@@ -65,6 +65,8 @@ export default function SeguimientosPage() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [derivingEntryId, setDerivingEntryId] = useState<string | null>(null);
   const [derivingToTechId, setDerivingToTechId] = useState("");
+  const [editingHourId, setEditingHourId] = useState<{ entryId: string; followUpCreatedAt?: string } | null>(null);
+  const [editHours, setEditHours] = useState({ arrival: "", called: "", returned: "", attended: "", completed: "" });
 
   const { entries, updateEntry, createEntry, removeEntry, technicians, currentUser, getNextRegistrationNumber, juntas, createJunta, updateJunta, deleteJunta, derivarTramite } =
     useTramitesStore();
@@ -607,6 +609,30 @@ export default function SeguimientosPage() {
     setDerivingToTechId("");
   }
 
+  function guardarHorasEditadas(entryId: string, followUpCreatedAt?: string) {
+    const entry = entries.find((e) => e.id === entryId);
+    if (!entry) return;
+    const fu = followUpCreatedAt
+      ? entry.followUps?.find(f => f.createdAt === followUpCreatedAt)
+      : entry.followUps?.[0];
+    if (!fu) return;
+
+    const newFollowUps = (entry.followUps ?? []).map(f =>
+      f === fu ? {
+        ...f,
+        arrivalTime: editHours.arrival || f.arrivalTime,
+        calledTime: editHours.called || f.calledTime,
+        returnedTime: editHours.returned || f.returnedTime,
+        attendedTime: editHours.attended || f.attendedTime,
+        completedTime: editHours.completed || f.completedTime,
+      } : f
+    );
+
+    updateEntry(entryId, { ...entry, followUps: newFollowUps });
+    setEditingHourId(null);
+    setEditHours({ arrival: "", called: "", returned: "", attended: "", completed: "" });
+  }
+
   async function exportarReporte() {
     const XLSX = await import("xlsx");
     const rows = todayFollowUps.flatMap((e) =>
@@ -1088,6 +1114,10 @@ export default function SeguimientosPage() {
                                 ↗️ Derivar
                               </button>
                               <button onClick={() => handleStartEdit(entry, fu)} className="text-xs px-2 py-1 rounded bg-blue-500 text-white hover:bg-blue-600 cursor-pointer">✏️ Editar</button>
+                              <button onClick={() => {
+                                setEditHours({ arrival: fu.arrivalTime || "", called: fu.calledTime || "", returned: fu.returnedTime || "", attended: fu.attendedTime || "", completed: fu.completedTime || "" });
+                                setEditingHourId({ entryId: entry.id, followUpCreatedAt: fu.createdAt });
+                              }} className="text-xs px-2 py-1 rounded bg-amber-500 text-white hover:bg-amber-600 cursor-pointer">🕐 Hora</button>
                               <button onClick={() => setConfirmDeleteId(followUpKey)} className="text-xs px-2 py-1 rounded bg-gray-300 text-gray-700 hover:bg-red-100 cursor-pointer">🗑️</button>
                             </div>
                           )}
@@ -1441,6 +1471,53 @@ export default function SeguimientosPage() {
                 }`}
               >
                 💾 Guardar Cambios
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editingHourId && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-6 space-y-4">
+            <h2 className="text-2xl font-bold text-gray-800">Editar horas</h2>
+
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs text-gray-600 font-semibold">Llegada</label>
+                <input type="time" value={editHours.arrival} onChange={(e) => setEditHours({...editHours, arrival: e.target.value})}
+                  className="w-full px-3 py-2 border rounded-lg focus:border-amber-500 focus:outline-none" />
+              </div>
+              <div>
+                <label className="text-xs text-gray-600 font-semibold">Salida</label>
+                <input type="time" value={editHours.called} onChange={(e) => setEditHours({...editHours, called: e.target.value})}
+                  className="w-full px-3 py-2 border rounded-lg focus:border-amber-500 focus:outline-none" />
+              </div>
+              <div>
+                <label className="text-xs text-gray-600 font-semibold">Regreso</label>
+                <input type="time" value={editHours.returned} onChange={(e) => setEditHours({...editHours, returned: e.target.value})}
+                  className="w-full px-3 py-2 border rounded-lg focus:border-amber-500 focus:outline-none" />
+              </div>
+              <div>
+                <label className="text-xs text-gray-600 font-semibold">Atendido</label>
+                <input type="time" value={editHours.attended} onChange={(e) => setEditHours({...editHours, attended: e.target.value})}
+                  className="w-full px-3 py-2 border rounded-lg focus:border-amber-500 focus:outline-none" />
+              </div>
+              <div>
+                <label className="text-xs text-gray-600 font-semibold">Completado</label>
+                <input type="time" value={editHours.completed} onChange={(e) => setEditHours({...editHours, completed: e.target.value})}
+                  className="w-full px-3 py-2 border rounded-lg focus:border-amber-500 focus:outline-none" />
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button onClick={() => setEditingHourId(null)}
+                className="flex-1 px-3 py-2 rounded-lg bg-gray-300 text-gray-700 font-semibold hover:bg-gray-400 cursor-pointer">
+                Cancelar
+              </button>
+              <button onClick={() => guardarHorasEditadas(editingHourId.entryId, editingHourId.followUpCreatedAt)}
+                className="flex-1 px-3 py-2 rounded-lg bg-green-600 text-white font-semibold hover:bg-green-700 cursor-pointer">
+                Guardar
               </button>
             </div>
           </div>
