@@ -77,13 +77,21 @@ const AgendaRow = memo(function AgendaRow({
   const fu = propsFollowUp ?? entry.followUps?.[0];
   const st = (fu?.followUpStatus ?? (fu ? "esperando" : undefined)) as FollowUpStatus | undefined;
 
-  const rowBg =
+  // Definir colores base por status
+  const statusBg =
     st === "completado"   ? "bg-green-50 border-green-400" :
     st === "llamado"      ? "bg-purple-50 border-purple-400" :
     st === "regreso"      ? "bg-yellow-50 border-yellow-400" :
     st === "no-escucho"   ? "bg-orange-50 border-orange-300" :
     st === "esperando"    ? "bg-red-100 border-red-500 animate-pulse" :
     "bg-white border-gray-200";
+
+  // Ajustar color si es un tipo especial de registro
+  const rowBg =
+    fu?.type === "planimetrias" ? "bg-orange-50 border-orange-400" :
+    fu?.type === "consultas" ? "bg-indigo-50 border-indigo-400" :
+    fu?.type === "legalización" ? "bg-lime-50 border-lime-400" :
+    statusBg;
 
   const esperaMinutos = fu?.arrivalTime ? minDiff(fu.arrivalTime, fu.completedTime) : null;
   const atencionMinutos = fu?.attendedTime && fu?.completedTime ? minDiff(fu.attendedTime, fu.completedTime) : null;
@@ -95,12 +103,26 @@ const AgendaRow = memo(function AgendaRow({
         {/* Trámite */}
         <div>
           <p className="text-xs text-gray-500 uppercase mb-1">Trámite</p>
-          <p className="font-mono font-bold text-base">{entry.tramiteCode}</p>
-          <p className="text-xs text-gray-400">{entry.registrationNumber}</p>
-          {entry.scheduledTime && (
-            <p className="text-xs text-blue-700 mt-1">{entry.scheduledTime}{entry.scheduledEndTime ? ` – ${entry.scheduledEndTime}` : ""}</p>
+          {entry.tramiteCode ? (
+            <>
+              <p className="font-mono font-bold text-base">{entry.tramiteCode}</p>
+              <p className="text-xs text-gray-400">{entry.registrationNumber}</p>
+              {entry.scheduledTime && (
+                <p className="text-xs text-blue-700 mt-1">{entry.scheduledTime}{entry.scheduledEndTime ? ` – ${entry.scheduledEndTime}` : ""}</p>
+              )}
+              {fu?.isUnscheduled && <span className="text-xs bg-amber-100 text-amber-700 px-1 rounded mt-1 inline-block">sin prog.</span>}
+            </>
+          ) : (
+            <>
+              <p className="font-bold text-base">
+                {fu?.type === "planimetrias" ? "📐 Planimetría" :
+                 fu?.type === "consultas" ? "❓ Consulta" :
+                 fu?.type === "legalización" ? "✍️ Legalización" :
+                 "📋 Registro"}
+              </p>
+              <p className="text-xs text-gray-400">{entry.registrationNumber}</p>
+            </>
           )}
-          {fu?.isUnscheduled && <span className="text-xs bg-amber-100 text-amber-700 px-1 rounded mt-1 inline-block">sin prog.</span>}
         </div>
 
         {/* Cliente + tiempos */}
@@ -451,6 +473,7 @@ export default function AgendaTecnicoPage() {
   const agendaHoy = useMemo(() => {
     if (!currentTechnicianId) return [];
     return entries
+      .filter((e) => !e.deleted) // Excluir entries deletados
       .filter((e) => {
         const hasTodayFollowUp = (e.followUps ?? []).some((fu) => {
           if (fu.createdAt?.startsWith(selectedDate)) {
@@ -497,7 +520,8 @@ export default function AgendaTecnicoPage() {
     else { const r = monthRange(selectedDate); from = r.from; to = r.to; }
 
     // Contar trámites ÚNICOS que tienen al menos un followUp en el rango
-    return entries.filter((e) => {
+    return entries.filter((e) => !e.deleted) // Excluir entries deletados
+      .filter((e) => {
       if (!e.followUps?.length) return false;
 
       // Verificar si al menos un followUp de este técnico cae en el rango

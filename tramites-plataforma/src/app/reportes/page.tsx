@@ -16,7 +16,7 @@ export default function ReportesPage() {
 
   // Filtrar entries según criterios
   const filteredEntries = useMemo(() => {
-    let filtered = entries;
+    let filtered = entries.filter((e) => !e.deleted); // Excluir entries deletados
 
     if (filterFromDate) {
       filtered = filtered.filter((e) => e.registrationDate >= filterFromDate);

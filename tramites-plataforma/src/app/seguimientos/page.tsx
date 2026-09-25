@@ -28,7 +28,7 @@ function techColor(count: number, isArchivos: boolean = false): { dot: string; b
 }
 
 type EditState = { clientName: string; technicianId: string; observations: string };
-type FormMode = "tecnico" | "interna";
+type FormMode = "tecnico" | "interna" | "planimetrias" | "consultas" | "legalizaciones";
 type GestionInterna = "RAM" | "Firma de Jefatura" | "Firma Secretaria";
 
 const GESTIONES_INTERNAS: GestionInterna[] = ["RAM", "Firma de Jefatura", "Firma Secretaria"];
@@ -37,6 +37,12 @@ const GESTION_COLOR: Record<GestionInterna, { bg: string; badge: string; dot: st
   "RAM":                 { bg: "bg-blue-50 border-blue-300",   badge: "bg-blue-100 text-blue-800",   dot: "🗂️" },
   "Firma de Jefatura":   { bg: "bg-violet-50 border-violet-300", badge: "bg-violet-100 text-violet-800", dot: "✍️" },
   "Firma Secretaria":    { bg: "bg-teal-50 border-teal-300",   badge: "bg-teal-100 text-teal-800",   dot: "📝" },
+};
+
+const REGISTRO_COLORS: Record<string, { bg: string; badge: string; dot: string }> = {
+  "planimetrias":    { bg: "bg-orange-50 border-orange-300",  badge: "bg-orange-100 text-orange-800",  dot: "📐" },
+  "consultas":       { bg: "bg-indigo-50 border-indigo-300",  badge: "bg-indigo-100 text-indigo-800",  dot: "❓" },
+  "legalizaciones":  { bg: "bg-lime-50 border-lime-300",      badge: "bg-lime-100 text-lime-800",      dot: "✍️" },
 };
 
 export default function SeguimientosPage() {
@@ -67,6 +73,19 @@ export default function SeguimientosPage() {
   const [derivingToTechId, setDerivingToTechId] = useState("");
   const [editingHourId, setEditingHourId] = useState<{ entryId: string; followUpCreatedAt?: string } | null>(null);
   const [editHours, setEditHours] = useState({ arrival: "", called: "", returned: "", attended: "", completed: "" });
+
+  // Planimetrías
+  const [planimetriasName, setPlanimetriasName] = useState("");
+  const [selectedPlanimetriaTechnicianId, setSelectedPlanimetriaTechnicianId] = useState("");
+
+  // Consultas
+  const [consultasName, setConsultasName] = useState("");
+  const [selectedConsultasTechnicianId, setSelectedConsultasTechnicianId] = useState("");
+
+  // Legalizaciones
+  const [legalizacionesName, setLegalizacionesName] = useState("");
+  const [legalizacionesSheets, setLegalizacionesSheets] = useState("");
+  const [selectedLegalizacionesTechnicianId, setSelectedLegalizacionesTechnicianId] = useState("");
 
   const { entries, updateEntry, createEntry, removeEntry, technicians, currentUser, getNextRegistrationNumber, juntas, createJunta, updateJunta, deleteJunta, derivarTramite } =
     useTramitesStore();
@@ -176,6 +195,7 @@ export default function SeguimientosPage() {
 
   const todayFollowUps = useMemo(() => {
     const filtered = entries.filter((e) => {
+      if (e.deleted) return false; // Excluir entries deletados
       const fu = e.followUps?.[0];
       if (fu?.type === "junta_ingreso") return false;
       if (!e.followUps?.length) return false;
@@ -220,8 +240,9 @@ export default function SeguimientosPage() {
     });
   }, [expandedFollowUps, debouncedSearch]);
 
-  const { techCountToday, programadosHoy, technicianLoad } = useMemo(() => {
+  const { techCountToday, programadosHoy, technicianLoad, techCountByType } = useMemo(() => {
     const countToday: Record<string, number> = {};
+    const countByType: Record<string, { normal: number; planimetrias: number; consultas: number; legalizaciones: number }> = {};
     const programados: Record<string, { name: string; area: string; entries: Entry[] }> = {};
     const load: Record<string, { name: string; programados: number; llegadas: number; atendidos: number; completados: number }> = {};
 
@@ -232,9 +253,10 @@ export default function SeguimientosPage() {
 
     relevantTechs.forEach((tech) => {
       load[tech.id] = { name: tech.name, programados: 0, llegadas: 0, atendidos: 0, completados: 0 };
+      countByType[tech.id] = { normal: 0, planimetrias: 0, consultas: 0, legalizaciones: 0 };
     });
 
-    entries.forEach((e) => {
+    entries.filter((e) => !e.deleted).forEach((e) => {
       const isToday = e.scheduleDate === today;
       const inArea = !currentUser.areaId || areas.some((a) => a.id === currentUser.areaId && a.label === e.technicianArea);
 
@@ -254,6 +276,8 @@ export default function SeguimientosPage() {
           const tn = fu.actualTechnicianName ?? e.technicianName;
           countToday[tid] = (countToday[tid] ?? 0) + 1;
           if (!load[tid]) load[tid] = { name: tn, programados: 0, llegadas: 0, atendidos: 0, completados: 0 };
+          if (!countByType[tid]) countByType[tid] = { normal: 0, planimetrias: 0, consultas: 0, legalizaciones: 0 };
+          countByType[tid].normal++;
           load[tid].llegadas++;
           if (fu.attendedTime || fu.returnedTime || fu.calledTime) load[tid].atendidos++;
           if (fu.completedTime) load[tid].completados++;
@@ -261,7 +285,7 @@ export default function SeguimientosPage() {
     });
 
     // Contar también trámites de junta (junta_ingreso)
-    entries.forEach((e) => {
+    entries.filter((e) => !e.deleted).forEach((e) => {
       const inArea = !currentUser.areaId || areas.some((a) => a.id === currentUser.areaId && a.label === e.technicianArea);
       if (!inArea) return;
 
@@ -271,13 +295,37 @@ export default function SeguimientosPage() {
           const tid = e.technicianId;
           const tn = e.technicianName;
           if (!load[tid]) load[tid] = { name: tn, programados: 0, llegadas: 0, atendidos: 0, completados: 0 };
+          if (!countByType[tid]) countByType[tid] = { normal: 0, planimetrias: 0, consultas: 0, legalizaciones: 0 };
+          countByType[tid].normal++;
           load[tid].llegadas++;
           if (fu.attendedTime || fu.returnedTime || fu.calledTime) load[tid].atendidos++;
           if (fu.completedTime) load[tid].completados++;
         });
     });
 
-    return { techCountToday: countToday, programadosHoy: programados, technicianLoad: load };
+    // Contar también registros nuevos: planimetrías, consultas, legalizaciones
+    entries.filter((e) => !e.deleted).forEach((e) => {
+      const inArea = !currentUser.areaId || areas.some((a) => a.id === currentUser.areaId && a.label === e.technicianArea);
+      if (!inArea) return;
+
+      (e.followUps ?? [])
+        .filter((fu) => (fu.type === "planimetrias" || fu.type === "consultas" || fu.type === "legalización") && fu.createdAt?.startsWith(today))
+        .forEach((fu) => {
+          const tid = e.technicianId;
+          const tn = e.technicianName;
+          countToday[tid] = (countToday[tid] ?? 0) + 1;
+          if (!load[tid]) load[tid] = { name: tn, programados: 0, llegadas: 0, atendidos: 0, completados: 0 };
+          if (!countByType[tid]) countByType[tid] = { normal: 0, planimetrias: 0, consultas: 0, legalizaciones: 0 };
+          if (fu.type === "planimetrias") countByType[tid].planimetrias++;
+          else if (fu.type === "consultas") countByType[tid].consultas++;
+          else if (fu.type === "legalización") countByType[tid].legalizaciones++;
+          load[tid].llegadas++;
+          if (fu.attendedTime || fu.returnedTime || fu.calledTime) load[tid].atendidos++;
+          if (fu.completedTime) load[tid].completados++;
+        });
+    });
+
+    return { techCountToday: countToday, programadosHoy: programados, technicianLoad: load, techCountByType: countByType };
   }, [entries, todayFollowUps, today, currentUser.areaId, areas, technicians]);
 
   function showMsg(text: string, type: "success" | "error" = "success") {
@@ -545,6 +593,111 @@ export default function SeguimientosPage() {
     setTramiteCode(""); setClientName(""); setSelectedGestion(""); setObservations("");
   }
 
+  async function handleRegisterPlanimetrias() {
+    if (!planimetriasName.trim()) return showMsg("⚠️ Ingresa el nombre del solicitante", "error");
+    if (!selectedPlanimetriaTechnicianId) return showMsg("⚠️ Selecciona un técnico", "error");
+
+    const { time: arrival, iso } = await getServerNow();
+    const tech = technicians.find((t) => t.id === selectedPlanimetriaTechnicianId);
+
+    const newEntry: Entry = {
+      id: `plan-${Date.now()}`,
+      createdBy: currentUser.id, createdByName: currentUser.name,
+      registrationNumber: getNextRegistrationNumber(),
+      tramiteCode: "", // Sin trámite code
+      technicianId: selectedPlanimetriaTechnicianId,
+      technicianName: tech?.name ?? selectedPlanimetriaTechnicianId,
+      technicianArea: tech?.areaLabel ?? "",
+      scheduleDate: today, registrationDate: today,
+      observations: observations.trim() || "", status: "Registrado", createdAt: iso,
+      followUps: [{
+        type: "planimetrias",
+        clientName: planimetriasName.trim(),
+        arrivalTime: arrival,
+        followUpStatus: "completado",
+        technicianId: selectedPlanimetriaTechnicianId,
+        technicianName: tech?.name ?? selectedPlanimetriaTechnicianId,
+        attendedTime: arrival,
+        observations: observations.trim() || undefined,
+        createdAt: iso,
+        isUnscheduled: true,
+      }],
+    };
+    createEntry(newEntry);
+    showMsg(`✅ Planimetría registrada — ${tech?.name} — ${arrival}`, "success");
+    setPlanimetriasName(""); setSelectedPlanimetriaTechnicianId(""); setObservations("");
+  }
+
+  async function handleRegisterConsultas() {
+    if (!selectedConsultasTechnicianId) return showMsg("⚠️ Selecciona un técnico", "error");
+
+    const { time: arrival, iso } = await getServerNow();
+    const tech = technicians.find((t) => t.id === selectedConsultasTechnicianId);
+
+    const newEntry: Entry = {
+      id: `cons-${Date.now()}`,
+      createdBy: currentUser.id, createdByName: currentUser.name,
+      registrationNumber: getNextRegistrationNumber(),
+      tramiteCode: "",
+      technicianId: selectedConsultasTechnicianId,
+      technicianName: tech?.name ?? selectedConsultasTechnicianId,
+      technicianArea: tech?.areaLabel ?? "",
+      scheduleDate: today, registrationDate: today,
+      observations: observations.trim() || "", status: "Registrado", createdAt: iso,
+      followUps: [{
+        type: "consultas",
+        clientName: consultasName.trim() || undefined,
+        arrivalTime: arrival,
+        followUpStatus: "completado",
+        technicianId: selectedConsultasTechnicianId,
+        technicianName: tech?.name ?? selectedConsultasTechnicianId,
+        attendedTime: arrival,
+        observations: observations.trim() || undefined,
+        createdAt: iso,
+        isUnscheduled: true,
+      }],
+    };
+    createEntry(newEntry);
+    showMsg(`✅ Consulta registrada — ${tech?.name} — ${arrival}`, "success");
+    setConsultasName(""); setSelectedConsultasTechnicianId(""); setObservations("");
+  }
+
+  async function handleRegisterLegalizaciones() {
+    if (!legalizacionesName.trim()) return showMsg("⚠️ Ingresa el nombre del propietario", "error");
+    if (!legalizacionesSheets.trim()) return showMsg("⚠️ Ingresa la cantidad de hojas", "error");
+    if (!selectedLegalizacionesTechnicianId) return showMsg("⚠️ Selecciona un técnico", "error");
+
+    const { time: arrival, iso } = await getServerNow();
+    const tech = technicians.find((t) => t.id === selectedLegalizacionesTechnicianId);
+
+    const newEntry: Entry = {
+      id: `leg-${Date.now()}`,
+      createdBy: currentUser.id, createdByName: currentUser.name,
+      registrationNumber: getNextRegistrationNumber(),
+      tramiteCode: "",
+      technicianId: selectedLegalizacionesTechnicianId,
+      technicianName: tech?.name ?? selectedLegalizacionesTechnicianId,
+      technicianArea: tech?.areaLabel ?? "",
+      scheduleDate: today, registrationDate: today,
+      observations: observations.trim() || "", status: "Registrado", createdAt: iso,
+      followUps: [{
+        type: "legalización",
+        clientName: legalizacionesName.trim(),
+        arrivalTime: arrival,
+        followUpStatus: "completado",
+        technicianId: selectedLegalizacionesTechnicianId,
+        technicianName: tech?.name ?? selectedLegalizacionesTechnicianId,
+        attendedTime: arrival,
+        observations: `${legalizacionesSheets} hojas${observations.trim() ? ` — ${observations.trim()}` : ""}`,
+        createdAt: iso,
+        isUnscheduled: true,
+      }],
+    };
+    createEntry(newEntry);
+    showMsg(`✅ Legalización registrada (${legalizacionesSheets} hojas) — ${tech?.name} — ${arrival}`, "success");
+    setLegalizacionesName(""); setLegalizacionesSheets(""); setSelectedLegalizacionesTechnicianId(""); setObservations("");
+  }
+
   async function handleMarkRegreso(entry: Entry, followUp: FollowUp) {
     const { time } = await getServerNow();
     const newFollowUps = (entry.followUps ?? []).map((fu) =>
@@ -576,19 +729,38 @@ export default function SeguimientosPage() {
   }
 
   function handleDeleteFollowUp(entry: Entry, followUp: FollowUp) {
-    if (entry.followUps && entry.followUps.length > 0) {
-      const newFollowUps = entry.followUps.filter((fu) => fu !== followUp);
+    console.log("handleDeleteFollowUp - entry:", entry.id, "followUp createdAt:", followUp.createdAt);
+    console.log("handleDeleteFollowUp - entry.followUps:", entry.followUps);
 
-      // Si no quedan followUps, borrar el entry completo (soft delete)
-      if (newFollowUps.length === 0) {
-        removeEntry(entry.id);
-      } else {
-        // Si quedan followUps, solo actualizar la lista
-        updateEntry(entry.id, { ...entry, followUps: newFollowUps });
-      }
+    if (!entry.followUps || entry.followUps.length === 0) {
+      showMsg("⚠️ No hay seguimientos para eliminar", "error");
+      setConfirmDeleteId(null);
+      return;
+    }
+
+    // Filtrar comparando por createdAt (más confiable que referencia)
+    const newFollowUps = entry.followUps.filter((fu, idx) => {
+      const isSame = fu.createdAt === followUp.createdAt;
+      console.log(`Comparando índice ${idx}: ${fu.createdAt} === ${followUp.createdAt}? ${isSame}`);
+      return !isSame;
+    });
+
+    console.log("newFollowUps length:", newFollowUps.length, "original length:", entry.followUps.length);
+
+    // Si no quedan followUps, borrar el entry completo (soft delete)
+    if (newFollowUps.length === 0) {
+      removeEntry(entry.id);
+      showMsg(`✅ Seguimiento eliminado`);
+    } else if (newFollowUps.length === entry.followUps.length) {
+      // No se eliminó nada
+      console.error("No se eliminó nada - createdAt mismatch?");
+      showMsg("⚠️ No se pudo eliminar - falla al encontrar registro", "error");
+    } else {
+      // Si quedan followUps, solo actualizar la lista
+      updateEntry(entry.id, { ...entry, followUps: newFollowUps });
+      showMsg(`✅ Seguimiento eliminado`);
     }
     setConfirmDeleteId(null);
-    showMsg(`Seguimiento de ${entry.tramiteCode} eliminado`);
   }
 
   async function handleDerivar(entryId: string, newTechId: string) {
@@ -674,14 +846,26 @@ export default function SeguimientosPage() {
           <h2 className="text-2xl font-bold">Registrar Llegada</h2>
 
           {/* Toggle modo */}
-          <div className="flex rounded-xl overflow-hidden border-2 border-pink-300 w-fit">
+          <div className="flex flex-wrap gap-2 w-full">
             <button onClick={() => { setFormMode("tecnico"); setSelectedGestion(""); }}
-              className={`px-5 py-2 text-sm font-bold transition cursor-pointer ${formMode === "tecnico" ? "bg-pink-600 text-white" : "bg-white text-pink-700 hover:bg-pink-50"}`}>
+              className={`px-5 py-2 text-sm font-bold rounded-lg transition cursor-pointer ${formMode === "tecnico" ? "bg-pink-600 text-white" : "bg-white text-pink-700 border-2 border-pink-300 hover:bg-pink-50"}`}>
               👤 Con Técnico
             </button>
             <button onClick={() => { setFormMode("interna"); setSelectedTechnicianId(""); }}
-              className={`px-5 py-2 text-sm font-bold transition cursor-pointer ${formMode === "interna" ? "bg-violet-600 text-white" : "bg-white text-violet-700 hover:bg-violet-50"}`}>
+              className={`px-5 py-2 text-sm font-bold rounded-lg transition cursor-pointer ${formMode === "interna" ? "bg-violet-600 text-white" : "bg-white text-violet-700 border-2 border-violet-300 hover:bg-violet-50"}`}>
               📋 Gestión Interna
+            </button>
+            <button onClick={() => { setFormMode("planimetrias"); setSelectedTechnicianId(""); }}
+              className={`px-5 py-2 text-sm font-bold rounded-lg transition cursor-pointer ${formMode === "planimetrias" ? "bg-orange-600 text-white" : "bg-white text-orange-700 border-2 border-orange-300 hover:bg-orange-50"}`}>
+              📐 Planimetrías
+            </button>
+            <button onClick={() => { setFormMode("consultas"); setSelectedTechnicianId(""); }}
+              className={`px-5 py-2 text-sm font-bold rounded-lg transition cursor-pointer ${formMode === "consultas" ? "bg-indigo-600 text-white" : "bg-white text-indigo-700 border-2 border-indigo-300 hover:bg-indigo-50"}`}>
+              ❓ Consultas
+            </button>
+            <button onClick={() => { setFormMode("legalizaciones"); setSelectedTechnicianId(""); }}
+              className={`px-5 py-2 text-sm font-bold rounded-lg transition cursor-pointer ${formMode === "legalizaciones" ? "bg-lime-600 text-white" : "bg-white text-lime-700 border-2 border-lime-300 hover:bg-lime-50"}`}>
+              ✍️ Legalizaciones
             </button>
           </div>
 
@@ -692,61 +876,65 @@ export default function SeguimientosPage() {
           )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Código trámite */}
-            <label className="grid gap-2 md:col-span-2">
-              <span className="text-sm font-semibold text-gray-700">Número de Trámite *</span>
-              <input
-                type="text" value={tramiteCode} autoFocus
-                onChange={(e) => {
-                  const val = e.target.value.replace(/\D/g, "").slice(0, 10);
-                  setTramiteCode(val);
-                  if (formMode === "tecnico") {
-                    const match = entries.find((en) => en.tramiteCode === val);
-                    if (match) {
-                      setSelectedTechnicianId(match.technicianId);
-                      // Auto-llenar nombre del cliente si no está vacío
-                      const lastFollowUp = match.followUps?.[match.followUps.length - 1];
-                      if (lastFollowUp?.clientName) setClientName(lastFollowUp.clientName);
-                    }
-                  }
-                }}
-                onKeyDown={(e) => e.key === "Enter" && (formMode === "tecnico" ? handleRegisterArrival() : handleRegisterGestionInterna())}
-                inputMode="numeric" placeholder="Ej: 2026016618"
-                className={`rounded-lg border-2 px-4 py-3 text-lg font-semibold focus:outline-none ${codeValidationError ? "border-red-400 bg-red-50" : formMode === "interna" ? "border-violet-300 bg-white focus:border-violet-500" : "border-pink-300 bg-white focus:border-pink-500"}`}
-              />
-              {codeValidationError && <p className="text-xs text-red-600 font-medium">⚠️ {codeValidationError}</p>}
-            </label>
+            {/* Código trámite — solo para "Con Técnico" e "Gestión Interna" */}
+            {(formMode === "tecnico" || formMode === "interna") && (
+              <>
+                <label className="grid gap-2 md:col-span-2">
+                  <span className="text-sm font-semibold text-gray-700">Número de Trámite *</span>
+                  <input
+                    type="text" value={tramiteCode} autoFocus
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, "").slice(0, 10);
+                      setTramiteCode(val);
+                      if (formMode === "tecnico") {
+                        const match = entries.find((en) => en.tramiteCode === val);
+                        if (match) {
+                          setSelectedTechnicianId(match.technicianId);
+                          // Auto-llenar nombre del cliente si no está vacío
+                          const lastFollowUp = match.followUps?.[match.followUps.length - 1];
+                          if (lastFollowUp?.clientName) setClientName(lastFollowUp.clientName);
+                        }
+                      }
+                    }}
+                    onKeyDown={(e) => e.key === "Enter" && (formMode === "tecnico" ? handleRegisterArrival() : handleRegisterGestionInterna())}
+                    inputMode="numeric" placeholder="Ej: 2026016618"
+                    className={`rounded-lg border-2 px-4 py-3 text-lg font-semibold focus:outline-none ${codeValidationError ? "border-red-400 bg-red-50" : formMode === "interna" ? "border-violet-300 bg-white focus:border-violet-500" : "border-pink-300 bg-white focus:border-pink-500"}`}
+                  />
+                  {codeValidationError && <p className="text-xs text-red-600 font-medium">⚠️ {codeValidationError}</p>}
+                </label>
 
-            {/* Info trámite encontrado */}
-            {tramiteCode.trim() && !codeValidationError && foundEntry && (
-              <div className="md:col-span-2 rounded-lg bg-blue-50 border-2 border-blue-200 p-4">
-                <p className="text-xs font-semibold text-blue-700 uppercase">✓ Trámite encontrado</p>
-                <div className="grid grid-cols-2 gap-2 text-sm mt-2">
-                  <div><p className="text-xs text-gray-500">Registro</p><p className="font-bold">{foundEntry.registrationNumber}</p></div>
-                  <div><p className="text-xs text-gray-500">Fecha programada</p><p className="font-bold">{foundEntry.scheduleDate}</p></div>
-                  <div><p className="text-xs text-gray-500">Técnico asignado</p><p className="font-bold text-blue-900">{foundEntry.technicianName}</p></div>
-                  {foundEntry.followUps && foundEntry.followUps.length > 0 && <div><p className="text-xs text-blue-600">📊 {foundEntry.followUps.length} seguimiento{foundEntry.followUps.length !== 1 ? "s" : ""}</p></div>}
-                </div>
-              </div>
-            )}
-            {tramiteCode.trim() && !codeValidationError && !foundEntry && (
-              <div className="md:col-span-2 rounded-lg bg-amber-50 border-2 border-amber-200 p-3">
-                <p className="text-sm font-semibold text-amber-800">
-                  {formMode === "tecnico" ? "⚠️ Trámite no encontrado — selecciona técnico manualmente" : "⚠️ Trámite no encontrado — se registrará como gestión sin programación"}
-                </p>
-              </div>
-            )}
+                {/* Info trámite encontrado */}
+                {tramiteCode.trim() && !codeValidationError && foundEntry && (
+                  <div className="md:col-span-2 rounded-lg bg-blue-50 border-2 border-blue-200 p-4">
+                    <p className="text-xs font-semibold text-blue-700 uppercase">✓ Trámite encontrado</p>
+                    <div className="grid grid-cols-2 gap-2 text-sm mt-2">
+                      <div><p className="text-xs text-gray-500">Registro</p><p className="font-bold">{foundEntry.registrationNumber}</p></div>
+                      <div><p className="text-xs text-gray-500">Fecha programada</p><p className="font-bold">{foundEntry.scheduleDate}</p></div>
+                      <div><p className="text-xs text-gray-500">Técnico asignado</p><p className="font-bold text-blue-900">{foundEntry.technicianName}</p></div>
+                      {foundEntry.followUps && foundEntry.followUps.length > 0 && <div><p className="text-xs text-blue-600">📊 {foundEntry.followUps.length} seguimiento{foundEntry.followUps.length !== 1 ? "s" : ""}</p></div>}
+                    </div>
+                  </div>
+                )}
+                {tramiteCode.trim() && !codeValidationError && !foundEntry && (
+                  <div className="md:col-span-2 rounded-lg bg-amber-50 border-2 border-amber-200 p-3">
+                    <p className="text-sm font-semibold text-amber-800">
+                      {formMode === "tecnico" ? "⚠️ Trámite no encontrado — selecciona técnico manualmente" : "⚠️ Trámite no encontrado — se registrará como gestión sin programación"}
+                    </p>
+                  </div>
+                )}
 
-            {/* Nombre */}
-            <label className="grid gap-2 md:col-span-2">
-              <span className="text-sm font-semibold text-gray-700">Contribuyente <span className="text-xs text-gray-500 font-normal">(se auto-completa si existe)</span></span>
-              <input type="text" value={clientName}
-                onChange={(e) => setClientName(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && (formMode === "tecnico" ? handleRegisterArrival() : handleRegisterGestionInterna())}
-                placeholder="Ej: Juan Pérez"
-                className={`rounded-lg border-2 px-4 py-3 focus:outline-none ${formMode === "interna" ? "border-violet-300 focus:border-violet-500" : "border-pink-300 focus:border-pink-500"}`}
-              />
-            </label>
+                {/* Nombre */}
+                <label className="grid gap-2 md:col-span-2">
+                  <span className="text-sm font-semibold text-gray-700">Contribuyente <span className="text-xs text-gray-500 font-normal">(se auto-completa si existe)</span></span>
+                  <input type="text" value={clientName}
+                    onChange={(e) => setClientName(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && (formMode === "tecnico" ? handleRegisterArrival() : handleRegisterGestionInterna())}
+                    placeholder="Ej: Juan Pérez"
+                    className={`rounded-lg border-2 px-4 py-3 focus:outline-none ${formMode === "interna" ? "border-violet-300 focus:border-violet-500" : "border-pink-300 focus:border-pink-500"}`}
+                  />
+                </label>
+              </>
+            )}
 
             {/* ── MODO TÉCNICO: selector con agrupación por área ── */}
             {formMode === "tecnico" && (
@@ -766,9 +954,13 @@ export default function SeguimientosPage() {
                           const cnt = techCountToday[t.id] ?? 0;
                           const isArchivos = t.id === "archivos";
                           const { dot, label } = techColor(cnt, isArchivos);
+                          const breakdown = techCountByType[t.id];
+                          const breakdownStr = breakdown
+                            ? `${breakdown.normal > 0 ? breakdown.normal : "0"}${breakdown.planimetrias > 0 || breakdown.consultas > 0 || breakdown.legalizaciones > 0 ? "+" : ""}`
+                            : "";
                           return (
                             <option key={t.id} value={t.id}>
-                              {dot} {t.name} ({label})
+                              {dot} {t.name} ({label}) {breakdownStr && `[${breakdownStr}]`}
                             </option>
                           );
                         })}
@@ -789,6 +981,14 @@ export default function SeguimientosPage() {
                       <div className={`h-3 rounded-full transition-all ${selColors.bar}`}
                         style={{ width: `${Math.min((selCount / LIMITE) * 100, 100)}%` }} />
                     </div>
+                    {techCountByType[selectedTechnicianId] && (
+                      <p className="text-xs text-gray-600 mt-1">
+                        Desglose: {techCountByType[selectedTechnicianId].normal > 0 && `${techCountByType[selectedTechnicianId].normal} llamadas`}
+                        {techCountByType[selectedTechnicianId].planimetrias > 0 && ` • 📐 ${techCountByType[selectedTechnicianId].planimetrias}`}
+                        {techCountByType[selectedTechnicianId].consultas > 0 && ` • ❓ ${techCountByType[selectedTechnicianId].consultas}`}
+                        {techCountByType[selectedTechnicianId].legalizaciones > 0 && ` • ✍️ ${techCountByType[selectedTechnicianId].legalizaciones}`}
+                      </p>
+                    )}
                     {selOverLimit && selectedTechnicianId !== "archivos" && <p className="text-xs text-orange-600 font-semibold">⚠️ Este técnico está sobre el límite de {LIMITE} pero puede continuar atendiendo</p>}
                   </div>
                 )}
@@ -816,25 +1016,136 @@ export default function SeguimientosPage() {
               </div>
             )}
 
+            {/* ── MODO PLANIMETRÍAS ── */}
+            {formMode === "planimetrias" && (
+              <label className="grid gap-2 md:col-span-2">
+                <span className="text-sm font-semibold text-gray-700">Nombre de la Planimetria *</span>
+                <input type="text" value={planimetriasName}
+                  onChange={(e) => setPlanimetriasName(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleRegisterPlanimetrias()}
+                  placeholder="Ej: Juan Pérez"
+                  className="rounded-lg border-2 border-orange-300 px-4 py-3 focus:outline-none focus:border-orange-500"
+                />
+              </label>
+            )}
+
+            {/* ── MODO CONSULTAS ── */}
+            {formMode === "consultas" && (
+              <label className="grid gap-2 md:col-span-2">
+                <span className="text-sm font-semibold text-gray-700">Nombre (opcional)</span>
+                <input type="text" value={consultasName}
+                  onChange={(e) => setConsultasName(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleRegisterConsultas()}
+                  placeholder="Ej: María López"
+                  className="rounded-lg border-2 border-indigo-300 px-4 py-3 focus:outline-none focus:border-indigo-500"
+                />
+              </label>
+            )}
+
+            {/* ── MODO LEGALIZACIONES ── */}
+            {formMode === "legalizaciones" && (
+              <>
+                <label className="grid gap-2 md:col-span-2">
+                  <span className="text-sm font-semibold text-gray-700">Propietario *</span>
+                  <input type="text" value={legalizacionesName}
+                    onChange={(e) => setLegalizacionesName(e.target.value)}
+                    placeholder="Ej: Carlos Mendoza"
+                    className="rounded-lg border-2 border-lime-300 px-4 py-3 focus:outline-none focus:border-lime-500"
+                  />
+                </label>
+                <label className="grid gap-2">
+                  <span className="text-sm font-semibold text-gray-700">Cantidad de Hojas *</span>
+                  <input type="number" value={legalizacionesSheets}
+                    onChange={(e) => setLegalizacionesSheets(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleRegisterLegalizaciones()}
+                    placeholder="Ej: 3"
+                    min="1"
+                    className="rounded-lg border-2 border-lime-300 px-4 py-3 focus:outline-none focus:border-lime-500"
+                  />
+                </label>
+              </>
+            )}
+
+            {/* ── SELECTOR DE TÉCNICO: Para Planimetrías, Consultas y Legalizaciones ── */}
+            {(formMode === "planimetrias" || formMode === "consultas" || formMode === "legalizaciones") && (
+              <label className="grid gap-2 md:col-span-2">
+                <span className="text-sm font-semibold text-gray-700">Técnico que Atendera *</span>
+                <select value={
+                  formMode === "planimetrias" ? selectedPlanimetriaTechnicianId :
+                  formMode === "consultas" ? selectedConsultasTechnicianId :
+                  selectedLegalizacionesTechnicianId
+                } onChange={(e) => {
+                  if (formMode === "planimetrias") setSelectedPlanimetriaTechnicianId(e.target.value);
+                  else if (formMode === "consultas") setSelectedConsultasTechnicianId(e.target.value);
+                  else setSelectedLegalizacionesTechnicianId(e.target.value);
+                }}
+                  className={`rounded-lg border-2 px-4 py-3 focus:outline-none bg-white ${
+                    formMode === "planimetrias" ? "border-orange-300 focus:border-orange-500" :
+                    formMode === "consultas" ? "border-indigo-300 focus:border-indigo-500" :
+                    "border-lime-300 focus:border-lime-500"
+                  }`}>
+                  <option value="">— Selecciona técnico —</option>
+                  {availableAreas.map((area) => {
+                    const techsInArea = availableTechnicians.filter((t) => t.areaId === area.id);
+                    return (
+                      <optgroup key={area.id} label={`── ${area.label.toUpperCase()} ──`}>
+                        {techsInArea.map((t) => (
+                          <option key={t.id} value={t.id}>{t.name}</option>
+                        ))}
+                      </optgroup>
+                    );
+                  })}
+                </select>
+              </label>
+            )}
+
             <label className="grid gap-2 md:col-span-2">
               <span className="text-sm font-semibold text-gray-700">Observaciones (opcional)</span>
               <textarea value={observations} onChange={(e) => setObservations(e.target.value)}
                 placeholder="Ej: documento incompleto, urgente…" rows={2}
-                className={`rounded-lg border-2 px-4 py-3 focus:outline-none ${formMode === "interna" ? "border-violet-300 focus:border-violet-500" : "border-pink-300 focus:border-pink-500"}`} />
+                className={`rounded-lg border-2 px-4 py-3 focus:outline-none ${
+                  formMode === "interna" ? "border-violet-300 focus:border-violet-500" :
+                  formMode === "planimetrias" ? "border-orange-300 focus:border-orange-500" :
+                  formMode === "consultas" ? "border-indigo-300 focus:border-indigo-500" :
+                  formMode === "legalizaciones" ? "border-lime-300 focus:border-lime-500" :
+                  "border-pink-300 focus:border-pink-500"
+                }`} />
             </label>
           </div>
 
-          {formMode === "tecnico" ? (
+          {formMode === "tecnico" && (
             <button onClick={handleRegisterArrival}
               disabled={!canSubmitTecnico || !!codeValidationError}
               className={`w-full rounded-lg px-6 py-3 font-semibold text-white text-lg transition shadow-md ${canSubmitTecnico && !codeValidationError ? "bg-pink-600 hover:bg-pink-700 cursor-pointer" : "bg-gray-400 cursor-not-allowed"}`}>
               ✅ Registrar Llegada con Técnico
             </button>
-          ) : (
+          )}
+          {formMode === "interna" && (
             <button onClick={handleRegisterGestionInterna}
               disabled={!canSubmitInterna || !!codeValidationError}
               className={`w-full rounded-lg px-6 py-3 font-semibold text-white text-lg transition shadow-md ${canSubmitInterna && !codeValidationError ? "bg-violet-600 hover:bg-violet-700 cursor-pointer" : "bg-gray-400 cursor-not-allowed"}`}>
               📋 Registrar Gestión Interna
+            </button>
+          )}
+          {formMode === "planimetrias" && (
+            <button onClick={handleRegisterPlanimetrias}
+              disabled={!planimetriasName.trim() || !selectedPlanimetriaTechnicianId}
+              className={`w-full rounded-lg px-6 py-3 font-semibold text-white text-lg transition shadow-md ${planimetriasName.trim() && selectedPlanimetriaTechnicianId ? "bg-orange-600 hover:bg-orange-700 cursor-pointer" : "bg-gray-400 cursor-not-allowed"}`}>
+              📐 Registrar Planimetría
+            </button>
+          )}
+          {formMode === "consultas" && (
+            <button onClick={handleRegisterConsultas}
+              disabled={!selectedConsultasTechnicianId}
+              className={`w-full rounded-lg px-6 py-3 font-semibold text-white text-lg transition shadow-md ${selectedConsultasTechnicianId ? "bg-indigo-600 hover:bg-indigo-700 cursor-pointer" : "bg-gray-400 cursor-not-allowed"}`}>
+              ❓ Registrar Consulta
+            </button>
+          )}
+          {formMode === "legalizaciones" && (
+            <button onClick={handleRegisterLegalizaciones}
+              disabled={!legalizacionesName.trim() || !legalizacionesSheets.trim() || !selectedLegalizacionesTechnicianId}
+              className={`w-full rounded-lg px-6 py-3 font-semibold text-white text-lg transition shadow-md ${legalizacionesName.trim() && legalizacionesSheets.trim() && selectedLegalizacionesTechnicianId ? "bg-lime-600 hover:bg-lime-700 cursor-pointer" : "bg-gray-400 cursor-not-allowed"}`}>
+              ✍️ Registrar Legalización
             </button>
           )}
         </section>
@@ -1071,9 +1382,23 @@ export default function SeguimientosPage() {
                     return (
                       <tr key={followUpKey} className={`${rowBg} border-b border-gray-100`}>
                         <td className="px-3 py-3">
-                          <p className="font-mono font-semibold">{entry.tramiteCode}</p>
-                          <p className="text-xs text-gray-400">{entry.registrationNumber}</p>
-                          {fu.isUnscheduled && <span className="text-xs bg-amber-100 text-amber-700 px-1 rounded">sin prog.</span>}
+                          {entry.tramiteCode ? (
+                            <>
+                              <p className="font-mono font-semibold">{entry.tramiteCode}</p>
+                              <p className="text-xs text-gray-400">{entry.registrationNumber}</p>
+                              {fu.isUnscheduled && <span className="text-xs bg-amber-100 text-amber-700 px-1 rounded">sin prog.</span>}
+                            </>
+                          ) : (
+                            <>
+                              <p className="font-bold">
+                                {fu.type === "planimetrias" ? "📐 Planimetría" :
+                                 fu.type === "consultas" ? "❓ Consulta" :
+                                 fu.type === "legalización" ? "✍️ Legalización" :
+                                 "📋 Registro"}
+                              </p>
+                              <p className="text-xs text-gray-400">{entry.registrationNumber}</p>
+                            </>
+                          )}
                         </td>
                         <td className="px-3 py-3">{fu.clientName}</td>
                         <td className="px-3 py-3 text-sm">
@@ -1165,6 +1490,14 @@ export default function SeguimientosPage() {
                       <div className="w-full bg-gray-200 rounded-full h-2">
                         <div className={`h-2 rounded-full ${bar}`} style={{ width: `${Math.min((cnt / LIMITE) * 100, 100)}%` }} />
                       </div>
+                      {techCountByType[tid] && (
+                        <p className="text-xs text-gray-600 mt-2">
+                          {techCountByType[tid].normal > 0 && `${techCountByType[tid].normal} llamadas`}
+                          {techCountByType[tid].planimetrias > 0 && ` • 📐 ${techCountByType[tid].planimetrias}`}
+                          {techCountByType[tid].consultas > 0 && ` • ❓ ${techCountByType[tid].consultas}`}
+                          {techCountByType[tid].legalizaciones > 0 && ` • ✍️ ${techCountByType[tid].legalizaciones}`}
+                        </p>
+                      )}
                     </div>
                   </div>
                 );
