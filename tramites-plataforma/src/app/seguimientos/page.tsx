@@ -702,7 +702,12 @@ export default function SeguimientosPage() {
                   setTramiteCode(val);
                   if (formMode === "tecnico") {
                     const match = entries.find((en) => en.tramiteCode === val);
-                    if (match) setSelectedTechnicianId(match.technicianId);
+                    if (match) {
+                      setSelectedTechnicianId(match.technicianId);
+                      // Auto-llenar nombre del cliente si no está vacío
+                      const lastFollowUp = match.followUps?.[match.followUps.length - 1];
+                      if (lastFollowUp?.clientName) setClientName(lastFollowUp.clientName);
+                    }
                   }
                 }}
                 onKeyDown={(e) => e.key === "Enter" && (formMode === "tecnico" ? handleRegisterArrival() : handleRegisterGestionInterna())}
@@ -1177,6 +1182,9 @@ export default function SeguimientosPage() {
                 <p className="text-sm text-gray-500 mt-1">
                   Reasigna este trámite a otro técnico
                 </p>
+                <div className="mt-3 rounded-lg bg-blue-50 border border-blue-200 p-3">
+                  <p className="text-xs text-blue-700 font-semibold">💡 Consejo: Para registros de múltiples técnicos, es mejor ir a <span className="font-bold">Seguimientos</span> y registrar con el nuevo técnico. Así ambos reciben su ficha de atención.</p>
+                </div>
               </div>
 
               {/* Información del trámite */}
