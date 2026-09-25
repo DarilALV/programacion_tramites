@@ -27,7 +27,7 @@ function techColor(count: number, isArchivos: boolean = false): { dot: string; b
   return { dot: "⚪", bar: "bg-gray-300", label: `0/${LIMITE}` };
 }
 
-type EditState = { clientName: string; technicianId: string; observations: string };
+type EditState = { clientName: string; technicianId: string; observations: string; tramiteCode: string };
 type FormMode = "tecnico" | "interna" | "planimetrias" | "consultas" | "legalizaciones";
 type GestionInterna = "RAM" | "Firma de Jefatura" | "Firma Secretaria";
 
@@ -67,7 +67,7 @@ export default function SeguimientosPage() {
   const [expandedJuntaId, setExpandedJuntaId] = useState<string | null>(null);
   const [editingJuntaId, setEditingJuntaId] = useState<string | null>(null);
   const [editingJuntaTramites, setEditingJuntaTramites] = useState<{ code: string; clientName: string }[]>([]);
-  const [editState, setEditState] = useState<EditState>({ clientName: "", technicianId: "", observations: "" });
+  const [editState, setEditState] = useState<EditState>({ clientName: "", technicianId: "", observations: "", tramiteCode: "" });
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [derivingEntryId, setDerivingEntryId] = useState<string | null>(null);
   const [derivingToTechId, setDerivingToTechId] = useState("");
@@ -713,6 +713,7 @@ export default function SeguimientosPage() {
       clientName: followUp.clientName ?? "",
       technicianId: "",
       observations: followUp.observations ?? "",
+      tramiteCode: entry.tramiteCode,
     });
     setConfirmDeleteId(null);
   }
@@ -723,9 +724,13 @@ export default function SeguimientosPage() {
         ? { ...fu, clientName: editState.clientName.trim(), observations: editState.observations.trim() || undefined }
         : fu
     );
-    updateEntry(entry.id, { ...entry, followUps: newFollowUps });
+    updateEntry(entry.id, {
+      ...entry,
+      tramiteCode: editState.tramiteCode.trim(),
+      followUps: newFollowUps
+    });
     setEditingFollowUpId(null);
-    showMsg("✓ Seguimiento actualizado (cliente y observaciones)");
+    showMsg("✓ Seguimiento actualizado (trámite, cliente y observaciones)");
   }
 
   function handleDeleteFollowUp(entry: Entry, followUp: FollowUp) {
@@ -1353,7 +1358,14 @@ export default function SeguimientosPage() {
                       return (
                         <tr key={followUpKey} className="bg-blue-50 border-b border-blue-200">
                           <td colSpan={7} className="px-4 py-3">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                              <label className="grid gap-1">
+                                <span className="text-xs text-gray-600">Número de Trámite</span>
+                                <input value={editState.tramiteCode}
+                                  onChange={(e) => setEditState({ ...editState, tramiteCode: e.target.value.replace(/\D/g, "").slice(0, 10) })}
+                                  inputMode="numeric"
+                                  className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm" />
+                              </label>
                               <label className="grid gap-1">
                                 <span className="text-xs text-gray-600">Nombre cliente</span>
                                 <input value={editState.clientName}
