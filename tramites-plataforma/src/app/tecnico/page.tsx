@@ -53,6 +53,7 @@ interface AgendaRowProps {
   entry: Entry;
   followUp?: FollowUp;
   onSaliALlamar: (id: string, followUpCreatedAt?: string) => void;
+  onEnRevision: (id: string, followUpCreatedAt?: string) => void;
   onAtendi: (id: string, followUpCreatedAt?: string) => void;
   onNoRespondio: (id: string, followUpCreatedAt?: string) => void;
   onRegreso: (id: string, followUpCreatedAt?: string) => void;
@@ -65,6 +66,7 @@ const AgendaRow = memo(function AgendaRow({
   entry,
   followUp: propsFollowUp,
   onSaliALlamar,
+  onEnRevision,
   onAtendi,
   onNoRespondio,
   onRegreso,
@@ -139,10 +141,16 @@ const AgendaRow = memo(function AgendaRow({
           )}
 
           {st === "esperando" && (
-            <button onClick={() => onSaliALlamar(entry.id, fu?.createdAt)}
-              className="px-3 py-2 bg-purple-600 text-white text-sm font-bold rounded-lg hover:bg-purple-700 cursor-pointer shadow">
-              🚶 Salgo a llamar
-            </button>
+            <div className="space-y-2">
+              <button onClick={() => onSaliALlamar(entry.id, fu?.createdAt)}
+                className="w-full px-3 py-2 bg-purple-600 text-white text-sm font-bold rounded-lg hover:bg-purple-700 cursor-pointer shadow">
+                🚶 Salgo a llamar
+              </button>
+              <button onClick={() => onEnRevision(entry.id, fu?.createdAt)}
+                className="w-full px-3 py-2 bg-blue-500 text-white text-sm font-bold rounded-lg hover:bg-blue-600 cursor-pointer shadow">
+                🔍 Revisando
+              </button>
+            </div>
           )}
 
           {st === "llamado" && (
@@ -155,6 +163,18 @@ const AgendaRow = memo(function AgendaRow({
               <button onClick={() => onNoRespondio(entry.id, fu?.createdAt)}
                 className="w-full px-3 py-2 bg-orange-500 text-white text-sm font-bold rounded-lg hover:bg-orange-600 cursor-pointer shadow">
                 ↩️ No respondió
+              </button>
+            </div>
+          )}
+
+          {st === "en-revision" && (
+            <div className="space-y-2">
+              <div className="rounded-lg bg-blue-50 border border-blue-200 p-2">
+                <p className="text-xs text-blue-800 font-semibold">🔍 En revisión</p>
+              </div>
+              <button onClick={() => onSaliALlamar(entry.id, fu?.createdAt)}
+                className="w-full px-3 py-2 bg-purple-600 text-white text-sm font-bold rounded-lg hover:bg-purple-700 cursor-pointer shadow">
+                🚶 Salgo a llamar
               </button>
             </div>
           )}
@@ -537,6 +557,17 @@ export default function AgendaTecnicoPage() {
     updateEntry(entryId, { ...entry, followUps: newFollowUps });
   }, [entries, updateEntry]);
 
+  const marcarEnRevision = useCallback((entryId: string, followUpCreatedAt?: string) => {
+    const entry = entries.find((e) => e.id === entryId);
+    if (!entry) return;
+    const fu = followUpCreatedAt
+      ? entry.followUps?.find(f => f.createdAt === followUpCreatedAt)
+      : entry.followUps?.[0];
+    if (!fu) return;
+    const newFollowUps = (entry.followUps ?? []).map(f => f === fu ? { ...f, followUpStatus: "en-revision" as const } : f);
+    updateEntry(entryId, { ...entry, followUps: newFollowUps });
+  }, [entries, updateEntry]);
+
   const marcarLeAtendi = useCallback(async (entryId: string, followUpCreatedAt?: string) => {
     const entry = entries.find((e) => e.id === entryId);
     if (!entry) return;
@@ -840,6 +871,7 @@ export default function AgendaTecnicoPage() {
                   entry={entry}
                   followUp={followUp}
                   onSaliALlamar={marcarSaliALlamar}
+                  onEnRevision={marcarEnRevision}
                   onAtendi={marcarLeAtendi}
                   onNoRespondio={marcarNoRespondio}
                   onRegreso={marcarRegreso}
