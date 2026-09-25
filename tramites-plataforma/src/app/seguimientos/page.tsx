@@ -1183,7 +1183,7 @@ export default function SeguimientosPage() {
                   Reasigna este trámite a otro técnico
                 </p>
                 <div className="mt-3 rounded-lg bg-amber-50 border border-amber-200 p-3">
-                  <p className="text-xs text-amber-800 font-semibold">✅ La derivación funciona. Nota: en la lista se ve uno solo, pero ambos técnicos reciben su ficha de atención.</p>
+                  <p className="text-xs text-amber-800 font-semibold">✅ La derivación funciona. Nota: en la lista se ve uno solo, pero ambos técnicos reciben su ficha de atención. Si prefieren, también pueden registrar el trámite desde Seguimientos eligiendo el nuevo técnico.</p>
                 </div>
               </div>
 
