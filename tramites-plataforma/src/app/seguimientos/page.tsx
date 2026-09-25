@@ -739,7 +739,7 @@ export default function SeguimientosPage() {
 
             {/* Nombre */}
             <label className="grid gap-2 md:col-span-2">
-              <span className="text-sm font-semibold text-gray-700">Contribuyente (opcional)</span>
+              <span className="text-sm font-semibold text-gray-700">Contribuyente <span className="text-xs text-gray-500 font-normal">(se auto-completa si existe)</span></span>
               <input type="text" value={clientName}
                 onChange={(e) => setClientName(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && (formMode === "tecnico" ? handleRegisterArrival() : handleRegisterGestionInterna())}
@@ -1182,8 +1182,8 @@ export default function SeguimientosPage() {
                 <p className="text-sm text-gray-500 mt-1">
                   Reasigna este trámite a otro técnico
                 </p>
-                <div className="mt-3 rounded-lg bg-blue-50 border border-blue-200 p-3">
-                  <p className="text-xs text-blue-700 font-semibold">💡 Consejo: Para registros de múltiples técnicos, es mejor ir a <span className="font-bold">Seguimientos</span> y registrar con el nuevo técnico. Así ambos reciben su ficha de atención.</p>
+                <div className="mt-3 rounded-lg bg-amber-50 border border-amber-200 p-3">
+                  <p className="text-xs text-amber-800 font-semibold">✅ La derivación funciona. Nota: en la lista se ve uno solo, pero ambos técnicos reciben su ficha de atención.</p>
                 </div>
               </div>
 
