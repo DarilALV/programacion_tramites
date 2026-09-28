@@ -376,6 +376,7 @@ followUps: (() => {
 
   // Migrar from followUps (plural, new)
   if (Array.isArray(rawEntry.followUps)) {
+    const fallbackCreatedAt = new Date(`${registrationDate}T08:00:00.000Z`).toISOString();
     followUps.push(...(rawEntry.followUps as any[]).map((fu) => ({
       type: typeof fu.type === "string" ? fu.type : "normal",
       juntaId: typeof fu.juntaId === "string" ? fu.juntaId : undefined,
@@ -390,7 +391,7 @@ followUps: (() => {
       actualTechnicianId: typeof fu.actualTechnicianId === "string" ? fu.actualTechnicianId : undefined,
       actualTechnicianName: typeof fu.actualTechnicianName === "string" ? fu.actualTechnicianName : undefined,
       observations: typeof fu.observations === "string" ? fu.observations : undefined,
-      createdAt: typeof fu.createdAt === "string" ? fu.createdAt : undefined,
+      createdAt: typeof fu.createdAt === "string" && fu.createdAt.trim().length > 0 ? fu.createdAt : fallbackCreatedAt,
       isUnscheduled: typeof fu.isUnscheduled === "boolean" ? fu.isUnscheduled : undefined,
     })));
   }
