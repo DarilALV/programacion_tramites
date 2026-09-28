@@ -759,24 +759,23 @@ export function useTramitesStore() {
       return [];
     }
   });
-  const [currentUserId, setCurrentUserId] = useState(() => {
-    if (typeof window === "undefined") return plannerUsers[0].id;
+  const [currentUserId, setCurrentUserId] = useState(plannerUsers[0].id);
+  const [currentTechnicianId, setCurrentTechnicianId] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
     try {
       const saved = localStorage.getItem(storageKey);
       if (saved) {
         const parsed = JSON.parse(saved) as PersistedState;
-        return parsed.currentUserId || plannerUsers[0].id;
+        setCurrentUserId(parsed.currentUserId || plannerUsers[0].id);
       }
-    } catch (e) {}
-    return plannerUsers[0].id;
-  });
-  const [currentTechnicianId, setCurrentTechnicianId] = useState<string | undefined>(() => {
-    if (typeof window === "undefined") return undefined;
-    try {
-      return localStorage.getItem('currentTechnicianId') || undefined;
-    } catch (e) {}
-    return undefined;
-  });
+      const techId = localStorage.getItem('currentTechnicianId');
+      if (techId) setCurrentTechnicianId(techId);
+    } catch (e) {
+      console.warn('Error cargando usuarios de localStorage:', e);
+    }
+  }, []);
 
 useEffect(() => {
   const savedUserId = localStorage.getItem('currentUserId');
