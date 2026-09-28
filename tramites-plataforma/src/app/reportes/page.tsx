@@ -9,7 +9,7 @@ export default function ReportesPage() {
   const { entries, groupEntriesByCreator, groupEntriesByTechnician, groupEntriesByDateAndCreator, groupEntriesByDateAndTechnician } =
     useTramitesStore();
 
-  const [reportTab, setReportTab] = useState<"programaciones" | "atenciones" | "verificacion">("programaciones");
+  const [reportTab, setReportTab] = useState<"programaciones" | "atenciones" | "verificacion" | "consolidado">("programaciones");
   const [filterFromDate, setFilterFromDate] = useState("");
   const [filterToDate, setFilterToDate] = useState("");
   const [selectedCreator, setSelectedCreator] = useState<string | null>(null);
@@ -211,6 +211,75 @@ export default function ReportesPage() {
     link.click();
   };
 
+  // Exportar reporte consolidado
+  const exportConsolidatedReport = () => {
+    try {
+      const { utils, write } = require('xlsx');
+      const wb = utils.book_new();
+
+      // Sheet 1: Resumen
+      const summaryData = [
+        ['Métrica', 'Valor'],
+        ['Total Programaciones', verificationMetrics.totalEntries],
+        ['Total Atenciones', verificationMetrics.totalFollowUps],
+        ['Total Juntas', verificationMetrics.totalJuntas],
+        ['Promedio Atenciones/Prog', verificationMetrics.promedioFollowUpsPerEntry],
+        ['Técnicos Activos', followUpsTechnicianSummary.filter(t => t.total > 0).length],
+        ['Registradoras Activas', followUpsCreatorSummary.length],
+      ];
+      utils.book_append_sheet(wb, utils.aoa_to_sheet(summaryData), 'Resumen');
+
+      // Sheet 2: Programaciones
+      const programsData = [
+        ['Código', 'Técnico', 'Registrador', 'Estado', 'Fecha Registro'],
+        ...filteredEntries.map(e => [e.tramiteCode, e.technicianName, e.createdByName, e.status, e.registrationDate]),
+      ];
+      utils.book_append_sheet(wb, utils.aoa_to_sheet(programsData), 'Programaciones');
+
+      // Sheet 3: Atenciones
+      const followUpsData = [
+        ['Fecha', 'Tipo', 'Técnico', 'Registrador', 'Cliente', 'Estado'],
+        ...filteredFollowUps.map(f => [
+          f.createdAtDate,
+          f.followUp.type || 'normal',
+          f.followUp.technicianName || f.entry.technicianName || '—',
+          f.entry.createdByName,
+          f.followUp.clientName || '—',
+          f.followUp.followUpStatus || '—',
+        ]),
+      ];
+      utils.book_append_sheet(wb, utils.aoa_to_sheet(followUpsData), 'Atenciones');
+
+      // Sheet 4: Productividad Técnicos
+      const techsData = [
+        ['Técnico', 'Área', 'Programaciones', 'Atenciones'],
+        ...technicians.map(t => {
+          const progCount = filteredEntries.filter(e => e.technicianId === t.id).length;
+          const followUpCount = filteredFollowUps.filter(f => f.followUp.technicianId === t.id).length;
+          return [t.name, t.areaLabel, progCount, followUpCount];
+        }),
+      ];
+      utils.book_append_sheet(wb, utils.aoa_to_sheet(techsData), 'Productividad Técnicos');
+
+      // Sheet 5: Productividad Registradoras
+      const creatorsData = [
+        ['Registradora', 'Programaciones', 'Atenciones Registradas'],
+        ...plannerUsers.map(u => {
+          const progCount = filteredEntries.filter(e => e.createdBy === u.id).length;
+          const followUpCount = filteredFollowUps.filter(f => f.entry.createdBy === u.id).length;
+          return [u.name, progCount, followUpCount];
+        }),
+      ];
+      utils.book_append_sheet(wb, utils.aoa_to_sheet(creatorsData), 'Productividad Registradoras');
+
+      // Descargar
+      write(wb, { bookType: 'xlsx', type: 'binary', filename: `reporte_consolidado_${new Date().toISOString().slice(0, 10)}.xlsx` });
+    } catch (error) {
+      console.error('Error generando reporte:', error);
+      alert('Error al generar el reporte');
+    }
+  };
+
   // Exportar atenciones a Excel
   const exportFollowUpsToExcel = () => {
     const data = filteredFollowUps.map((f) => ({
@@ -288,6 +357,16 @@ export default function ReportesPage() {
     >
       {/* TABS */}
       <div className="flex gap-3 mb-6 flex-wrap">
+        <button
+          onClick={() => setReportTab("consolidado")}
+          className={`px-6 py-3 rounded-full font-semibold transition ${
+            reportTab === "consolidado"
+              ? "bg-[#1a140d] text-white"
+              : "border border-black/10 bg-white text-[#1a140d] hover:border-black/20"
+          }`}
+        >
+          📊 Consolidado
+        </button>
         <button
           onClick={() => setReportTab("programaciones")}
           className={`px-6 py-3 rounded-full font-semibold transition ${
@@ -416,7 +495,26 @@ export default function ReportesPage() {
 
       {/* MÉTRICAS PRINCIPALES */}
       <section className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        {reportTab === "verificacion" ? (
+        {reportTab === "consolidado" ? (
+          <>
+            <article className="rounded-4xl border border-black/10 bg-[linear-gradient(135deg,rgba(255,255,255,0.92),rgba(244,233,211,0.96))] p-6 shadow-[0_16px_40px_rgba(26,21,12,0.08)]">
+              <div className="text-xs uppercase tracking-[0.24em] text-black/50">Total Programaciones</div>
+              <div className="mt-3 text-4xl font-bold text-[#1a140d]">{verificationMetrics.totalEntries}</div>
+            </article>
+            <article className="rounded-4xl border border-black/10 bg-[linear-gradient(135deg,rgba(255,255,255,0.92),rgba(244,233,211,0.96))] p-6 shadow-[0_16px_40px_rgba(26,21,12,0.08)]">
+              <div className="text-xs uppercase tracking-[0.24em] text-black/50">Total Atenciones</div>
+              <div className="mt-3 text-4xl font-bold text-[#1a140d]">{verificationMetrics.totalFollowUps}</div>
+            </article>
+            <article className="rounded-4xl border border-black/10 bg-[linear-gradient(135deg,rgba(255,255,255,0.92),rgba(244,233,211,0.96))] p-6 shadow-[0_16px_40px_rgba(26,21,12,0.08)]">
+              <div className="text-xs uppercase tracking-[0.24em] text-black/50">Total Juntas</div>
+              <div className="mt-3 text-4xl font-bold text-[#1a140d]">{verificationMetrics.totalJuntas}</div>
+            </article>
+            <article className="rounded-4xl border border-black/10 bg-[linear-gradient(135deg,rgba(255,255,255,0.92),rgba(244,233,211,0.96))] p-6 shadow-[0_16px_40px_rgba(26,21,12,0.08)]">
+              <div className="text-xs uppercase tracking-[0.24em] text-black/50">Promedio Atenciones</div>
+              <div className="mt-3 text-4xl font-bold text-[#1a140d]">{verificationMetrics.promedioFollowUpsPerEntry}</div>
+            </article>
+          </>
+        ) : reportTab === "verificacion" ? (
           <>
             <article className="rounded-4xl border border-black/10 bg-[linear-gradient(135deg,rgba(255,255,255,0.92),rgba(244,233,211,0.96))] p-6 shadow-[0_16px_40px_rgba(26,21,12,0.08)]">
               <div className="text-xs uppercase tracking-[0.24em] text-black/50">Total Programaciones</div>
@@ -479,7 +577,15 @@ export default function ReportesPage() {
       {/* BOTONES DE EXPORTACIÓN */}
       {reportTab !== "verificacion" && (
       <section className="flex flex-wrap gap-3">
-        {reportTab === "programaciones" ? (
+        {reportTab === "consolidado" ? (
+          <button
+            onClick={exportConsolidatedReport}
+            className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-6 py-3 text-sm font-semibold text-white hover:bg-blue-700 transition"
+          >
+            <Download size={18} />
+            Descargar Reporte Consolidado (Excel)
+          </button>
+        ) : reportTab === "programaciones" ? (
           <>
             <button
               onClick={exportToExcel}
@@ -509,7 +615,28 @@ export default function ReportesPage() {
       )}
 
       {/* REPORTES */}
-      {reportTab === "verificacion" ? (
+      {reportTab === "consolidado" ? (
+        <section className="rounded-4xl border border-black/10 bg-white p-6 shadow-[0_16px_40px_rgba(26,21,12,0.08)]">
+          <h2 className="font-serif text-3xl text-[#1a140d]">Reporte Consolidado</h2>
+          <div className="mt-6 space-y-4">
+            <p className="text-sm text-black/70">
+              El reporte consolidado incluye 5 sheets en Excel:
+            </p>
+            <ul className="space-y-2 text-sm text-black/70 ml-4">
+              <li><strong>Resumen:</strong> Métricas clave del período</li>
+              <li><strong>Programaciones:</strong> Listado completo de trámites</li>
+              <li><strong>Atenciones:</strong> Listado completo de seguimientos registrados</li>
+              <li><strong>Productividad Técnicos:</strong> Desempeño por técnico</li>
+              <li><strong>Productividad Registradoras:</strong> Desempeño por usuaria registradora</li>
+            </ul>
+            <div className="mt-6 p-4 rounded-3xl border border-green-200 bg-green-50">
+              <p className="text-sm text-green-800">
+                ✓ Haz clic en "Descargar Reporte Consolidado" para descargar el archivo Excel completo con todos los datos.
+              </p>
+            </div>
+          </div>
+        </section>
+      ) : reportTab === "verificacion" ? (
         <section className="grid gap-6 lg:grid-cols-2">
           {/* SEGUIMIENTOS POR TIPO */}
           <article className="rounded-4xl border border-black/10 bg-white p-6 shadow-[0_16px_40px_rgba(26,21,12,0.08)]">
