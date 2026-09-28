@@ -313,31 +313,23 @@ export default function ReportesPage() {
 
   // Métricas de verificación/auditoría
   const verificationMetrics = useMemo(() => {
-    const totalEntries = entries.filter(e => !e.deleted).length;
-    const totalFollowUps = entries
-      .filter(e => !e.deleted)
-      .reduce((sum, e) => sum + (e.followUps?.length ?? 0), 0);
-    const totalJuntas = entries
-      .filter(e => !e.deleted)
-      .reduce((sum, e) => sum + ((e.juntaId ? 1 : 0)), 0);
+    const totalEntries = filteredEntries.length;
+    const totalFollowUps = filteredFollowUps.length;
+    const totalJuntas = filteredEntries.filter(e => e.juntaId).length;
 
     // Desglose de followUps por tipo
     const followUpsByType = new Map<string, number>();
     const types: FollowUpType[] = ["normal", "junta_ingreso", "derivado", "legalización", "planimetrias", "consultas"];
     types.forEach(type => {
-      const count = entries
-        .filter(e => !e.deleted)
-        .reduce((sum, e) => sum + (e.followUps?.filter(f => f.type === type).length ?? 0), 0);
+      const count = filteredFollowUps.filter(f => f.followUp.type === type).length;
       if (count > 0) followUpsByType.set(type, count);
     });
 
     // Desglose de entries por estado
     const entriesByStatus = new Map<string, number>();
-    entries
-      .filter(e => !e.deleted)
-      .forEach(e => {
-        entriesByStatus.set(e.status, (entriesByStatus.get(e.status) ?? 0) + 1);
-      });
+    filteredEntries.forEach(e => {
+      entriesByStatus.set(e.status, (entriesByStatus.get(e.status) ?? 0) + 1);
+    });
 
     return {
       totalEntries,
@@ -347,7 +339,7 @@ export default function ReportesPage() {
       followUpsByType,
       entriesByStatus,
     };
-  }, [entries]);
+  }, [filteredEntries, filteredFollowUps]);
 
   // Función de auditoría
   const runAudit = async () => {
