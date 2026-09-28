@@ -1013,6 +1013,34 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
     setCurrentUserId(plannerUsers[0].id);
   }
 
+  async function restoreFromFirebase() {
+    try {
+      const { firestore } = await import('@/lib/firebase');
+      const { collection, getDocs } = await import('firebase/firestore');
+
+      const snapshot = await getDocs(collection(firestore, 'entries'));
+      if (!snapshot.empty) {
+        const firestoreEntries = snapshot.docs
+          .map((docSnap, i) =>
+            normalizeStoredEntry({ ...docSnap.data(), id: docSnap.id } as Record<string, unknown>, i)
+          );
+        setEntries(firestoreEntries);
+        // Guardar en localStorage para próximas cargas
+        window.localStorage.setItem(
+          storageKey,
+          JSON.stringify({ currentUserId, currentTechnicianId, entries: firestoreEntries } satisfies PersistedState),
+        );
+        devLog('✅ Datos restaurados desde Firebase:', `${firestoreEntries.length} registros`);
+        return true;
+      }
+      devLog('⚠️ No hay datos en Firebase para restaurar');
+      return false;
+    } catch (error) {
+      devWarn('Error restaurando desde Firebase:', error);
+      return false;
+    }
+  }
+
   function createJunta(technicianId: string, name: string, tramiteCount: number, observations?: string) {
     const junta: Junta = {
       id: `junta-${Date.now()}`,
@@ -1085,6 +1113,7 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
     updateEntry,
     removeEntry,
     resetDemo,
+    restoreFromFirebase,
     currentTechnicianId,
     loginTechnician: (technicianId: string) => {
       setCurrentTechnicianId(technicianId);
