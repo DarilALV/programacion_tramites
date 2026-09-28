@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { saveToIndexedDB, loadFromIndexedDB, clearIndexedDB } from "./indexeddb";
 
 const isDev = () => typeof window !== "undefined" && (new URL(window.location.href).searchParams.get("debug") === "1");
@@ -911,24 +911,33 @@ useEffect(() => {
   };
 }, []);
 
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (!hydrated || typeof window === "undefined") {
       return;
     }
 
-    // Guardar en IndexedDB (asincrónico, sin bloquear)
-    saveToIndexedDB(entries, juntas, currentUserId, currentTechnicianId).catch(error => {
-      console.error('Error guardando en IndexedDB:', error);
-      // Fallback a localStorage si IndexedDB falla
-      try {
-        window.localStorage.setItem(
-          storageKey,
-          JSON.stringify({ currentUserId, currentTechnicianId, entries } satisfies PersistedState),
-        );
-      } catch (e) {
-        console.error('Error guardando en localStorage:', e);
-      }
-    });
+    // Limpiar timeout anterior
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+
+    // Agendar guardado en 3 segundos (debounce)
+    saveTimeoutRef.current = setTimeout(() => {
+      saveToIndexedDB(entries, juntas, currentUserId, currentTechnicianId).catch(error => {
+        console.error('Error guardando en IndexedDB:', error);
+        try {
+          window.localStorage.setItem(
+            storageKey,
+            JSON.stringify({ currentUserId, currentTechnicianId, entries } satisfies PersistedState),
+          );
+        } catch (e) {
+          console.error('Error guardando en localStorage:', e);
+        }
+      });
+    }, 3000);
+
+    return () => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    };
   }, [currentUserId, currentTechnicianId, entries, hydrated, juntas]);
 
   const currentUser = useMemo(
