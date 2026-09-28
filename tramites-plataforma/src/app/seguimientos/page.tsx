@@ -709,32 +709,36 @@ export default function SeguimientosPage() {
 
     const { time: arrival, iso } = await getServerNow();
     const tech = technicians.find((t) => t.id === selectedCaducidadesTechnicianId);
+    const quantity = parseInt(caducidadesQuantity, 10);
 
-    const newEntry: Entry = {
-      id: `cad-${Date.now()}`,
-      createdBy: currentUser.id, createdByName: currentUser.name,
-      registrationNumber: getNextRegistrationNumber(),
-      tramiteCode: "",
-      technicianId: selectedCaducidadesTechnicianId,
-      technicianName: tech?.name ?? selectedCaducidadesTechnicianId,
-      technicianArea: tech?.areaLabel ?? "",
-      scheduleDate: today, registrationDate: today,
-      observations: observations.trim() || "", status: "Registrado", createdAt: iso,
-      followUps: [{
-        type: "caducidades",
-        clientName: `${caducidadesQuantity} trámites a revisar`,
-        arrivalTime: arrival,
-        followUpStatus: "completado",
+    // Crear una Entry por cada trámite (para que cada uno cuente como 1 atención)
+    for (let i = 0; i < quantity; i++) {
+      const newEntry: Entry = {
+        id: `cad-${Date.now()}-${i}`,
+        createdBy: currentUser.id, createdByName: currentUser.name,
+        registrationNumber: getNextRegistrationNumber(),
+        tramiteCode: "",
         technicianId: selectedCaducidadesTechnicianId,
         technicianName: tech?.name ?? selectedCaducidadesTechnicianId,
-        attendedTime: arrival,
-        observations: observations.trim() || undefined,
-        createdAt: iso,
-        isUnscheduled: true,
-      }],
-    };
-    createEntry(newEntry);
-    showMsg(`✅ Caducidades registradas (${caducidadesQuantity} trámites) — ${tech?.name} — ${arrival}`, "success");
+        technicianArea: tech?.areaLabel ?? "",
+        scheduleDate: today, registrationDate: today,
+        observations: observations.trim() || "", status: "Registrado", createdAt: iso,
+        followUps: [{
+          type: "caducidades",
+          clientName: "Trámite caducado — revisión",
+          arrivalTime: arrival,
+          followUpStatus: "completado",
+          technicianId: selectedCaducidadesTechnicianId,
+          technicianName: tech?.name ?? selectedCaducidadesTechnicianId,
+          attendedTime: arrival,
+          observations: observations.trim() || undefined,
+          createdAt: iso,
+          isUnscheduled: true,
+        }],
+      };
+      createEntry(newEntry);
+    }
+    showMsg(`✅ ${quantity} caducidades registradas — ${tech?.name} — ${arrival}`, "success");
     setCaducidadesQuantity(""); setSelectedCaducidadesTechnicianId(""); setObservations("");
   }
 
