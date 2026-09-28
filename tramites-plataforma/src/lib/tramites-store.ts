@@ -745,7 +745,6 @@ export function useTramitesStore() {
 
     (async () => {
       try {
-        // Intentar cargar desde IndexedDB primero
         const idbData = await loadFromIndexedDB();
         if (idbData?.entries && idbData.entries.length > 0) {
           console.log('📂 Cargadas desde IndexedDB:', idbData.entries.length, 'registros');
@@ -756,8 +755,31 @@ export function useTramitesStore() {
           if (idbData.metadata?.currentTechnicianId) {
             setCurrentTechnicianId(idbData.metadata.currentTechnicianId);
           }
+
+          // Si IndexedDB tiene pocos datos (< 1500), cargar todo desde Firebase en background
+          if (idbData.entries.length < 1500) {
+            console.log('⏳ IndexedDB incompleto, sincronizando desde Firebase...');
+            setTimeout(async () => {
+              try {
+                const { firestore } = await import('@/lib/firebase');
+                const { collection, getDocs } = await import('firebase/firestore');
+                const snapshot = await getDocs(collection(firestore, 'entries'));
+                if (!snapshot.empty) {
+                  const firestoreEntries = snapshot.docs.map((docSnap, i) =>
+                    normalizeStoredEntry({ ...docSnap.data(), id: docSnap.id } as Record<string, unknown>, i)
+                  );
+                  if (firestoreEntries.length > idbData.entries.length) {
+                    console.log('✅ Actualizando IndexedDB con', firestoreEntries.length, 'registros');
+                    setEntries(firestoreEntries);
+                    await saveToIndexedDB(firestoreEntries, [], idbData.metadata?.currentUserId || plannerUsers[0].id, idbData.metadata?.currentTechnicianId);
+                  }
+                }
+              } catch (error) {
+                console.warn('Error sincronizando Firebase:', error);
+              }
+            }, 1000);
+          }
         } else {
-          // Si IndexedDB está vacío, intentar cargar desde localStorage (fallback)
           const saved = localStorage.getItem(storageKey);
           if (saved) {
             const parsed = JSON.parse(saved) as PersistedState;
