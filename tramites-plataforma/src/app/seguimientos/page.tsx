@@ -261,8 +261,8 @@ export default function SeguimientosPage() {
   }, [expandedFollowUps, debouncedSearch]);
 
   const { techCountToday, programadosHoy, technicianLoad, techCountByType } = useMemo(() => {
-    const countToday: Record<string, number> = {};
-    const countByType: Record<string, { normal: number; planimetrias: number; consultas: number; legalizaciones: number }> = {};
+    const countToday: Record<string, { normal: number; caducidades: number; planimetrias: number; consultas: number; legalizaciones: number; junta_ingreso: number; total: number }> = {};
+    const countByType: Record<string, { normal: number; planimetrias: number; consultas: number; legalizaciones: number; caducidades: number }> = {};
     const programados: Record<string, { name: string; area: string; entries: Entry[] }> = {};
     const load: Record<string, { name: string; programados: number; llegadas: number; atendidos: number; completados: number }> = {};
 
@@ -273,7 +273,8 @@ export default function SeguimientosPage() {
 
     relevantTechs.forEach((tech) => {
       load[tech.id] = { name: tech.name, programados: 0, llegadas: 0, atendidos: 0, completados: 0 };
-      countByType[tech.id] = { normal: 0, planimetrias: 0, consultas: 0, legalizaciones: 0 };
+      countToday[tech.id] = { normal: 0, caducidades: 0, planimetrias: 0, consultas: 0, legalizaciones: 0, junta_ingreso: 0, total: 0 };
+      countByType[tech.id] = { normal: 0, planimetrias: 0, consultas: 0, legalizaciones: 0, caducidades: 0 };
     });
 
     entries.filter((e) => !e.deleted).forEach((e) => {
@@ -290,13 +291,15 @@ export default function SeguimientosPage() {
 
     todayFollowUps.forEach((e) => {
       (e.followUps ?? [])
-        .filter((fu) => fu.createdAt?.startsWith(today))
+        .filter((fu) => fu.createdAt?.startsWith(today) && fu.type !== 'caducidades')
         .forEach((fu) => {
           const tid = fu.actualTechnicianId ?? e.technicianId;
           const tn = fu.actualTechnicianName ?? e.technicianName;
-          countToday[tid] = (countToday[tid] ?? 0) + 1;
           if (!load[tid]) load[tid] = { name: tn, programados: 0, llegadas: 0, atendidos: 0, completados: 0 };
-          if (!countByType[tid]) countByType[tid] = { normal: 0, planimetrias: 0, consultas: 0, legalizaciones: 0 };
+          if (!countToday[tid]) countToday[tid] = { normal: 0, caducidades: 0, planimetrias: 0, consultas: 0, legalizaciones: 0, junta_ingreso: 0, total: 0 };
+          if (!countByType[tid]) countByType[tid] = { normal: 0, planimetrias: 0, consultas: 0, legalizaciones: 0, caducidades: 0 };
+          countToday[tid].normal++;
+          countToday[tid].total++;
           countByType[tid].normal++;
           load[tid].llegadas++;
           if (fu.attendedTime || fu.returnedTime || fu.calledTime) load[tid].atendidos++;
@@ -315,7 +318,10 @@ export default function SeguimientosPage() {
           const tid = e.technicianId;
           const tn = e.technicianName;
           if (!load[tid]) load[tid] = { name: tn, programados: 0, llegadas: 0, atendidos: 0, completados: 0 };
-          if (!countByType[tid]) countByType[tid] = { normal: 0, planimetrias: 0, consultas: 0, legalizaciones: 0 };
+          if (!countToday[tid]) countToday[tid] = { normal: 0, caducidades: 0, planimetrias: 0, consultas: 0, legalizaciones: 0, junta_ingreso: 0, total: 0 };
+          if (!countByType[tid]) countByType[tid] = { normal: 0, planimetrias: 0, consultas: 0, legalizaciones: 0, caducidades: 0 };
+          countToday[tid].junta_ingreso++;
+          countToday[tid].total++;
           countByType[tid].normal++;
           load[tid].llegadas++;
           if (fu.attendedTime || fu.returnedTime || fu.calledTime) load[tid].atendidos++;
@@ -323,23 +329,32 @@ export default function SeguimientosPage() {
         });
     });
 
-    // Contar también registros nuevos: planimetrías, consultas, legalizaciones
+    // Contar también registros nuevos: planimetrías, consultas, legalizaciones, caducidades
     entries.filter((e) => !e.deleted).forEach((e) => {
       const inArea = !currentUser.areaId || areas.some((a) => a.id === currentUser.areaId && a.label === e.technicianArea);
       if (!inArea) return;
 
       (e.followUps ?? [])
-        .filter((fu) => (fu.type === "planimetrias" || fu.type === "consultas" || fu.type === "legalización") && fu.createdAt?.startsWith(today))
+        .filter((fu) => (fu.type === "planimetrias" || fu.type === "consultas" || fu.type === "legalización" || fu.type === "caducidades") && fu.createdAt?.startsWith(today))
         .forEach((fu) => {
           const tid = e.technicianId;
           const tn = e.technicianName;
-          countToday[tid] = (countToday[tid] ?? 0) + 1;
           if (!load[tid]) load[tid] = { name: tn, programados: 0, llegadas: 0, atendidos: 0, completados: 0 };
-          if (!countByType[tid]) countByType[tid] = { normal: 0, planimetrias: 0, consultas: 0, legalizaciones: 0 };
-          if (fu.type === "planimetrias") countByType[tid].planimetrias++;
-          else if (fu.type === "consultas") countByType[tid].consultas++;
-          else if (fu.type === "legalización") countByType[tid].legalizaciones++;
-          load[tid].llegadas++;
+          if (!countToday[tid]) countToday[tid] = { normal: 0, caducidades: 0, planimetrias: 0, consultas: 0, legalizaciones: 0, junta_ingreso: 0, total: 0 };
+          if (!countByType[tid]) countByType[tid] = { normal: 0, planimetrias: 0, consultas: 0, legalizaciones: 0, caducidades: 0 };
+
+          if (fu.type === "planimetrias") { countToday[tid].planimetrias++; countByType[tid].planimetrias++; }
+          else if (fu.type === "consultas") { countToday[tid].consultas++; countByType[tid].consultas++; }
+          else if (fu.type === "legalización") { countToday[tid].legalizaciones++; countByType[tid].legalizaciones++; }
+          else if (fu.type === "caducidades") { countToday[tid].caducidades++; countByType[tid].caducidades++; }
+
+          countToday[tid].total++;
+
+          // Solo contar como "llegadas" si no es caducidad
+          if (fu.type !== "caducidades") {
+            load[tid].llegadas++;
+          }
+
           if (fu.attendedTime || fu.returnedTime || fu.calledTime) load[tid].atendidos++;
           if (fu.completedTime) load[tid].completados++;
         });
@@ -482,7 +497,8 @@ export default function SeguimientosPage() {
     if (!selectedTechnicianId) return showMsg("⚠️ Selecciona el técnico", "error");
 
     console.log("handleRegisterArrival - selectedTechnicianId:", selectedTechnicianId, "effectiveTechnician:", effectiveTechnician);
-    const count = techCountToday[selectedTechnicianId] ?? 0;
+    const countObj = techCountToday[selectedTechnicianId] ?? { normal: 0, caducidades: 0, planimetrias: 0, consultas: 0, legalizaciones: 0, junta_ingreso: 0, total: 0 };
+    const count = countObj.total;
     if (count >= LIMITE) {
       showMsg(`⚠️ ${effectiveTechnician?.name} ya atendió ${count} (límite: ${LIMITE}). Continuará registrando.`, "success");
     }
@@ -940,7 +956,8 @@ export default function SeguimientosPage() {
 
   const canSubmitTecnico = tramiteCode.trim() && clientName.trim() && selectedTechnicianId;
   const canSubmitInterna = tramiteCode.trim() && clientName.trim() && selectedGestion;
-  const selCount = techCountToday[selectedTechnicianId] ?? 0;
+  const selCountObj = techCountToday[selectedTechnicianId] ?? { normal: 0, caducidades: 0, planimetrias: 0, consultas: 0, legalizaciones: 0, junta_ingreso: 0, total: 0 };
+  const selCount = selCountObj.total;
   const selOverLimit = selectedTechnicianId !== "archivos" && selCount >= LIMITE;
   const selColors = selectedTechnicianId ? techColor(selCount, selectedTechnicianId === "archivos") : null;
   const codeValidationError = tramiteCode.trim() ? validateCode(tramiteCode) : null;
@@ -1063,16 +1080,13 @@ export default function SeguimientosPage() {
                     return (
                       <optgroup key={area.id} label={`── ${area.label.toUpperCase()} ──`}>
                         {techsInArea.map((t) => {
-                          const cnt = techCountToday[t.id] ?? 0;
+                          const countObj = techCountToday[t.id] ?? { normal: 0, caducidades: 0, planimetrias: 0, consultas: 0, legalizaciones: 0, junta_ingreso: 0, total: 0 };
+                          const cnt = countObj.total;
                           const isArchivos = t.id === "archivos";
                           const { dot, label } = techColor(cnt, isArchivos);
-                          const breakdown = techCountByType[t.id];
-                          const breakdownStr = breakdown
-                            ? `${breakdown.normal > 0 ? breakdown.normal : "0"}${breakdown.planimetrias > 0 || breakdown.consultas > 0 || breakdown.legalizaciones > 0 ? "+" : ""}`
-                            : "";
                           return (
                             <option key={t.id} value={t.id}>
-                              {dot} {t.name} ({label}) {breakdownStr && `[${breakdownStr}]`}
+                              {dot} {t.name} ({label})
                             </option>
                           );
                         })}
@@ -1093,12 +1107,14 @@ export default function SeguimientosPage() {
                       <div className={`h-3 rounded-full transition-all ${selColors.bar}`}
                         style={{ width: `${Math.min((selCount / LIMITE) * 100, 100)}%` }} />
                     </div>
-                    {techCountByType[selectedTechnicianId] && (
+                    {(techCountToday[selectedTechnicianId]?.total ?? 0) > 0 && (
                       <p className="text-xs text-gray-600 mt-1">
-                        Desglose: {techCountByType[selectedTechnicianId].normal > 0 && `${techCountByType[selectedTechnicianId].normal} llamadas`}
-                        {techCountByType[selectedTechnicianId].planimetrias > 0 && ` • 📐 ${techCountByType[selectedTechnicianId].planimetrias}`}
-                        {techCountByType[selectedTechnicianId].consultas > 0 && ` • ❓ ${techCountByType[selectedTechnicianId].consultas}`}
-                        {techCountByType[selectedTechnicianId].legalizaciones > 0 && ` • ✍️ ${techCountByType[selectedTechnicianId].legalizaciones}`}
+                        Desglose:
+                        {selCountObj.normal > 0 && ` ${selCountObj.normal} llamadas`}
+                        {selCountObj.caducidades > 0 && ` • 📋 ${selCountObj.caducidades} caducidades`}
+                        {selCountObj.planimetrias > 0 && ` • 📐 ${selCountObj.planimetrias}`}
+                        {selCountObj.consultas > 0 && ` • ❓ ${selCountObj.consultas}`}
+                        {selCountObj.legalizaciones > 0 && ` • ✍️ ${selCountObj.legalizaciones}`}
                       </p>
                     )}
                     {selOverLimit && selectedTechnicianId !== "archivos" && <p className="text-xs text-orange-600 font-semibold">⚠️ Este técnico está sobre el límite de {LIMITE} pero puede continuar atendiendo</p>}
@@ -1643,7 +1659,8 @@ export default function SeguimientosPage() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {Object.entries(technicianLoad).map(([tid, data]) => {
-                const cnt = techCountToday[tid] ?? 0;
+                const countObj = techCountToday[tid] ?? { normal: 0, caducidades: 0, planimetrias: 0, consultas: 0, legalizaciones: 0, junta_ingreso: 0, total: 0 };
+                const cnt = countObj.total;
                 const { dot, bar } = techColor(cnt, tid === "archivos");
                 return (
                   <div key={tid} className="rounded-xl border-2 border-pink-200 bg-white p-4 space-y-3">
@@ -1659,17 +1676,18 @@ export default function SeguimientosPage() {
                     </div>
                     <div>
                       <div className="flex justify-between text-xs mb-1">
-                        <span className="text-gray-500">Seguimientos: {tid === "archivos" ? `${cnt} (ilimitado)` : `${cnt}/${LIMITE}`}</span>
+                        <span className="text-gray-500">Total: {tid === "archivos" ? `${cnt} (ilimitado)` : `${cnt}/${LIMITE}`}</span>
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-2">
                         <div className={`h-2 rounded-full ${bar}`} style={{ width: `${Math.min((cnt / LIMITE) * 100, 100)}%` }} />
                       </div>
-                      {techCountByType[tid] && (
+                      {cnt > 0 && (
                         <p className="text-xs text-gray-600 mt-2">
-                          {techCountByType[tid].normal > 0 && `${techCountByType[tid].normal} llamadas`}
-                          {techCountByType[tid].planimetrias > 0 && ` • 📐 ${techCountByType[tid].planimetrias}`}
-                          {techCountByType[tid].consultas > 0 && ` • ❓ ${techCountByType[tid].consultas}`}
-                          {techCountByType[tid].legalizaciones > 0 && ` • ✍️ ${techCountByType[tid].legalizaciones}`}
+                          {countObj.normal > 0 && `${countObj.normal} llamadas`}
+                          {countObj.caducidades > 0 && ` • 📋 ${countObj.caducidades} caducidades`}
+                          {countObj.planimetrias > 0 && ` • 📐 ${countObj.planimetrias}`}
+                          {countObj.consultas > 0 && ` • ❓ ${countObj.consultas}`}
+                          {countObj.legalizaciones > 0 && ` • ✍️ ${countObj.legalizaciones}`}
                         </p>
                       )}
                     </div>
