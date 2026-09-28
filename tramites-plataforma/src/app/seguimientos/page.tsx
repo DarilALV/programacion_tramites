@@ -817,22 +817,66 @@ export default function SeguimientosPage() {
         const tech = fu.actualTechnicianName ?? e.technicianName;
         const wait = fu.arrivalTime && fu.attendedTime ? minutesDiff(fu.arrivalTime, fu.attendedTime) : "";
         const attn = fu.attendedTime && fu.completedTime ? minutesDiff(fu.attendedTime, fu.completedTime) : "";
+
+        // Determinar tipo de registro
+        let tipo = "Llegada";
+        if (fu.type === "planimetrias") tipo = "Planimetría";
+        else if (fu.type === "consultas") tipo = "Consulta";
+        else if (fu.type === "legalización") tipo = "Legalización";
+        else if (fu.type === "junta_ingreso") tipo = "Junta";
+
         return {
-          Fecha: today, "Trámite": e.tramiteCode, "Registro": e.registrationNumber,
-          "Cliente": fu.clientName ?? "", "Técnico": tech, "Área": e.technicianArea,
+          "Fecha": today,
+          "Tipo": tipo,
+          "Trámite": e.tramiteCode || "(sin código)",
+          "Registro": e.registrationNumber,
+          "Cliente": fu.clientName ?? "",
+          "Técnico": tech,
+          "Área": e.technicianArea,
           "Sin programación": fu.isUnscheduled ? "Sí" : "No",
-          "Llegada": fu.arrivalTime ?? "", "Estado": fu.followUpStatus ?? "",
-          "Hora llamado": fu.calledTime ?? "", "Regresó": fu.returnedTime ?? "",
-          "Atendido": fu.attendedTime ?? "", "Completado": fu.completedTime ?? "",
-          "Espera (min)": wait, "Atención (min)": attn,
-          "Obs.": fu.observations ?? "", "Por": e.createdByName,
+          "Llegada": fu.arrivalTime ?? "",
+          "Estado": fu.followUpStatus ?? "",
+          "Hora llamado": fu.calledTime ?? "",
+          "Regresó": fu.returnedTime ?? "",
+          "Atendido": fu.attendedTime ?? "",
+          "Completado": fu.completedTime ?? "",
+          "Espera (min)": wait,
+          "Atención (min)": attn,
+          "Observaciones": fu.observations ?? "",
+          "Registrado por": e.createdByName,
         };
       })
     );
+
     const ws = XLSX.utils.json_to_sheet(rows);
+
+    // Ajustar ancho de columnas
+    const columnWidths = [
+      { wch: 12 }, // Fecha
+      { wch: 14 }, // Tipo
+      { wch: 12 }, // Trámite
+      { wch: 14 }, // Registro
+      { wch: 20 }, // Cliente
+      { wch: 15 }, // Técnico
+      { wch: 14 }, // Área
+      { wch: 12 }, // Sin programación
+      { wch: 10 }, // Llegada
+      { wch: 14 }, // Estado
+      { wch: 12 }, // Hora llamado
+      { wch: 12 }, // Regresó
+      { wch: 12 }, // Atendido
+      { wch: 12 }, // Completado
+      { wch: 12 }, // Espera
+      { wch: 12 }, // Atención
+      { wch: 25 }, // Observaciones
+      { wch: 16 }, // Registrado por
+    ];
+    ws["!cols"] = columnWidths;
+
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Seguimientos");
     XLSX.writeFile(wb, `seguimientos-${today}.xlsx`);
+    showMsg("✓ Reporte exportado a Excel");
   }
 
   const canSubmitTecnico = tramiteCode.trim() && clientName.trim() && selectedTechnicianId;
