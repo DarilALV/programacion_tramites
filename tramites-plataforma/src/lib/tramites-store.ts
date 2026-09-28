@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { saveToIndexedDB, loadFromIndexedDB, clearIndexedDB } from "./indexeddb";
 
 const isDev = () => typeof window !== "undefined" && (new URL(window.location.href).searchParams.get("debug") === "1");
 const devLog = (msg: string, err?: any) => { if (isDev()) console.error(msg, err); };
@@ -735,20 +736,41 @@ export function groupEntriesByDateAndTechnician(entries: Entry[]) {
 
 export function useTramitesStore() {
   const [hydrated, setHydrated] = useState(false);
-  const [entries, setEntries] = useState<Entry[]>(() => {
-    if (typeof window === "undefined") return seedEntries;
-    try {
-      const saved = localStorage.getItem(storageKey);
-      if (saved) {
-        const parsed = JSON.parse(saved) as PersistedState;
-        console.log('📂 Cargadas desde localStorage:', parsed.entries.length, 'registros');
-        return parsed.entries;
+  const [entries, setEntries] = useState<Entry[]>(seedEntries);
+  const [indexedDBReady, setIndexedDBReady] = useState(false);
+
+  // Cargar desde IndexedDB al inicializar
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    (async () => {
+      try {
+        // Intentar cargar desde IndexedDB primero
+        const idbData = await loadFromIndexedDB();
+        if (idbData?.entries && idbData.entries.length > 0) {
+          console.log('📂 Cargadas desde IndexedDB:', idbData.entries.length, 'registros');
+          setEntries(idbData.entries);
+          if (idbData.metadata?.currentUserId) {
+            setCurrentUserId(idbData.metadata.currentUserId);
+          }
+          if (idbData.metadata?.currentTechnicianId) {
+            setCurrentTechnicianId(idbData.metadata.currentTechnicianId);
+          }
+        } else {
+          // Si IndexedDB está vacío, intentar cargar desde localStorage (fallback)
+          const saved = localStorage.getItem(storageKey);
+          if (saved) {
+            const parsed = JSON.parse(saved) as PersistedState;
+            console.log('📂 Cargadas desde localStorage (fallback):', parsed.entries.length, 'registros');
+            setEntries(parsed.entries);
+          }
+        }
+      } catch (error) {
+        console.error('Error cargando datos:', error);
       }
-    } catch (e) {
-      console.warn('Error cargando desde localStorage:', e);
-    }
-    return seedEntries;
-  });
+      setIndexedDBReady(true);
+    })();
+  }, []);
   const [juntas, setJuntas] = useState<Junta[]>(() => {
     if (typeof window === "undefined") return [];
     try {
@@ -868,15 +890,24 @@ useEffect(() => {
 }, []);
 
   useEffect(() => {
-    if (!hydrated) {
+    if (!hydrated || typeof window === "undefined") {
       return;
     }
 
-    window.localStorage.setItem(
-      storageKey,
-      JSON.stringify({ currentUserId, currentTechnicianId, entries } satisfies PersistedState),
-    );
-  }, [currentUserId, currentTechnicianId, entries, hydrated]);
+    // Guardar en IndexedDB (asincrónico, sin bloquear)
+    saveToIndexedDB(entries, juntas, currentUserId, currentTechnicianId).catch(error => {
+      console.error('Error guardando en IndexedDB:', error);
+      // Fallback a localStorage si IndexedDB falla
+      try {
+        window.localStorage.setItem(
+          storageKey,
+          JSON.stringify({ currentUserId, currentTechnicianId, entries } satisfies PersistedState),
+        );
+      } catch (e) {
+        console.error('Error guardando en localStorage:', e);
+      }
+    });
+  }, [currentUserId, currentTechnicianId, entries, hydrated, juntas]);
 
   const currentUser = useMemo(
     () => plannerUsers.find((user) => user.id === currentUserId) ?? plannerUsers[0],
@@ -1084,11 +1115,17 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
         }
 
         setEntries(firestoreEntries);
-        // Guardar en localStorage para próximas cargas
-        window.localStorage.setItem(
-          storageKey,
-          JSON.stringify({ currentUserId, currentTechnicianId, entries: firestoreEntries } satisfies PersistedState),
-        );
+        // Guardar en IndexedDB para próximas cargas
+        await saveToIndexedDB(firestoreEntries, juntas, currentUserId, currentTechnicianId);
+        // También guardar en localStorage como fallback
+        try {
+          window.localStorage.setItem(
+            storageKey,
+            JSON.stringify({ currentUserId, currentTechnicianId, entries: firestoreEntries } satisfies PersistedState),
+          );
+        } catch (e) {
+          console.warn('localStorage lleno, usando solo IndexedDB:', e);
+        }
         return true;
       }
       console.warn('⚠️ No hay datos en Firebase para restaurar (snapshot vacío)');
