@@ -62,12 +62,19 @@ export default function IngresoPage() {
 
   async function handleRestore() {
     setRestoring(true);
-    const success = await restoreFromFirebase();
-    if (success) {
-      setStatusMsg("✅ Datos restaurados desde Firebase. Recargando...");
-      setTimeout(() => window.location.reload(), 1500);
-    } else {
-      setStatusMsg("❌ No se encontraron datos para restaurar en Firebase.");
+    setStatusMsg("⏳ Buscando datos en Firebase...");
+    try {
+      const success = await restoreFromFirebase();
+      if (success) {
+        setStatusMsg("✅ Datos restaurados desde Firebase. Recargando...");
+        setTimeout(() => window.location.reload(), 1500);
+      } else {
+        setStatusMsg("⚠️ No hay datos en Firebase o no se pudieron cargar. Verifica que Firebase esté conectado.");
+        setRestoring(false);
+      }
+    } catch (error) {
+      console.error("Error restaurando:", error);
+      setStatusMsg("❌ Error al restaurar: " + (error instanceof Error ? error.message : "error desconocido"));
       setRestoring(false);
     }
   }
