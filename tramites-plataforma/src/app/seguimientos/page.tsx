@@ -111,6 +111,21 @@ export default function SeguimientosPage() {
     [juntas, today],
   );
 
+  const caducidadesHoy = useMemo(
+    () => entries.filter(e => !e.deleted && e.registrationDate === today && e.followUps?.[0]?.type === 'caducidades'),
+    [entries, today],
+  );
+
+  const caducidadesByTech = useMemo(() => {
+    const map = new Map<string, Entry[]>();
+    caducidadesHoy.forEach((e) => {
+      const techId = e.technicianId;
+      if (!map.has(techId)) map.set(techId, []);
+      map.get(techId)!.push(e);
+    });
+    return map;
+  }, [caducidadesHoy]);
+
   const entriesByJunta = useMemo(() => {
     const map = new Map<string, Entry[]>();
     entries.forEach((e) => {
@@ -223,7 +238,7 @@ export default function SeguimientosPage() {
 
   const expandedFollowUps = useMemo(() => {
     const expanded = todayFollowUps.map((entry) => {
-      const todayFollowUps = (entry.followUps ?? []).filter((fu) => fu.createdAt?.startsWith(today));
+      const todayFollowUps = (entry.followUps ?? []).filter((fu) => fu.createdAt?.startsWith(today) && fu.type !== 'caducidades');
       const latestFollowUp = todayFollowUps[todayFollowUps.length - 1];
       return latestFollowUp ? { entry, followUp: latestFollowUp } : null;
     }).filter((x) => x !== null);
@@ -1416,6 +1431,36 @@ export default function SeguimientosPage() {
               )}
             </div>
           </div>
+
+        {/* ── CADUCIDADES DEL DÍA ── */}
+        {caducidadesHoy.length > 0 && (
+          <section className="rounded-4xl border-2 border-red-200 overflow-hidden">
+            <div className="bg-gradient-to-r from-red-600 to-orange-600 text-white px-6 py-4">
+              <h2 className="text-2xl font-bold">
+                📋 Caducidades Asignadas Hoy
+                <span className="text-sm font-normal ml-2">({caducidadesHoy.length})</span>
+              </h2>
+            </div>
+            <div className="divide-y-2 divide-red-100">
+              {Array.from(caducidadesByTech.entries()).map(([techId, entries]) => {
+                const tech = technicians.find(t => t.id === techId);
+                return (
+                  <div key={techId} className="bg-red-50 border-b border-red-200">
+                    <div className="w-full text-left px-6 py-4 bg-red-50 flex items-center justify-between">
+                      <div className="flex-1">
+                        <p className="font-bold text-red-900">
+                          👤 {tech?.name ?? techId}
+                        </p>
+                        <p className="text-sm text-red-700 mt-1">📋 {entries.length} trámite{entries.length !== 1 ? 's' : ''} a revisar</p>
+                      </div>
+                      <span className="text-2xl ml-2">🔍</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
 
           {/* Buscador en la lista */}
           <div className="px-6 py-3 border-b border-pink-100 bg-pink-50">
