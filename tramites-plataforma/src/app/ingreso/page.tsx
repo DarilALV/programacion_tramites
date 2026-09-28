@@ -6,7 +6,7 @@ import { AppShell } from "@/components/app-shell";
 import { plannerUsers, useTramitesStore, type PlannerUser } from "@/lib/tramites-store";
 
 export default function IngresoPage() {
-  const { currentUserId, setCurrentUserId, currentUser, resetDemo } = useTramitesStore();
+  const { currentUserId, setCurrentUserId, currentUser, resetDemo, restoreFromFirebase } = useTramitesStore();
 
   // PIN modal
   const [pinTarget, setPinTarget] = useState<PlannerUser | null>(null);
@@ -17,6 +17,8 @@ export default function IngresoPage() {
   const [resetPhase, setResetPhase] = useState<"idle" | "confirm">("idle");
   const [resetInput, setResetInput] = useState("");
 
+  // Restaurar datos
+  const [restoring, setRestoring] = useState(false);
   const [statusMsg, setStatusMsg] = useState("");
 
   function handleUserClick(user: PlannerUser) {
@@ -56,6 +58,18 @@ export default function IngresoPage() {
     setResetPhase("idle");
     setResetInput("");
     setStatusMsg("La demo fue reiniciada.");
+  }
+
+  async function handleRestore() {
+    setRestoring(true);
+    const success = await restoreFromFirebase();
+    if (success) {
+      setStatusMsg("✅ Datos restaurados desde Firebase. Recargando...");
+      setTimeout(() => window.location.reload(), 1500);
+    } else {
+      setStatusMsg("❌ No se encontraron datos para restaurar en Firebase.");
+      setRestoring(false);
+    }
   }
 
   return (
@@ -173,6 +187,13 @@ export default function IngresoPage() {
             <Link href="/supervision" className="rounded-full border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-white hover:bg-white/10 transition">
               Ir a supervisión
             </Link>
+            <button
+              onClick={handleRestore}
+              disabled={restoring}
+              className="rounded-full border border-amber-400/50 bg-amber-500/20 px-5 py-3 text-sm font-semibold text-amber-200 hover:bg-amber-500/30 transition disabled:opacity-50 cursor-pointer"
+            >
+              {restoring ? "Restaurando..." : "🔄 Restaurar datos"}
+            </button>
           </div>
         </article>
       </section>
