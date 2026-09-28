@@ -28,7 +28,7 @@ function techColor(count: number, isArchivos: boolean = false): { dot: string; b
 }
 
 type EditState = { clientName: string; technicianId: string; observations: string; tramiteCode: string };
-type FormMode = "tecnico" | "interna" | "planimetrias" | "consultas" | "legalizaciones";
+type FormMode = "tecnico" | "interna" | "planimetrias" | "consultas" | "legalizaciones" | "caducidades";
 type GestionInterna = "RAM" | "Firma de Jefatura" | "Firma Secretaria";
 
 const GESTIONES_INTERNAS: GestionInterna[] = ["RAM", "Firma de Jefatura", "Firma Secretaria"];
@@ -43,6 +43,7 @@ const REGISTRO_COLORS: Record<string, { bg: string; badge: string; dot: string }
   "planimetrias":    { bg: "bg-orange-50 border-orange-300",  badge: "bg-orange-100 text-orange-800",  dot: "📐" },
   "consultas":       { bg: "bg-indigo-50 border-indigo-300",  badge: "bg-indigo-100 text-indigo-800",  dot: "❓" },
   "legalizaciones":  { bg: "bg-lime-50 border-lime-300",      badge: "bg-lime-100 text-lime-800",      dot: "✍️" },
+  "caducidades":     { bg: "bg-red-50 border-red-300",        badge: "bg-red-100 text-red-800",        dot: "📋" },
 };
 
 export default function SeguimientosPage() {
@@ -86,6 +87,10 @@ export default function SeguimientosPage() {
   const [legalizacionesName, setLegalizacionesName] = useState("");
   const [legalizacionesSheets, setLegalizacionesSheets] = useState("");
   const [selectedLegalizacionesTechnicianId, setSelectedLegalizacionesTechnicianId] = useState("");
+
+  // Caducidades
+  const [caducidadesQuantity, setCaducidadesQuantity] = useState("");
+  const [selectedCaducidadesTechnicianId, setSelectedCaducidadesTechnicianId] = useState("");
 
   const { entries, updateEntry, createEntry, removeEntry, technicians, currentUser, getNextRegistrationNumber, juntas, createJunta, updateJunta, deleteJunta, derivarTramite } =
     useTramitesStore();
@@ -698,6 +703,41 @@ export default function SeguimientosPage() {
     setLegalizacionesName(""); setLegalizacionesSheets(""); setSelectedLegalizacionesTechnicianId(""); setObservations("");
   }
 
+  async function handleRegisterCaducidades() {
+    if (!caducidadesQuantity.trim()) return showMsg("⚠️ Ingresa la cantidad de trámites", "error");
+    if (!selectedCaducidadesTechnicianId) return showMsg("⚠️ Selecciona un técnico", "error");
+
+    const { time: arrival, iso } = await getServerNow();
+    const tech = technicians.find((t) => t.id === selectedCaducidadesTechnicianId);
+
+    const newEntry: Entry = {
+      id: `cad-${Date.now()}`,
+      createdBy: currentUser.id, createdByName: currentUser.name,
+      registrationNumber: getNextRegistrationNumber(),
+      tramiteCode: "",
+      technicianId: selectedCaducidadesTechnicianId,
+      technicianName: tech?.name ?? selectedCaducidadesTechnicianId,
+      technicianArea: tech?.areaLabel ?? "",
+      scheduleDate: today, registrationDate: today,
+      observations: observations.trim() || "", status: "Registrado", createdAt: iso,
+      followUps: [{
+        type: "caducidades",
+        clientName: `${caducidadesQuantity} trámites a revisar`,
+        arrivalTime: arrival,
+        followUpStatus: "completado",
+        technicianId: selectedCaducidadesTechnicianId,
+        technicianName: tech?.name ?? selectedCaducidadesTechnicianId,
+        attendedTime: arrival,
+        observations: observations.trim() || undefined,
+        createdAt: iso,
+        isUnscheduled: true,
+      }],
+    };
+    createEntry(newEntry);
+    showMsg(`✅ Caducidades registradas (${caducidadesQuantity} trámites) — ${tech?.name} — ${arrival}`, "success");
+    setCaducidadesQuantity(""); setSelectedCaducidadesTechnicianId(""); setObservations("");
+  }
+
   async function handleMarkRegreso(entry: Entry, followUp: FollowUp) {
     const { time } = await getServerNow();
     const newFollowUps = (entry.followUps ?? []).map((fu) =>
@@ -916,6 +956,10 @@ export default function SeguimientosPage() {
               className={`px-5 py-2 text-sm font-bold rounded-lg transition cursor-pointer ${formMode === "legalizaciones" ? "bg-lime-600 text-white" : "bg-white text-lime-700 border-2 border-lime-300 hover:bg-lime-50"}`}>
               ✍️ Legalizaciones
             </button>
+            <button onClick={() => { setFormMode("caducidades"); setSelectedTechnicianId(""); }}
+              className={`px-5 py-2 text-sm font-bold rounded-lg transition cursor-pointer ${formMode === "caducidades" ? "bg-red-600 text-white" : "bg-white text-red-700 border-2 border-red-300 hover:bg-red-50"}`}>
+              📋 Caducidades
+            </button>
           </div>
 
           {message && (
@@ -1115,23 +1159,41 @@ export default function SeguimientosPage() {
               </>
             )}
 
-            {/* ── SELECTOR DE TÉCNICO: Para Planimetrías, Consultas y Legalizaciones ── */}
-            {(formMode === "planimetrias" || formMode === "consultas" || formMode === "legalizaciones") && (
+            {formMode === "caducidades" && (
+              <>
+                <label className="grid gap-2 md:col-span-2">
+                  <span className="text-sm font-semibold text-gray-700">Cantidad de Trámites a Revisar *</span>
+                  <input type="number" value={caducidadesQuantity}
+                    onChange={(e) => setCaducidadesQuantity(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleRegisterCaducidades()}
+                    placeholder="Ej: 5"
+                    min="1"
+                    className="rounded-lg border-2 border-red-300 px-4 py-3 focus:outline-none focus:border-red-500"
+                  />
+                </label>
+              </>
+            )}
+
+            {/* ── SELECTOR DE TÉCNICO: Para Planimetrías, Consultas, Legalizaciones y Caducidades ── */}
+            {(formMode === "planimetrias" || formMode === "consultas" || formMode === "legalizaciones" || formMode === "caducidades") && (
               <label className="grid gap-2 md:col-span-2">
                 <span className="text-sm font-semibold text-gray-700">Técnico que Atendera *</span>
                 <select value={
                   formMode === "planimetrias" ? selectedPlanimetriaTechnicianId :
                   formMode === "consultas" ? selectedConsultasTechnicianId :
-                  selectedLegalizacionesTechnicianId
+                  formMode === "legalizaciones" ? selectedLegalizacionesTechnicianId :
+                  selectedCaducidadesTechnicianId
                 } onChange={(e) => {
                   if (formMode === "planimetrias") setSelectedPlanimetriaTechnicianId(e.target.value);
                   else if (formMode === "consultas") setSelectedConsultasTechnicianId(e.target.value);
-                  else setSelectedLegalizacionesTechnicianId(e.target.value);
+                  else if (formMode === "legalizaciones") setSelectedLegalizacionesTechnicianId(e.target.value);
+                  else setSelectedCaducidadesTechnicianId(e.target.value);
                 }}
                   className={`rounded-lg border-2 px-4 py-3 focus:outline-none bg-white ${
                     formMode === "planimetrias" ? "border-orange-300 focus:border-orange-500" :
                     formMode === "consultas" ? "border-indigo-300 focus:border-indigo-500" :
-                    "border-lime-300 focus:border-lime-500"
+                    formMode === "legalizaciones" ? "border-lime-300 focus:border-lime-500" :
+                    "border-red-300 focus:border-red-500"
                   }`}>
                   <option value="">— Selecciona técnico —</option>
                   {availableAreas.map((area) => {
@@ -1195,6 +1257,13 @@ export default function SeguimientosPage() {
               disabled={!legalizacionesName.trim() || !legalizacionesSheets.trim() || !selectedLegalizacionesTechnicianId}
               className={`w-full rounded-lg px-6 py-3 font-semibold text-white text-lg transition shadow-md ${legalizacionesName.trim() && legalizacionesSheets.trim() && selectedLegalizacionesTechnicianId ? "bg-lime-600 hover:bg-lime-700 cursor-pointer" : "bg-gray-400 cursor-not-allowed"}`}>
               ✍️ Registrar Legalización
+            </button>
+          )}
+          {formMode === "caducidades" && (
+            <button onClick={handleRegisterCaducidades}
+              disabled={!caducidadesQuantity.trim() || !selectedCaducidadesTechnicianId}
+              className={`w-full rounded-lg px-6 py-3 font-semibold text-white text-lg transition shadow-md ${caducidadesQuantity.trim() && selectedCaducidadesTechnicianId ? "bg-red-600 hover:bg-red-700 cursor-pointer" : "bg-gray-400 cursor-not-allowed"}`}>
+              📋 Registrar Caducidades
             </button>
           )}
         </section>

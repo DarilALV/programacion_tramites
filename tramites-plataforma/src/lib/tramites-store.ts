@@ -32,7 +32,7 @@ const logAudit = (operation: "create" | "update" | "delete", entityType: "entry"
 
 export type AreaId = "supervisor" | "ruat" | "legal" | "revision-plano" | "tunari";
 export type EntryStatus = "Registrado" | "En revisión" | "Aprobado";
-export type FollowUpType = "normal" | "junta_ingreso" | "derivado" | "legalización" | "planimetrias" | "consultas";
+export type FollowUpType = "normal" | "junta_ingreso" | "derivado" | "legalización" | "planimetrias" | "consultas" | "caducidades";
 
 export type Area = {
   id: AreaId;
