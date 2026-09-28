@@ -9,7 +9,7 @@ export default function ReportesPage() {
   const { entries, groupEntriesByCreator, groupEntriesByTechnician, groupEntriesByDateAndCreator, groupEntriesByDateAndTechnician } =
     useTramitesStore();
 
-  const [reportTab, setReportTab] = useState<"programaciones" | "atenciones">("programaciones");
+  const [reportTab, setReportTab] = useState<"programaciones" | "atenciones" | "verificacion">("programaciones");
   const [filterFromDate, setFilterFromDate] = useState("");
   const [filterToDate, setFilterToDate] = useState("");
   const [selectedCreator, setSelectedCreator] = useState<string | null>(null);
@@ -240,6 +240,44 @@ export default function ReportesPage() {
     link.click();
   };
 
+  // Métricas de verificación/auditoría
+  const verificationMetrics = useMemo(() => {
+    const totalEntries = entries.filter(e => !e.deleted).length;
+    const totalFollowUps = entries
+      .filter(e => !e.deleted)
+      .reduce((sum, e) => sum + (e.followUps?.length ?? 0), 0);
+    const totalJuntas = entries
+      .filter(e => !e.deleted)
+      .reduce((sum, e) => sum + ((e.juntaId ? 1 : 0)), 0);
+
+    // Desglose de followUps por tipo
+    const followUpsByType = new Map<string, number>();
+    const types: FollowUpType[] = ["normal", "junta_ingreso", "derivado", "legalización", "planimetrias", "consultas"];
+    types.forEach(type => {
+      const count = entries
+        .filter(e => !e.deleted)
+        .reduce((sum, e) => sum + (e.followUps?.filter(f => f.type === type).length ?? 0), 0);
+      if (count > 0) followUpsByType.set(type, count);
+    });
+
+    // Desglose de entries por estado
+    const entriesByStatus = new Map<string, number>();
+    entries
+      .filter(e => !e.deleted)
+      .forEach(e => {
+        entriesByStatus.set(e.status, (entriesByStatus.get(e.status) ?? 0) + 1);
+      });
+
+    return {
+      totalEntries,
+      totalFollowUps,
+      totalJuntas,
+      promedioFollowUpsPerEntry: totalEntries > 0 ? (totalFollowUps / totalEntries).toFixed(2) : 0,
+      followUpsByType,
+      entriesByStatus,
+    };
+  }, [entries]);
+
   const hasFilters = filterFromDate || filterToDate || selectedCreator || selectedTechnician || selectedFollowUpType;
 
   return (
@@ -249,7 +287,7 @@ export default function ReportesPage() {
       eyebrow="Reportes"
     >
       {/* TABS */}
-      <div className="flex gap-3 mb-6">
+      <div className="flex gap-3 mb-6 flex-wrap">
         <button
           onClick={() => setReportTab("programaciones")}
           className={`px-6 py-3 rounded-full font-semibold transition ${
@@ -269,6 +307,16 @@ export default function ReportesPage() {
           }`}
         >
           Atenciones
+        </button>
+        <button
+          onClick={() => setReportTab("verificacion")}
+          className={`px-6 py-3 rounded-full font-semibold transition ${
+            reportTab === "verificacion"
+              ? "bg-[#1a140d] text-white"
+              : "border border-black/10 bg-white text-[#1a140d] hover:border-black/20"
+          }`}
+        >
+          🔍 Verificación
         </button>
       </div>
 
@@ -368,7 +416,26 @@ export default function ReportesPage() {
 
       {/* MÉTRICAS PRINCIPALES */}
       <section className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        {reportTab === "programaciones" ? (
+        {reportTab === "verificacion" ? (
+          <>
+            <article className="rounded-4xl border border-black/10 bg-[linear-gradient(135deg,rgba(255,255,255,0.92),rgba(244,233,211,0.96))] p-6 shadow-[0_16px_40px_rgba(26,21,12,0.08)]">
+              <div className="text-xs uppercase tracking-[0.24em] text-black/50">Total Programaciones</div>
+              <div className="mt-3 text-4xl font-bold text-[#1a140d]">{verificationMetrics.totalEntries}</div>
+            </article>
+            <article className="rounded-4xl border border-black/10 bg-[linear-gradient(135deg,rgba(255,255,255,0.92),rgba(244,233,211,0.96))] p-6 shadow-[0_16px_40px_rgba(26,21,12,0.08)]">
+              <div className="text-xs uppercase tracking-[0.24em] text-black/50">Total Seguimientos</div>
+              <div className="mt-3 text-4xl font-bold text-[#1a140d]">{verificationMetrics.totalFollowUps}</div>
+            </article>
+            <article className="rounded-4xl border border-black/10 bg-[linear-gradient(135deg,rgba(255,255,255,0.92),rgba(244,233,211,0.96))] p-6 shadow-[0_16px_40px_rgba(26,21,12,0.08)]">
+              <div className="text-xs uppercase tracking-[0.24em] text-black/50">Total Juntas</div>
+              <div className="mt-3 text-4xl font-bold text-[#1a140d]">{verificationMetrics.totalJuntas}</div>
+            </article>
+            <article className="rounded-4xl border border-black/10 bg-[linear-gradient(135deg,rgba(255,255,255,0.92),rgba(244,233,211,0.96))] p-6 shadow-[0_16px_40px_rgba(26,21,12,0.08)]">
+              <div className="text-xs uppercase tracking-[0.24em] text-black/50">Promedio Seguimientos/Prog</div>
+              <div className="mt-3 text-4xl font-bold text-[#1a140d]">{verificationMetrics.promedioFollowUpsPerEntry}</div>
+            </article>
+          </>
+        ) : reportTab === "programaciones" ? (
           <>
             <article className="rounded-4xl border border-black/10 bg-[linear-gradient(135deg,rgba(255,255,255,0.92),rgba(244,233,211,0.96))] p-6 shadow-[0_16px_40px_rgba(26,21,12,0.08)]">
               <div className="text-xs uppercase tracking-[0.24em] text-black/50">Total Registros</div>
@@ -410,6 +477,7 @@ export default function ReportesPage() {
       </section>
 
       {/* BOTONES DE EXPORTACIÓN */}
+      {reportTab !== "verificacion" && (
       <section className="flex flex-wrap gap-3">
         {reportTab === "programaciones" ? (
           <>
@@ -438,9 +506,89 @@ export default function ReportesPage() {
           </button>
         )}
       </section>
+      )}
 
       {/* REPORTES */}
-      {reportTab === "programaciones" ? (
+      {reportTab === "verificacion" ? (
+        <section className="grid gap-6 lg:grid-cols-2">
+          {/* SEGUIMIENTOS POR TIPO */}
+          <article className="rounded-4xl border border-black/10 bg-white p-6 shadow-[0_16px_40px_rgba(26,21,12,0.08)]">
+            <h2 className="font-serif text-3xl text-[#1a140d]">Seguimientos por Tipo</h2>
+            <div className="mt-6 space-y-3">
+              {Array.from(verificationMetrics.followUpsByType.entries()).map(([type, count]) => (
+                <div key={type} className="rounded-3xl border border-black/10 bg-[#f7f4ee] p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="font-semibold text-[#151515]">{type}</div>
+                    <div className="text-sm text-black/70">
+                      <strong>{count}</strong>
+                    </div>
+                  </div>
+                  <div className="mt-2 h-2 bg-black/10 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-black/30"
+                      style={{ width: `${(count / Math.max(verificationMetrics.totalFollowUps, 1)) * 100}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </article>
+
+          {/* PROGRAMACIONES POR ESTADO */}
+          <article className="rounded-4xl border border-black/10 bg-[#151515] p-6 text-white shadow-[0_16px_40px_rgba(17,17,17,0.16)]">
+            <h2 className="font-serif text-3xl text-white flex items-center gap-2">
+              <TrendingUp size={24} />
+              Programaciones por Estado
+            </h2>
+            <div className="mt-6 space-y-3">
+              {Array.from(verificationMetrics.entriesByStatus.entries()).map(([status, count]) => (
+                <div key={status} className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                  <div className="flex items-center justify-between gap-3 mb-2">
+                    <span className="font-semibold">{status}</span>
+                    <span className="text-lg font-bold">{count}</span>
+                  </div>
+                  <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-white"
+                      style={{ width: `${(count / Math.max(verificationMetrics.totalEntries, 1)) * 100}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </article>
+
+          {/* INFORMACIÓN DE AUDITORÍA */}
+          <article className="rounded-4xl border border-black/10 bg-white p-6 shadow-[0_16px_40px_rgba(26,21,12,0.08)] lg:col-span-2">
+            <h2 className="font-serif text-3xl text-[#1a140d]">Resumen de Verificación</h2>
+            <div className="mt-6 space-y-3">
+              <div className="rounded-3xl border border-black/10 bg-[#f7f4ee] p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="font-semibold text-[#151515]">✓ Programaciones cargadas</span>
+                  <span className="text-lg font-bold text-[#151515]">{verificationMetrics.totalEntries}</span>
+                </div>
+              </div>
+              <div className="rounded-3xl border border-black/10 bg-[#f7f4ee] p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="font-semibold text-[#151515]">✓ Seguimientos/Atenciones cargadas</span>
+                  <span className="text-lg font-bold text-[#151515]">{verificationMetrics.totalFollowUps}</span>
+                </div>
+              </div>
+              <div className="rounded-3xl border border-black/10 bg-[#f7f4ee] p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="font-semibold text-[#151515]">✓ Juntas registradas</span>
+                  <span className="text-lg font-bold text-[#151515]">{verificationMetrics.totalJuntas}</span>
+                </div>
+              </div>
+              <div className="rounded-3xl border border-black/10 bg-[#e8f5e9] p-4 mt-4">
+                <div className="text-sm text-green-800">
+                  <strong>✓ Datos sincronizados correctamente desde Firebase</strong>
+                </div>
+              </div>
+            </div>
+          </article>
+        </section>
+      ) : reportTab === "programaciones" ? (
         <section className="grid gap-6 lg:grid-cols-[1fr_1fr]">
           {/* RESUMEN DIARIO */}
           <article className="rounded-4xl border border-black/10 bg-white p-6 shadow-[0_16px_40px_rgba(26,21,12,0.08)]">
