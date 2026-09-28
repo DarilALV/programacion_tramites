@@ -1024,10 +1024,12 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
       console.log('📊 Firebase devolvió', snapshot.size, 'documentos');
 
       if (!snapshot.empty) {
-        const firestoreEntries = snapshot.docs
-          .map((docSnap, i) =>
-            normalizeStoredEntry({ ...docSnap.data(), id: docSnap.id } as Record<string, unknown>, i)
-          );
+        const rawDocs = snapshot.docs.map((docSnap) => ({ ...docSnap.data(), id: docSnap.id } as Record<string, unknown>));
+        const deletedCount = rawDocs.filter(d => d.deleted === true).length;
+        console.log('🗑️ Documentos borrados (deleted=true):', deletedCount);
+        console.log('✅ Documentos activos:', rawDocs.length - deletedCount);
+
+        const firestoreEntries = rawDocs.map((data, i) => normalizeStoredEntry(data, i));
         console.log('✅ Normalizados:', firestoreEntries.length, 'registros');
         setEntries(firestoreEntries);
         // Guardar en localStorage para próximas cargas
