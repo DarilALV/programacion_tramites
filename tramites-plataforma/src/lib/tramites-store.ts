@@ -1018,25 +1018,28 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
       const { firestore } = await import('@/lib/firebase');
       const { collection, getDocs } = await import('firebase/firestore');
 
+      console.log('🔄 Iniciando restauración desde Firebase...');
       const snapshot = await getDocs(collection(firestore, 'entries'));
+      console.log('📊 Firebase devolvió', snapshot.size, 'documentos');
+
       if (!snapshot.empty) {
         const firestoreEntries = snapshot.docs
           .map((docSnap, i) =>
             normalizeStoredEntry({ ...docSnap.data(), id: docSnap.id } as Record<string, unknown>, i)
           );
+        console.log('✅ Normalizados:', firestoreEntries.length, 'registros');
         setEntries(firestoreEntries);
         // Guardar en localStorage para próximas cargas
         window.localStorage.setItem(
           storageKey,
           JSON.stringify({ currentUserId, currentTechnicianId, entries: firestoreEntries } satisfies PersistedState),
         );
-        devLog('✅ Datos restaurados desde Firebase:', `${firestoreEntries.length} registros`);
         return true;
       }
-      devLog('⚠️ No hay datos en Firebase para restaurar');
+      console.warn('⚠️ No hay datos en Firebase para restaurar (snapshot vacío)');
       return false;
     } catch (error) {
-      devWarn('Error restaurando desde Firebase:', error);
+      console.error('❌ Error restaurando desde Firebase:', error);
       return false;
     }
   }
