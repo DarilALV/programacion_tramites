@@ -9,7 +9,9 @@ export default function ReportesPage() {
   const { entries, groupEntriesByCreator, groupEntriesByTechnician, groupEntriesByDateAndCreator, groupEntriesByDateAndTechnician } =
     useTramitesStore();
 
-  const [reportTab, setReportTab] = useState<"programaciones" | "atenciones" | "verificacion" | "consolidado">("programaciones");
+  const [reportTab, setReportTab] = useState<"programaciones" | "atenciones" | "verificacion" | "consolidado" | "auditoria">("programaciones");
+  const [auditReport, setAuditReport] = useState<any>(null);
+  const [auditLoading, setAuditLoading] = useState(false);
   const [filterFromDate, setFilterFromDate] = useState("");
   const [filterToDate, setFilterToDate] = useState("");
   const [selectedCreator, setSelectedCreator] = useState<string | null>(null);
@@ -347,6 +349,56 @@ export default function ReportesPage() {
     };
   }, [entries]);
 
+  // Función de auditoría
+  const runAudit = async () => {
+    setAuditLoading(true);
+    try {
+      const { firestore } = await import('@/lib/firebase');
+      const { collection, getDocs } = await import('firebase/firestore');
+
+      // Datos de Firebase
+      const snapshot = await getDocs(collection(firestore, 'entries'));
+      const firebaseIds = new Set(snapshot.docs.map(d => d.id));
+      const firebaseTotal = snapshot.size;
+      const firebaseActive = snapshot.docs.filter(d => d.data().deleted !== true).length;
+
+      // Datos en localStorage
+      const storageKey = "gmc-tramites-mvp";
+      const stored = localStorage.getItem(storageKey);
+      const localStorageIds = new Set<string>();
+      let localStorageSize = 0;
+      if (stored) {
+        JSON.parse(stored).entries.forEach((e: any) => localStorageIds.add(e.id));
+        localStorageSize = new Blob([stored]).size;
+      }
+
+      // Datos en memoria
+      const memoryIds = new Set(entries.map(e => e.id));
+
+      // Comparar
+      const inFirebaseOnly = Array.from(firebaseIds).filter(id => !localStorageIds.has(id));
+      const inLocalStorageOnly = Array.from(localStorageIds).filter(id => !firebaseIds.has(id));
+      const inMemoryOnly = Array.from(memoryIds).filter(id => !firebaseIds.has(id));
+
+      setAuditReport({
+        firebaseTotal,
+        firebaseActive,
+        localStorageCount: localStorageIds.size,
+        localStorageSize: (localStorageSize / 1024).toFixed(2),
+        memoryCount: memoryIds.size,
+        inFirebaseOnly: inFirebaseOnly.length,
+        inLocalStorageOnly: inLocalStorageOnly.length,
+        inMemoryOnly: inMemoryOnly.length,
+        missingFromLocalStorage: inFirebaseOnly.slice(0, 10),
+      });
+    } catch (error) {
+      console.error('Error en auditoría:', error);
+      setAuditReport({ error: String(error) });
+    } finally {
+      setAuditLoading(false);
+    }
+  };
+
   const hasFilters = filterFromDate || filterToDate || selectedCreator || selectedTechnician || selectedFollowUpType;
 
   return (
@@ -357,6 +409,16 @@ export default function ReportesPage() {
     >
       {/* TABS */}
       <div className="flex gap-3 mb-6 flex-wrap">
+        <button
+          onClick={() => setReportTab("auditoria")}
+          className={`px-6 py-3 rounded-full font-semibold transition ${
+            reportTab === "auditoria"
+              ? "bg-[#1a140d] text-white"
+              : "border border-black/10 bg-white text-[#1a140d] hover:border-black/20"
+          }`}
+        >
+          🔍 Auditoría
+        </button>
         <button
           onClick={() => setReportTab("consolidado")}
           className={`px-6 py-3 rounded-full font-semibold transition ${
@@ -615,7 +677,75 @@ export default function ReportesPage() {
       )}
 
       {/* REPORTES */}
-      {reportTab === "consolidado" ? (
+      {reportTab === "auditoria" ? (
+        <section className="space-y-6">
+          <div className="rounded-4xl border border-black/10 bg-white p-6 shadow-[0_16px_40px_rgba(26,21,12,0.08)]">
+            <h2 className="font-serif text-3xl text-[#1a140d]">Auditoría de Datos</h2>
+            <p className="mt-2 text-sm text-black/70">Compara Firebase vs localStorage vs memoria para identificar datos perdidos</p>
+
+            <button
+              onClick={runAudit}
+              disabled={auditLoading}
+              className="mt-6 inline-flex items-center gap-2 rounded-full bg-indigo-600 px-6 py-3 text-sm font-semibold text-white hover:bg-indigo-700 transition disabled:opacity-50 cursor-pointer"
+            >
+              {auditLoading ? "Analizando..." : "🔍 Ejecutar Auditoría"}
+            </button>
+          </div>
+
+          {auditReport && (
+            <div className="rounded-4xl border border-black/10 bg-white p-6 shadow-[0_16px_40px_rgba(26,21,12,0.08)]">
+              <h3 className="font-semibold text-[#1a140d] mb-4">Resultados</h3>
+
+              {auditReport.error ? (
+                <p className="text-red-600">{auditReport.error}</p>
+              ) : (
+                <div className="space-y-4">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-3xl border border-black/10 bg-[#f7f4ee] p-4">
+                      <div className="text-sm text-black/70">📦 Firebase Total</div>
+                      <div className="text-2xl font-bold text-[#151515]">{auditReport.firebaseTotal}</div>
+                      <div className="text-xs text-black/60">({auditReport.firebaseActive} activos)</div>
+                    </div>
+                    <div className="rounded-3xl border border-black/10 bg-[#f7f4ee] p-4">
+                      <div className="text-sm text-black/70">💾 localStorage</div>
+                      <div className="text-2xl font-bold text-[#151515]">{auditReport.localStorageCount}</div>
+                      <div className="text-xs text-black/60">({auditReport.localStorageSize} KB)</div>
+                    </div>
+                    <div className="rounded-3xl border border-black/10 bg-[#f7f4ee] p-4">
+                      <div className="text-sm text-black/70">🧠 En Memoria</div>
+                      <div className="text-2xl font-bold text-[#151515]">{auditReport.memoryCount}</div>
+                    </div>
+                    <div className="rounded-3xl border border-red-200 bg-red-50 p-4">
+                      <div className="text-sm text-red-700">❌ Faltantes en localStorage</div>
+                      <div className="text-2xl font-bold text-red-700">{auditReport.inFirebaseOnly}</div>
+                    </div>
+                  </div>
+
+                  {auditReport.inFirebaseOnly > 0 && (
+                    <div className="mt-6 p-4 rounded-3xl border border-red-200 bg-red-50">
+                      <p className="text-sm font-semibold text-red-800 mb-2">
+                        ⚠️ {auditReport.inFirebaseOnly} documentos en Firebase no se guardaron en localStorage
+                      </p>
+                      <p className="text-xs text-red-700">
+                        localStorage tiene un límite de ~5-10MB. Necesitamos migrar a IndexedDB para guardar todos los datos históricos.
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="mt-6 p-4 rounded-3xl border border-green-200 bg-green-50">
+                    <p className="text-sm font-semibold text-green-800">
+                      ✓ Recomendación: Usar IndexedDB en lugar de localStorage
+                    </p>
+                    <p className="text-xs text-green-700 mt-2">
+                      IndexedDB tiene ~50MB de capacidad y es ideal para guardar todos los datos históricos sin límite.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </section>
+      ) : reportTab === "consolidado" ? (
         <section className="rounded-4xl border border-black/10 bg-white p-6 shadow-[0_16px_40px_rgba(26,21,12,0.08)]">
           <h2 className="font-serif text-3xl text-[#1a140d]">Reporte Consolidado</h2>
           <div className="mt-6 space-y-4">
