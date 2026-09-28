@@ -101,7 +101,7 @@ export default function IngresoPage() {
             {currentUser.name}
           </div>
 
-          {/* Reset demo — protegido con texto de confirmación */}
+          {/* Reset demo — OCULTADO para evitar borrados accidentales
           {resetPhase === "idle" ? (
             <button
               type="button"
@@ -142,7 +142,7 @@ export default function IngresoPage() {
                 </button>
               </div>
             </div>
-          )}
+          ) */}
         </aside>
 
         <article className="rounded-4xl border border-black/10 bg-[#151515] p-6 text-white shadow-[0_16px_40px_rgba(17,17,17,0.16)]">
