@@ -735,7 +735,20 @@ export function groupEntriesByDateAndTechnician(entries: Entry[]) {
 
 export function useTramitesStore() {
   const [hydrated, setHydrated] = useState(false);
-  const [entries, setEntries] = useState<Entry[]>(seedEntries);
+  const [entries, setEntries] = useState<Entry[]>(() => {
+    if (typeof window === "undefined") return seedEntries;
+    try {
+      const saved = localStorage.getItem(storageKey);
+      if (saved) {
+        const parsed = JSON.parse(saved) as PersistedState;
+        console.log('📂 Cargadas desde localStorage:', parsed.entries.length, 'registros');
+        return parsed.entries;
+      }
+    } catch (e) {
+      console.warn('Error cargando desde localStorage:', e);
+    }
+    return seedEntries;
+  });
   const [juntas, setJuntas] = useState<Junta[]>(() => {
     if (typeof window === "undefined") return [];
     try {
@@ -746,8 +759,24 @@ export function useTramitesStore() {
       return [];
     }
   });
-  const [currentUserId, setCurrentUserId] = useState(plannerUsers[0].id);
-  const [currentTechnicianId, setCurrentTechnicianId] = useState<string | undefined>(undefined);
+  const [currentUserId, setCurrentUserId] = useState(() => {
+    if (typeof window === "undefined") return plannerUsers[0].id;
+    try {
+      const saved = localStorage.getItem(storageKey);
+      if (saved) {
+        const parsed = JSON.parse(saved) as PersistedState;
+        return parsed.currentUserId || plannerUsers[0].id;
+      }
+    } catch (e) {}
+    return plannerUsers[0].id;
+  });
+  const [currentTechnicianId, setCurrentTechnicianId] = useState<string | undefined>(() => {
+    if (typeof window === "undefined") return undefined;
+    try {
+      return localStorage.getItem('currentTechnicianId') || undefined;
+    } catch (e) {}
+    return undefined;
+  });
 
 useEffect(() => {
   const savedUserId = localStorage.getItem('currentUserId');
