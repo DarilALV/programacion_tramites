@@ -212,10 +212,10 @@ export default function ReportesPage() {
   };
 
   // Exportar reporte consolidado
-  const exportConsolidatedReport = () => {
+  const exportConsolidatedReport = async () => {
     try {
-      const { utils, write } = require('xlsx');
-      const wb = utils.book_new();
+      const XLSX = await import('xlsx');
+      const wb = XLSX.utils.book_new();
 
       // Sheet 1: Resumen
       const summaryData = [
@@ -227,14 +227,14 @@ export default function ReportesPage() {
         ['Técnicos Activos', followUpsTechnicianSummary.filter(t => t.total > 0).length],
         ['Registradoras Activas', followUpsCreatorSummary.length],
       ];
-      utils.book_append_sheet(wb, utils.aoa_to_sheet(summaryData), 'Resumen');
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summaryData), 'Resumen');
 
       // Sheet 2: Programaciones
       const programsData = [
         ['Código', 'Técnico', 'Registrador', 'Estado', 'Fecha Registro'],
         ...filteredEntries.map(e => [e.tramiteCode, e.technicianName, e.createdByName, e.status, e.registrationDate]),
       ];
-      utils.book_append_sheet(wb, utils.aoa_to_sheet(programsData), 'Programaciones');
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(programsData), 'Programaciones');
 
       // Sheet 3: Atenciones
       const followUpsData = [
@@ -248,7 +248,7 @@ export default function ReportesPage() {
           f.followUp.followUpStatus || '—',
         ]),
       ];
-      utils.book_append_sheet(wb, utils.aoa_to_sheet(followUpsData), 'Atenciones');
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(followUpsData), 'Atenciones');
 
       // Sheet 4: Productividad Técnicos
       const techsData = [
@@ -259,7 +259,7 @@ export default function ReportesPage() {
           return [t.name, t.areaLabel, progCount, followUpCount];
         }),
       ];
-      utils.book_append_sheet(wb, utils.aoa_to_sheet(techsData), 'Productividad Técnicos');
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(techsData), 'Productividad Técnicos');
 
       // Sheet 5: Productividad Registradoras
       const creatorsData = [
@@ -270,10 +270,10 @@ export default function ReportesPage() {
           return [u.name, progCount, followUpCount];
         }),
       ];
-      utils.book_append_sheet(wb, utils.aoa_to_sheet(creatorsData), 'Productividad Registradoras');
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(creatorsData), 'Productividad Registradoras');
 
       // Descargar
-      write(wb, { bookType: 'xlsx', type: 'binary', filename: `reporte_consolidado_${new Date().toISOString().slice(0, 10)}.xlsx` });
+      XLSX.writeFile(wb, `reporte_consolidado_${new Date().toISOString().slice(0, 10)}.xlsx`);
     } catch (error) {
       console.error('Error generando reporte:', error);
       alert('Error al generar el reporte');
