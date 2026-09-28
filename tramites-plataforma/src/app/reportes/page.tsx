@@ -498,20 +498,20 @@ export default function ReportesPage() {
         {reportTab === "consolidado" ? (
           <>
             <article className="rounded-4xl border border-black/10 bg-[linear-gradient(135deg,rgba(255,255,255,0.92),rgba(244,233,211,0.96))] p-6 shadow-[0_16px_40px_rgba(26,21,12,0.08)]">
-              <div className="text-xs uppercase tracking-[0.24em] text-black/50">Total Programaciones</div>
-              <div className="mt-3 text-4xl font-bold text-[#1a140d]">{verificationMetrics.totalEntries}</div>
+              <div className="text-xs uppercase tracking-[0.24em] text-black/50">Programaciones (filtradas)</div>
+              <div className="mt-3 text-4xl font-bold text-[#1a140d]">{filteredEntries.length}</div>
             </article>
             <article className="rounded-4xl border border-black/10 bg-[linear-gradient(135deg,rgba(255,255,255,0.92),rgba(244,233,211,0.96))] p-6 shadow-[0_16px_40px_rgba(26,21,12,0.08)]">
-              <div className="text-xs uppercase tracking-[0.24em] text-black/50">Total Atenciones</div>
-              <div className="mt-3 text-4xl font-bold text-[#1a140d]">{verificationMetrics.totalFollowUps}</div>
+              <div className="text-xs uppercase tracking-[0.24em] text-black/50">Atenciones (filtradas)</div>
+              <div className="mt-3 text-4xl font-bold text-[#1a140d]">{filteredFollowUps.length}</div>
             </article>
             <article className="rounded-4xl border border-black/10 bg-[linear-gradient(135deg,rgba(255,255,255,0.92),rgba(244,233,211,0.96))] p-6 shadow-[0_16px_40px_rgba(26,21,12,0.08)]">
               <div className="text-xs uppercase tracking-[0.24em] text-black/50">Total Juntas</div>
               <div className="mt-3 text-4xl font-bold text-[#1a140d]">{verificationMetrics.totalJuntas}</div>
             </article>
             <article className="rounded-4xl border border-black/10 bg-[linear-gradient(135deg,rgba(255,255,255,0.92),rgba(244,233,211,0.96))] p-6 shadow-[0_16px_40px_rgba(26,21,12,0.08)]">
-              <div className="text-xs uppercase tracking-[0.24em] text-black/50">Promedio Atenciones</div>
-              <div className="mt-3 text-4xl font-bold text-[#1a140d]">{verificationMetrics.promedioFollowUpsPerEntry}</div>
+              <div className="text-xs uppercase tracking-[0.24em] text-black/50">Promedio Atenciones/Prog</div>
+              <div className="mt-3 text-4xl font-bold text-[#1a140d]">{filteredEntries.length > 0 ? (filteredFollowUps.length / filteredEntries.length).toFixed(2) : 0}</div>
             </article>
           </>
         ) : reportTab === "verificacion" ? (
