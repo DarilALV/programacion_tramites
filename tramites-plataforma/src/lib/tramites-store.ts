@@ -1026,11 +1026,35 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
       if (!snapshot.empty) {
         const rawDocs = snapshot.docs.map((docSnap) => ({ ...docSnap.data(), id: docSnap.id } as Record<string, unknown>));
         const deletedCount = rawDocs.filter(d => d.deleted === true).length;
+        const activeDocs = rawDocs.filter(d => d.deleted !== true);
         console.log('🗑️ Documentos borrados (deleted=true):', deletedCount);
-        console.log('✅ Documentos activos:', rawDocs.length - deletedCount);
+        console.log('✅ Documentos activos:', activeDocs.length);
 
-        const firestoreEntries = rawDocs.map((data, i) => normalizeStoredEntry(data, i));
+        const rejectedDocs: Array<{ id: string; reason: string }> = [];
+        const firestoreEntries = activeDocs
+          .map((data, i) => {
+            try {
+              return normalizeStoredEntry(data, i);
+            } catch (err) {
+              rejectedDocs.push({
+                id: String(data.id),
+                reason: err instanceof Error ? err.message : 'Error desconocido'
+              });
+              return null;
+            }
+          })
+          .filter((e) => e !== null) as Entry[];
+
         console.log('✅ Normalizados:', firestoreEntries.length, 'registros');
+        if (rejectedDocs.length > 0) {
+          console.warn('❌ Documentos rechazados:', rejectedDocs.length);
+          console.table(rejectedDocs.slice(0, 10));
+          if (rejectedDocs.length > 10) {
+            console.warn(`... y ${rejectedDocs.length - 10} más`);
+          }
+          window.localStorage.setItem('rejected-docs', JSON.stringify(rejectedDocs));
+        }
+
         setEntries(firestoreEntries);
         // Guardar en localStorage para próximas cargas
         window.localStorage.setItem(
