@@ -757,13 +757,8 @@ export function useTramitesStore() {
           }
 
           // Si IndexedDB tiene pocos datos (< 1500), cargar todo desde Firebase en background
-          const lastAutoSyncTime = localStorage.getItem('lastAutoSyncTime');
-          const now = Date.now();
-          const shouldAutoSync = !lastAutoSyncTime || (now - parseInt(lastAutoSyncTime, 10)) > 3600000; // 1 hora
-
-          if (idbData.entries.length < 1500 && shouldAutoSync) {
+          if (idbData.entries.length < 1500) {
             console.log('⏳ IndexedDB incompleto, sincronizando desde Firebase...');
-            localStorage.setItem('lastAutoSyncTime', now.toString());
             setTimeout(async () => {
               try {
                 const { firestore } = await import('@/lib/firebase');
