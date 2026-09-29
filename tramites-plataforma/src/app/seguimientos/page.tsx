@@ -699,7 +699,6 @@ export default function SeguimientosPage() {
   }
 
   async function handleRegisterLegalizaciones() {
-    if (!legalizacionesName.trim()) return showMsg("⚠️ Ingresa el nombre del propietario", "error");
     if (!legalizacionesSheets.trim()) return showMsg("⚠️ Ingresa la cantidad de hojas", "error");
     if (!selectedLegalizacionesTechnicianId) return showMsg("⚠️ Selecciona un técnico", "error");
 
@@ -718,7 +717,7 @@ export default function SeguimientosPage() {
       observations: observations.trim() || "", status: "Registrado", createdAt: iso,
       followUps: [{
         type: "legalización",
-        clientName: legalizacionesName.trim(),
+        clientName: legalizacionesName.trim() || `Legalización — ${legalizacionesSheets} hojas`,
         arrivalTime: arrival,
         followUpStatus: "completado",
         technicianId: selectedLegalizacionesTechnicianId,
@@ -1174,10 +1173,10 @@ export default function SeguimientosPage() {
             {formMode === "legalizaciones" && (
               <>
                 <label className="grid gap-2 md:col-span-2">
-                  <span className="text-sm font-semibold text-gray-700">Propietario *</span>
+                  <span className="text-sm font-semibold text-gray-700">Propietario (opcional)</span>
                   <input type="text" value={legalizacionesName}
                     onChange={(e) => setLegalizacionesName(e.target.value)}
-                    placeholder="Ej: Carlos Mendoza"
+                    placeholder="Ej: Carlos Mendoza (dejar en blanco si no se conoce)"
                     className="rounded-lg border-2 border-lime-300 px-4 py-3 focus:outline-none focus:border-lime-500"
                   />
                 </label>
