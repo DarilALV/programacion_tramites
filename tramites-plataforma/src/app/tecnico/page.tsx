@@ -505,9 +505,7 @@ export default function AgendaTecnicoPage() {
         return belongsToThisTech;
       });
       if (todayFollowUps.length === 0) return [];
-      // Solo mostrar el ÚLTIMO followUp del día para evitar duplicados
-      const latestFollowUp = todayFollowUps[todayFollowUps.length - 1];
-      return [{ entry, followUp: latestFollowUp }];
+      return todayFollowUps.map(followUp => ({ entry, followUp }));
     });
   }, [agendaHoy, selectedDate, currentTechnicianId]);
 
