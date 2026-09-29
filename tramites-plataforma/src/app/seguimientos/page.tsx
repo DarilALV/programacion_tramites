@@ -1112,14 +1112,14 @@ export default function SeguimientosPage() {
                         style={{ width: `${Math.min((selCount / LIMITE) * 100, 100)}%` }} />
                     </div>
                     {(techCountToday[selectedTechnicianId]?.total ?? 0) > 0 && (
-                      <p className="text-xs text-gray-600 mt-1">
-                        Desglose:
-                        {selCountObj.normal > 0 && ` ${selCountObj.normal} llamadas`}
-                        {selCountObj.caducidades > 0 && ` • 📋 ${selCountObj.caducidades} caducidades`}
-                        {selCountObj.planimetrias > 0 && ` • 📐 ${selCountObj.planimetrias}`}
-                        {selCountObj.consultas > 0 && ` • ❓ ${selCountObj.consultas}`}
-                        {selCountObj.legalizaciones > 0 && ` • ✍️ ${selCountObj.legalizaciones}`}
-                      </p>
+                      <div className="text-xs text-gray-600 mt-1 space-y-1 border-t border-gray-200 pt-2">
+                        {selCountObj.normal > 0 && <div>Seguimientos: {selCountObj.normal}</div>}
+                        {selCountObj.caducidades > 0 && <div>📋 Caducidades: {selCountObj.caducidades}</div>}
+                        {selCountObj.consultas > 0 && <div>❓ Consultas: {selCountObj.consultas}</div>}
+                        {selCountObj.planimetrias > 0 && <div>📐 Planimetrías: {selCountObj.planimetrias}</div>}
+                        {selCountObj.legalizaciones > 0 && <div>✍️ Legalizaciones: {selCountObj.legalizaciones} hojas</div>}
+                        {selCountObj.junta_ingreso > 0 && <div>📋 Juntas: {selCountObj.junta_ingreso} trámites</div>}
+                      </div>
                     )}
                     {selOverLimit && selectedTechnicianId !== "archivos" && <p className="text-xs text-orange-600 font-semibold">⚠️ Este técnico está sobre el límite de {LIMITE} pero puede continuar atendiendo</p>}
                   </div>
@@ -1686,13 +1686,14 @@ export default function SeguimientosPage() {
                         <div className={`h-2 rounded-full ${bar}`} style={{ width: `${Math.min((cnt / LIMITE) * 100, 100)}%` }} />
                       </div>
                       {cnt > 0 && (
-                        <p className="text-xs text-gray-600 mt-2">
-                          {countObj.normal > 0 && `${countObj.normal} llamadas`}
-                          {countObj.caducidades > 0 && ` • 📋 ${countObj.caducidades} caducidades`}
-                          {countObj.planimetrias > 0 && ` • 📐 ${countObj.planimetrias}`}
-                          {countObj.consultas > 0 && ` • ❓ ${countObj.consultas}`}
-                          {countObj.legalizaciones > 0 && ` • ✍️ ${countObj.legalizaciones}`}
-                        </p>
+                        <div className="text-xs text-gray-600 mt-2 space-y-1 border-t border-gray-200 pt-2">
+                          {countObj.normal > 0 && <div>Seguimientos: {countObj.normal}</div>}
+                          {countObj.caducidades > 0 && <div>📋 Caducidades: {countObj.caducidades}</div>}
+                          {countObj.consultas > 0 && <div>❓ Consultas: {countObj.consultas}</div>}
+                          {countObj.planimetrias > 0 && <div>📐 Planimetrías: {countObj.planimetrias}</div>}
+                          {countObj.legalizaciones > 0 && <div>✍️ Legalizaciones: {countObj.legalizaciones} hojas</div>}
+                          {countObj.junta_ingreso > 0 && <div>📋 Juntas: {countObj.junta_ingreso} trámites</div>}
+                        </div>
                       )}
                     </div>
                   </div>
