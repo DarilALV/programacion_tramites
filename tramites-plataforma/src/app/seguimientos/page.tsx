@@ -355,8 +355,8 @@ export default function SeguimientosPage() {
 
           countToday[tid].total++;
 
-          // Solo contar como "llegadas" si no es caducidad
-          if (fu.type !== "caducidades") {
+          // Solo contar como "llegadas" si es seguimiento normal o junta_ingreso
+          if (fu.type === "normal" || fu.type === "junta_ingreso") {
             load[tid].llegadas++;
           }
 
