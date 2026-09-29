@@ -499,6 +499,7 @@ export default function AgendaTecnicoPage() {
     return agendaHoy.flatMap((entry) => {
       const todayFollowUps = (entry.followUps ?? []).filter((followUp) => {
         if (!followUp.createdAt?.startsWith(selectedDate)) return false;
+        if (followUp.type === 'caducidades') return false;
         const belongsToThisTech =
           (followUp.technicianId ? followUp.technicianId === currentTechnicianId : entry.technicianId === currentTechnicianId) ||
           followUp.actualTechnicianId === currentTechnicianId;
