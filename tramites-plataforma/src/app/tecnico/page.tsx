@@ -541,13 +541,14 @@ export default function AgendaTecnicoPage() {
     else if (reportePeriodo === "semana") { const r = weekRange(selectedDate); from = r.from; to = r.to; }
     else { const r = monthRange(selectedDate); from = r.from; to = r.to; }
 
-    // Contar trámites ÚNICOS que tienen al menos un followUp en el rango
+    // Contar trámites ÚNICOS que tienen al menos un followUp en el rango (excluyendo caducidades)
     return entries.filter((e) => !e.deleted) // Excluir entries deletados
       .filter((e) => {
       if (!e.followUps?.length) return false;
 
-      // Verificar si al menos un followUp de este técnico cae en el rango
+      // Verificar si al menos un followUp de este técnico cae en el rango (sin caducidades)
       return (e.followUps ?? []).some((fu) => {
+        if (fu.type === 'caducidades') return false;
         const isThisTech = e.technicianId === currentTechnicianId || fu.actualTechnicianId === currentTechnicianId;
         if (!isThisTech) return false;
 
