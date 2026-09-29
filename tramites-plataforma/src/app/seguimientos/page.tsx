@@ -354,14 +354,6 @@ export default function SeguimientosPage() {
           else if (fu.type === "caducidades") { countToday[tid].caducidades++; countByType[tid].caducidades++; }
 
           countToday[tid].total++;
-
-          // Solo contar como "llegadas" si es seguimiento normal o junta_ingreso
-          if (fu.type === "normal" || fu.type === "junta_ingreso") {
-            load[tid].llegadas++;
-          }
-
-          if (fu.attendedTime || fu.returnedTime || fu.calledTime) load[tid].atendidos++;
-          if (fu.completedTime) load[tid].completados++;
         });
     });
 
