@@ -499,7 +499,6 @@ export default function AgendaTecnicoPage() {
     return agendaHoy.flatMap((entry) => {
       const todayFollowUps = (entry.followUps ?? []).filter((followUp) => {
         if (!followUp.createdAt?.startsWith(selectedDate)) return false;
-        if (followUp.type === 'caducidades') return false;
         const belongsToThisTech =
           (followUp.technicianId ? followUp.technicianId === currentTechnicianId : entry.technicianId === currentTechnicianId) ||
           followUp.actualTechnicianId === currentTechnicianId;
@@ -541,14 +540,13 @@ export default function AgendaTecnicoPage() {
     else if (reportePeriodo === "semana") { const r = weekRange(selectedDate); from = r.from; to = r.to; }
     else { const r = monthRange(selectedDate); from = r.from; to = r.to; }
 
-    // Contar trámites ÚNICOS que tienen al menos un followUp en el rango (excluyendo caducidades)
+    // Contar trámites ÚNICOS que tienen al menos un followUp en el rango
     return entries.filter((e) => !e.deleted) // Excluir entries deletados
       .filter((e) => {
       if (!e.followUps?.length) return false;
 
-      // Verificar si al menos un followUp de este técnico cae en el rango (sin caducidades)
+      // Verificar si al menos un followUp de este técnico cae en el rango
       return (e.followUps ?? []).some((fu) => {
-        if (fu.type === 'caducidades') return false;
         const isThisTech = e.technicianId === currentTechnicianId || fu.actualTechnicianId === currentTechnicianId;
         if (!isThisTech) return false;
 

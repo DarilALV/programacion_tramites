@@ -291,8 +291,9 @@ export default function SeguimientosPage() {
 
     todayFollowUps.forEach((e) => {
       (e.followUps ?? [])
-        .filter((fu) => fu.createdAt?.startsWith(today) && fu.type !== 'caducidades')
+        .filter((fu) => fu.createdAt?.startsWith(today))
         .forEach((fu) => {
+          if (fu.type === 'caducidades') return;
           const tid = fu.actualTechnicianId ?? e.technicianId;
           const tn = fu.actualTechnicianName ?? e.technicianName;
           if (!load[tid]) load[tid] = { name: tn, programados: 0, llegadas: 0, atendidos: 0, completados: 0 };
