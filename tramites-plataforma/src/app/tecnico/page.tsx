@@ -511,6 +511,29 @@ export default function AgendaTecnicoPage() {
     });
   }, [agendaHoy, selectedDate, currentTechnicianId]);
 
+  const attendanceBreakdown = useMemo(() => {
+    const breakdown = { normal: 0, caducidades: 0, planimetrias: 0, consultas: 0, legalizaciones_sheets: 0, juntas_tramites: 0, total: 0 };
+    expandedAgendaHoy.forEach(({ followUp }) => {
+      const type = followUp.type || 'normal';
+      if (type === 'legalización') {
+        const match = followUp.observations?.match(/(\d+)\s+hojas?/);
+        if (match) breakdown.legalizaciones_sheets += parseInt(match[1], 10);
+      } else if (type === 'junta_ingreso') {
+        breakdown.juntas_tramites++;
+      } else if (type === 'normal') {
+        breakdown.normal++;
+      } else if (type === 'caducidades') {
+        breakdown.caducidades++;
+      } else if (type === 'planimetrias') {
+        breakdown.planimetrias++;
+      } else if (type === 'consultas') {
+        breakdown.consultas++;
+      }
+    });
+    breakdown.total = breakdown.normal + breakdown.caducidades + breakdown.planimetrias + breakdown.consultas + breakdown.legalizaciones_sheets + breakdown.juntas_tramites;
+    return breakdown;
+  }, [expandedAgendaHoy]);
+
   // Report data
   const reportEntries = useMemo(() => {
     if (!currentTechnicianId) return [];
@@ -877,11 +900,16 @@ export default function AgendaTecnicoPage() {
 
         {/* ── AGENDA ── */}
         <section className="rounded-4xl border-2 border-pink-200 overflow-hidden">
-          <div className="bg-gradient-to-r from-pink-600 to-purple-600 text-white px-6 py-4 flex items-center justify-between gap-4 flex-wrap">
-            <h2 className="text-2xl font-bold">Agenda — {selectedDate}</h2>
-            <div className="flex items-center gap-3 text-sm">
-              <span>📋 {expandedAgendaHoy.length} seguimientos</span>
-              <span>✅ {expandedAgendaHoy.filter(({ followUp }) => followUp.followUpStatus === "completado").length} completados</span>
+          <div className="bg-gradient-to-r from-pink-600 to-purple-600 text-white px-6 py-4">
+            <h2 className="text-2xl font-bold mb-3">Agenda — {selectedDate}</h2>
+            <div className="text-sm space-y-1">
+              {attendanceBreakdown.normal > 0 && <span>Seguimientos: {attendanceBreakdown.normal}</span>}
+              {attendanceBreakdown.caducidades > 0 && <span>Caducidades: {attendanceBreakdown.caducidades}</span>}
+              {attendanceBreakdown.planimetrias > 0 && <span>Planimetrías: {attendanceBreakdown.planimetrias}</span>}
+              {attendanceBreakdown.consultas > 0 && <span>Consultas: {attendanceBreakdown.consultas}</span>}
+              {attendanceBreakdown.legalizaciones_sheets > 0 && <span>Legalizaciones: {attendanceBreakdown.legalizaciones_sheets} hojas</span>}
+              {attendanceBreakdown.juntas_tramites > 0 && <span>Juntas: {attendanceBreakdown.juntas_tramites} trámites</span>}
+              <div className="border-t border-white/30 pt-2 mt-2 font-semibold">Total: {attendanceBreakdown.total} atenciones</div>
             </div>
           </div>
 
