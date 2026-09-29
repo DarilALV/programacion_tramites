@@ -345,7 +345,12 @@ export default function SeguimientosPage() {
 
           if (fu.type === "planimetrias") { countToday[tid].planimetrias++; countByType[tid].planimetrias++; }
           else if (fu.type === "consultas") { countToday[tid].consultas++; countByType[tid].consultas++; }
-          else if (fu.type === "legalización") { countToday[tid].legalizaciones++; countByType[tid].legalizaciones++; }
+          else if (fu.type === "legalización") {
+            const match = fu.observations?.match(/(\d+)\s+hojas?/);
+            const sheets = match ? parseInt(match[1], 10) : 1;
+            countToday[tid].legalizaciones += sheets;
+            countByType[tid].legalizaciones++;
+          }
           else if (fu.type === "caducidades") { countToday[tid].caducidades++; countByType[tid].caducidades++; }
 
           countToday[tid].total++;
