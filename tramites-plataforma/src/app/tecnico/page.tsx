@@ -715,23 +715,33 @@ export default function AgendaTecnicoPage() {
 
   async function exportarReporte() {
     const XLSX = await import("xlsx");
-    const rows = reportEntries.map((e) => {
-      const fu = e.followUps?.[0];
-      if (!fu) return null;
-      const wait = fu.arrivalTime && fu.attendedTime ? minDiff(fu.arrivalTime, fu.attendedTime) : "";
-      const attn = fu.attendedTime && fu.completedTime ? minDiff(fu.attendedTime, fu.completedTime) : "";
-      return {
-        Fecha: e.scheduleDate, Técnico: currentTechnician?.name ?? "",
-        "Trámite": e.tramiteCode, "Registro": e.registrationNumber,
-        "Sin programación": fu.isUnscheduled ? "Sí" : "No",
-        "Cliente": fu.clientName ?? "", "Llegó": fu.arrivalTime ?? "",
-        "Estado": fu.followUpStatus ?? "", "Llamado": fu.calledTime ?? "",
-        "Regresó": fu.returnedTime ?? "", "Atendiendo": fu.attendedTime ?? "",
-        "Completado": fu.completedTime ?? "",
-        "Espera (min)": wait, "Atención (min)": attn,
-        "Obs.": fu.observations ?? "",
-      };
-    }).filter((r): r is any => r !== null);
+    // Exportar TODOS los followUps, no solo el primero de cada entry
+    const rows = reportEntries.flatMap((e) =>
+      (e.followUps ?? []).map((fu) => {
+        // Filtrar por período según reportePeriodo
+        let from: string, to: string;
+        if (reportePeriodo === "dia") { from = to = selectedDate; }
+        else if (reportePeriodo === "semana") { const r = weekRange(selectedDate); from = r.from; to = r.to; }
+        else { const r = monthRange(selectedDate); from = r.from; to = r.to; }
+
+        const d = fu.createdAt?.slice(0, 10) ?? "";
+        if (!(d >= from && d <= to)) return null;
+
+        const wait = fu.arrivalTime && fu.attendedTime ? minDiff(fu.arrivalTime, fu.attendedTime) : "";
+        const attn = fu.attendedTime && fu.completedTime ? minDiff(fu.attendedTime, fu.completedTime) : "";
+        return {
+          Fecha: e.scheduleDate, Técnico: currentTechnician?.name ?? "",
+          "Trámite": e.tramiteCode, "Registro": e.registrationNumber,
+          "Sin programación": fu.isUnscheduled ? "Sí" : "No",
+          "Cliente": fu.clientName ?? "", "Llegó": fu.arrivalTime ?? "",
+          "Estado": fu.followUpStatus ?? "", "Llamado": fu.calledTime ?? "",
+          "Regresó": fu.returnedTime ?? "", "Atendiendo": fu.attendedTime ?? "",
+          "Completado": fu.completedTime ?? "", "Tipo": fu.type ?? "normal",
+          "Espera (min)": wait, "Atención (min)": attn,
+          "Obs.": fu.observations ?? "",
+        };
+      })
+    ).filter((r): r is any => r !== null);
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Reporte");
