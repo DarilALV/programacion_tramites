@@ -557,38 +557,47 @@ export default function AgendaTecnicoPage() {
   }, [entries, currentTechnicianId, selectedDate, reportePeriodo]);
 
   const reportStats = useMemo(() => {
-    const getLastFollowUp = (e: Entry) => e.followUps?.[e.followUps.length - 1];
+    // Calcular período según filtro
+    let from: string, to: string;
+    if (reportePeriodo === "dia") { from = to = selectedDate; }
+    else if (reportePeriodo === "semana") { const r = weekRange(selectedDate); from = r.from; to = r.to; }
+    else { const r = monthRange(selectedDate); from = r.from; to = r.to; }
 
-    const completados = reportEntries.filter((e) => getLastFollowUp(e)?.followUpStatus === "completado");
-    const noEscucho = reportEntries.filter((e) => getLastFollowUp(e)?.followUpStatus === "no-escucho");
-    const enProceso = reportEntries.filter((e) => {
-      const st = getLastFollowUp(e)?.followUpStatus;
+    // Contar TODOS los followUps en el período (no solo el último por entry)
+    const allFollowUpsInPeriod: any[] = [];
+    reportEntries.forEach((e) => {
+      (e.followUps ?? []).forEach((fu) => {
+        const d = fu.createdAt?.slice(0, 10) ?? "";
+        if (d >= from && d <= to) {
+          allFollowUpsInPeriod.push(fu);
+        }
+      });
+    });
+
+    const completados = allFollowUpsInPeriod.filter((fu) => fu?.followUpStatus === "completado");
+    const noEscucho = allFollowUpsInPeriod.filter((fu) => fu?.followUpStatus === "no-escucho");
+    const enProceso = allFollowUpsInPeriod.filter((fu) => {
+      const st = fu?.followUpStatus;
       return st && ["esperando", "en-revision", "llamado", "regreso"].includes(st);
     });
 
     const waitTimes = completados
-      .map((e) => {
-        const fu = getLastFollowUp(e);
-        return fu?.arrivalTime && fu?.attendedTime ? minDiff(fu.arrivalTime, fu.attendedTime) : null;
-      })
+      .map((fu) => fu?.arrivalTime && fu?.attendedTime ? minDiff(fu.arrivalTime, fu.attendedTime) : null)
       .filter((v): v is number => v !== null && v >= 0);
     const attnTimes = completados
-      .map((e) => {
-        const fu = getLastFollowUp(e);
-        return fu?.attendedTime && fu?.completedTime ? minDiff(fu.attendedTime, fu.completedTime) : null;
-      })
+      .map((fu) => fu?.attendedTime && fu?.completedTime ? minDiff(fu.attendedTime, fu.completedTime) : null)
       .filter((v): v is number => v !== null && v >= 0);
     const avg = (arr: number[]) => arr.length ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : null;
 
     return {
-      total: reportEntries.length,
+      total: allFollowUpsInPeriod.length,
       completados: completados.length,
       noEscucho: noEscucho.length,
       enProceso: enProceso.length,
       avgEspera: avg(waitTimes),
       avgAtencion: avg(attnTimes),
     };
-  }, [reportEntries]);
+  }, [reportEntries, selectedDate, reportePeriodo]);
 
   const marcarSaliALlamar = useCallback(async (entryId: string, followUpCreatedAt?: string) => {
     const entry = entries.find((e) => e.id === entryId);
