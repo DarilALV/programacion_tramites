@@ -77,20 +77,20 @@ const AgendaRow = memo(function AgendaRow({
   const fu = propsFollowUp ?? entry.followUps?.[0];
   const st = (fu?.followUpStatus ?? (fu ? "esperando" : undefined)) as FollowUpStatus | undefined;
 
-  // Definir colores base por status
+  // Definir colores base por status - Identidad Mi Casa Segura (Celeste, Morado, Blanco)
   const statusBg =
-    st === "completado"   ? "bg-green-50 border-green-400" :
+    st === "completado"   ? "bg-sky-50 border-sky-400" :
     st === "llamado"      ? "bg-purple-50 border-purple-400" :
-    st === "regreso"      ? "bg-yellow-50 border-yellow-400" :
-    st === "no-escucho"   ? "bg-orange-50 border-orange-300" :
-    st === "esperando"    ? "bg-red-100 border-red-500 animate-pulse" :
+    st === "regreso"      ? "bg-sky-100 border-sky-400" :
+    st === "no-escucho"   ? "bg-purple-50 border-purple-300" :
+    st === "esperando"    ? "bg-purple-100 border-purple-400 animate-pulse" :
     "bg-white border-gray-200";
 
   // Ajustar color si es un tipo especial de registro
   const rowBg =
-    fu?.type === "planimetrias" ? "bg-orange-50 border-orange-400" :
-    fu?.type === "consultas" ? "bg-indigo-50 border-indigo-400" :
-    fu?.type === "legalización" ? "bg-lime-50 border-lime-400" :
+    fu?.type === "planimetrias" ? "bg-sky-50 border-sky-400" :
+    fu?.type === "consultas" ? "bg-purple-50 border-purple-400" :
+    fu?.type === "legalización" ? "bg-purple-50 border-purple-300" :
     statusBg;
 
   const esperaMinutos = fu?.arrivalTime ? minDiff(fu.arrivalTime, fu.completedTime) : null;
@@ -856,7 +856,7 @@ export default function AgendaTecnicoPage() {
         </div>
 
         {/* ── FILTROS ── */}
-        <section className="rounded-4xl border-2 border-pink-200 bg-pink-50 p-6 space-y-4">
+        <section className="rounded-4xl border-2 border-purple-300 bg-white p-6 space-y-4">
           <div className="flex items-center justify-between flex-wrap gap-3">
             <h3 className="text-lg font-bold text-gray-800">Mi Agenda</h3>
             {!notifAllowed && "Notification" in (typeof window !== "undefined" ? window : {}) && (

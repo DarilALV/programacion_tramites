@@ -1554,9 +1554,6 @@ export default function SeguimientosPage() {
                                   className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm" />
                               </label>
                             </div>
-                            <div className="rounded-lg bg-blue-50 border border-blue-200 p-3 mt-2">
-                              <p className="text-xs text-blue-700 font-semibold">ℹ️ Para cambiar técnico, usa el botón <span className="bg-purple-500 text-white px-2 py-0.5 rounded text-xs font-bold">↗️ Derivar</span></p>
-                            </div>
                             <div className="flex gap-2 mt-2">
                               <button onClick={() => handleSaveEdit(entry)} className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-semibold cursor-pointer hover:bg-green-700">✓ Guardar</button>
                               <button onClick={() => setEditingFollowUpId(null)} className="px-3 py-1.5 bg-gray-400 text-white rounded-lg text-xs font-semibold cursor-pointer hover:bg-gray-500">Cancelar</button>
@@ -1627,9 +1624,6 @@ export default function SeguimientosPage() {
                                   ↩️ Regresó
                                 </button>
                               )}
-                              <button onClick={() => { setDerivingEntryId(entry.id); setDerivingToTechId(""); }} className="text-xs px-2 py-1 rounded bg-purple-500 text-white hover:bg-purple-600 cursor-pointer whitespace-nowrap">
-                                ↗️ Derivar
-                              </button>
                               <button onClick={() => handleStartEdit(entry, fu)} className="text-xs px-2 py-1 rounded bg-blue-500 text-white hover:bg-blue-600 cursor-pointer">✏️ Editar</button>
                               <button onClick={() => {
                                 setEditHours({ arrival: fu.arrivalTime || "", called: fu.calledTime || "", returned: fu.returnedTime || "", attended: fu.attendedTime || "", completed: fu.completedTime || "" });
@@ -1696,8 +1690,8 @@ export default function SeguimientosPage() {
           )}
         </section>
 
-        {/* ── MODAL DERIVACIÓN ── */}
-        {derivingEntryId && (
+        {/* ── MODAL DERIVACIÓN ── (Oculto - Usar registro manual en su lugar) */}
+        {false && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 space-y-6">
               <div>
@@ -1760,7 +1754,7 @@ export default function SeguimientosPage() {
                   className="flex-1 px-4 py-3 rounded-lg bg-gray-300 text-gray-700 font-semibold hover:bg-gray-400 cursor-pointer transition">
                   Cancelar
                 </button>
-                <button onClick={() => handleDerivar(derivingEntryId, derivingToTechId)}
+                <button onClick={() => handleDerivar(derivingEntryId!, derivingToTechId)}
                   disabled={!derivingToTechId}
                   className={`flex-1 px-4 py-3 rounded-lg font-semibold transition cursor-pointer ${derivingToTechId ? "bg-purple-600 text-white hover:bg-purple-700" : "bg-gray-300 text-gray-500 cursor-not-allowed"}`}>
                   ↗️ Derivar
