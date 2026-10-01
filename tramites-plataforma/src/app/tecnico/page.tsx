@@ -217,7 +217,7 @@ const AgendaRow = memo(function AgendaRow({
                 </button>
                 <button onClick={() => onSinRespuesta(entry.id, fu?.createdAt)}
                   className="w-full px-3 py-2 bg-gray-600 text-white text-sm font-bold rounded-lg hover:bg-gray-700 cursor-pointer shadow">
-                  ✅ No Atendí
+                  ✅ No Respondió
                 </button>
               </div>
             </div>
