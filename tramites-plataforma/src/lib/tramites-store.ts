@@ -1069,6 +1069,12 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
       entry.id === entryId ? updatedEntry : entry
     );
     persistState(nextEntries);
+
+    // Guardado inmediato en IndexedDB para no perder datos con debounce
+    saveToIndexedDB(nextEntries, juntas, currentUserId, currentTechnicianId).catch((error) => {
+      console.error('Error guardando inmediatamente en IndexedDB:', error);
+    });
+
     const creator = plannerUsers.find((user) => user.id === currentUserId) ?? plannerUsers[0];
     logAudit("update", "entry", entryId, updatedEntry.tramiteCode, creator.id, creator.name, ["localStorage"], "success");
     firestoreSet(entryId, updatedEntry).catch((error) => {
