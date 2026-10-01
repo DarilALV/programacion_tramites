@@ -1273,6 +1273,7 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
         technicianId: newTechnicianId,
         technicianName: newTechnicianName,
         createdAt: new Date().toISOString(),
+        attemptCount: 1,
       };
 
       console.log("derivarTramite - newFollowUp creado:", newFollowUp);
@@ -1331,6 +1332,7 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
         actualTechnicianId: newTechnicianId,
         actualTechnicianName: newTechnicianName,
         clientName: clientName,
+        attemptCount: 1,
       };
 
       updateEntry(entryId, {

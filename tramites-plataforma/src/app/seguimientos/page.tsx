@@ -531,6 +531,7 @@ export default function SeguimientosPage() {
         technicianName: effectiveTechnician?.name ?? selectedTechnicianId,
         observations: observations.trim() || undefined,
         createdAt: iso,
+        attemptCount: 1,
       };
 
       updateEntry(foundEntry.id, {
@@ -551,7 +552,7 @@ export default function SeguimientosPage() {
         technicianArea: effectiveTechnician?.areaLabel ?? "",
         scheduleDate: today, registrationDate: today,
         observations: "", status: "Registrado", createdAt: iso,
-        followUps: [{ type: "normal", clientName: clientName.trim(), arrivalTime: arrival, followUpStatus: "esperando", observations: observations.trim() || undefined, createdAt: iso, isUnscheduled: true }],
+        followUps: [{ type: "normal", clientName: clientName.trim(), arrivalTime: arrival, followUpStatus: "esperando", observations: observations.trim() || undefined, createdAt: iso, isUnscheduled: true, attemptCount: 1 }],
       };
       createEntry(newEntry);
     }
@@ -593,6 +594,7 @@ export default function SeguimientosPage() {
         observations: (observations.trim() ? `[${selectedGestion}] ${observations.trim()}` : `[${selectedGestion}]`),
         createdAt: iso,
         isUnscheduled: false,
+        attemptCount: 1,
       };
 
       updateEntry(foundEntry.id, {
@@ -621,6 +623,7 @@ export default function SeguimientosPage() {
           observations: (observations.trim() ? `[${selectedGestion}] ${observations.trim()}` : `[${selectedGestion}]`),
           createdAt: iso,
           isUnscheduled: true,
+          attemptCount: 1,
         }],
       };
       createEntry(newEntry);
