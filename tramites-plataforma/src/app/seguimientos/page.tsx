@@ -536,6 +536,7 @@ export default function SeguimientosPage() {
 
       updateEntry(foundEntry.id, {
         ...foundEntry,
+        deleted: false, // Restaurar si estaba eliminado
         technicianId: selectedTechnicianId,
         technicianName: effectiveTechnician?.name ?? selectedTechnicianId,
         technicianArea: effectiveTechnician?.areaLabel ?? foundEntry.technicianArea,
@@ -599,6 +600,7 @@ export default function SeguimientosPage() {
 
       updateEntry(foundEntry.id, {
         ...foundEntry,
+        deleted: false, // Restaurar si estaba eliminado
         technicianId: archivosId,
         technicianName: archivosName,
         technicianArea: archivosArea,
