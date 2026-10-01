@@ -581,7 +581,10 @@ export default function AgendaTecnicoPage() {
       });
     });
 
-    const completados = allFollowUpsInPeriod.filter((fu) => fu?.followUpStatus === "completado");
+    const completados = allFollowUpsInPeriod.filter((fu) => {
+      const st = fu?.followUpStatus;
+      return st && ["completado", "sin-respuesta"].includes(st);
+    });
     const noEscucho = allFollowUpsInPeriod.filter((fu) => fu?.followUpStatus === "no-escucho");
     const enProceso = allFollowUpsInPeriod.filter((fu) => {
       const st = fu?.followUpStatus;
