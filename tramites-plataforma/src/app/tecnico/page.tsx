@@ -621,7 +621,7 @@ export default function AgendaTecnicoPage() {
       : entry.followUps?.[0];
     if (!fu) return;
     const { time } = await getServerNow();
-    const newFollowUps = (entry.followUps ?? []).map(f => f === fu ? { ...fu, followUpStatus: "llamado" as const, calledTime: time } : f);
+    const newFollowUps = (entry.followUps ?? []).map(f => f.createdAt === fu.createdAt ? { ...fu, followUpStatus: "llamado" as const, calledTime: time } : f);
     updateEntry(entryId, { ...entry, followUps: newFollowUps });
   }, [entries, updateEntry]);
 
@@ -632,7 +632,7 @@ export default function AgendaTecnicoPage() {
       ? entry.followUps?.find(f => f.createdAt === followUpCreatedAt)
       : entry.followUps?.[0];
     if (!fu) return;
-    const newFollowUps = (entry.followUps ?? []).map(f => f === fu ? { ...f, followUpStatus: "en-revision" as const } : f);
+    const newFollowUps = (entry.followUps ?? []).map(f => f.createdAt === fu.createdAt ? { ...f, followUpStatus: "en-revision" as const } : f);
     updateEntry(entryId, { ...entry, followUps: newFollowUps });
   }, [entries, updateEntry]);
 
@@ -644,7 +644,7 @@ export default function AgendaTecnicoPage() {
       : entry.followUps?.[0];
     if (!fu) return;
     const { time } = await getServerNow();
-    const newFollowUps = (entry.followUps ?? []).map(f => f === fu ? {
+    const newFollowUps = (entry.followUps ?? []).map(f => f.createdAt === fu.createdAt ? {
       ...fu,
       followUpStatus: "completado" as const,
       attendedTime: fu.calledTime ?? fu.returnedTime ?? time,
@@ -660,7 +660,7 @@ export default function AgendaTecnicoPage() {
       ? entry.followUps?.find(f => f.createdAt === followUpCreatedAt)
       : entry.followUps?.[0];
     if (!fu) return;
-    const newFollowUps = (entry.followUps ?? []).map(f => f === fu ? { ...fu, followUpStatus: "no-escucho" as const } : f);
+    const newFollowUps = (entry.followUps ?? []).map(f => f.createdAt === fu.createdAt ? { ...fu, followUpStatus: "no-escucho" as const } : f);
     updateEntry(entryId, { ...entry, followUps: newFollowUps });
   }, [entries, updateEntry]);
 
@@ -675,7 +675,7 @@ export default function AgendaTecnicoPage() {
 
     // Incrementar contador de intentos y cambiar a "llamado"
     const newFollowUps = (entry.followUps ?? []).map(f =>
-      f === fu ? {
+      f.createdAt === fu.createdAt ? {
         ...f,
         followUpStatus: "llamado" as const,
         returnedTime: time,
@@ -695,7 +695,7 @@ export default function AgendaTecnicoPage() {
       : entry.followUps?.[0];
     if (!fu) return;
     const { time } = await getServerNow();
-    const newFollowUps = (entry.followUps ?? []).map(f => f === fu ? {
+    const newFollowUps = (entry.followUps ?? []).map(f => f.createdAt === fu.createdAt ? {
       ...fu,
       followUpStatus: "completado" as const,
       completedTime: time,
@@ -711,7 +711,7 @@ export default function AgendaTecnicoPage() {
       : entry.followUps?.[0];
     if (!fu) return;
     const { time } = await getServerNow();
-    const newFollowUps = (entry.followUps ?? []).map(f => f === fu ? {
+    const newFollowUps = (entry.followUps ?? []).map(f => f.createdAt === fu.createdAt ? {
       ...fu,
       followUpStatus: "sin-respuesta" as const,
       completedTime: time,
@@ -729,7 +729,7 @@ export default function AgendaTecnicoPage() {
     if (!fu) return;
 
     const newFollowUps = (entry.followUps ?? []).map(f =>
-      f === fu ? {
+      f.createdAt === fu.createdAt ? {
         ...f,
         arrivalTime: editHours.arrival || f.arrivalTime,
         calledTime: editHours.called || f.calledTime,
