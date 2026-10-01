@@ -811,34 +811,21 @@ export default function SeguimientosPage() {
   }
 
   function handleDeleteFollowUp(entry: Entry, followUp: FollowUp) {
-    console.log("handleDeleteFollowUp - entry:", entry.id, "followUp createdAt:", followUp.createdAt);
-    console.log("handleDeleteFollowUp - entry.followUps:", entry.followUps);
-
     if (!entry.followUps || entry.followUps.length === 0) {
       showMsg("⚠️ No hay seguimientos para eliminar", "error");
       setConfirmDeleteId(null);
       return;
     }
 
-    // Filtrar comparando por createdAt (más confiable que referencia)
-    const newFollowUps = entry.followUps.filter((fu, idx) => {
-      const isSame = fu.createdAt === followUp.createdAt;
-      console.log(`Comparando índice ${idx}: ${fu.createdAt} === ${followUp.createdAt}? ${isSame}`);
-      return !isSame;
-    });
+    // Filtrar por createdAt - solo elimina el followUp, no el Entry completo
+    const newFollowUps = entry.followUps.filter((fu) => fu.createdAt !== followUp.createdAt);
 
-    console.log("newFollowUps length:", newFollowUps.length, "original length:", entry.followUps.length);
-
-    // Si no quedan followUps, borrar el entry completo (soft delete)
-    if (newFollowUps.length === 0) {
-      removeEntry(entry.id);
-      showMsg(`✅ Seguimiento eliminado`);
-    } else if (newFollowUps.length === entry.followUps.length) {
-      // No se eliminó nada
-      console.error("No se eliminó nada - createdAt mismatch?");
-      showMsg("⚠️ No se pudo eliminar - falla al encontrar registro", "error");
+    if (newFollowUps.length === entry.followUps.length) {
+      // No se eliminó nada (no encontró el followUp)
+      showMsg("⚠️ No se pudo eliminar - registro no encontrado", "error");
     } else {
-      // Si quedan followUps, solo actualizar la lista
+      // Siempre actualizar solo los followUps, nunca borrar el Entry completo
+      // Así nuevos seguimientos aparecen sin necesidad de restaurar
       updateEntry(entry.id, { ...entry, followUps: newFollowUps });
       showMsg(`✅ Seguimiento eliminado`);
     }
