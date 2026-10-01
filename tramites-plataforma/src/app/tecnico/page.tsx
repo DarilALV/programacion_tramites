@@ -59,6 +59,7 @@ interface AgendaRowProps {
   onNoRespondio: (id: string, followUpCreatedAt?: string) => void;
   onRegreso: (id: string, followUpCreatedAt?: string) => void;
   onTermineDeAtender: (id: string, followUpCreatedAt?: string) => void;
+  onSinRespuesta: (id: string, followUpCreatedAt?: string) => void;
   onEditarHora: (id: string, followUpCreatedAt?: string) => void;
   onContinuarEtapa?: (id: string) => void;
 }
@@ -72,6 +73,7 @@ const AgendaRow = memo(function AgendaRow({
   onNoRespondio,
   onRegreso,
   onTermineDeAtender,
+  onSinRespuesta,
   onEditarHora,
   onContinuarEtapa,
 }: AgendaRowProps) {
@@ -208,10 +210,16 @@ const AgendaRow = memo(function AgendaRow({
               <div className="rounded-lg bg-orange-50 border border-orange-200 p-2">
                 <p className="text-xs text-orange-800 font-semibold">⏳ Esperando regreso</p>
               </div>
-              <button onClick={() => onRegreso(entry.id, fu?.createdAt)}
-                className="w-full px-3 py-2 bg-yellow-600 text-white text-sm font-bold rounded-lg hover:bg-yellow-700 cursor-pointer shadow">
-                ↩️ Volví a salir
-              </button>
+              <div className="space-y-1">
+                <button onClick={() => onRegreso(entry.id, fu?.createdAt)}
+                  className="w-full px-3 py-2 bg-yellow-600 text-white text-sm font-bold rounded-lg hover:bg-yellow-700 cursor-pointer shadow">
+                  ↩️ Volví a salir
+                </button>
+                <button onClick={() => onSinRespuesta(entry.id, fu?.createdAt)}
+                  className="w-full px-3 py-2 bg-gray-600 text-white text-sm font-bold rounded-lg hover:bg-gray-700 cursor-pointer shadow">
+                  ✅ No Atendí
+                </button>
+              </div>
             </div>
           )}
 
@@ -691,6 +699,23 @@ export default function AgendaTecnicoPage() {
     updateEntry(entryId, { ...entry, followUps: newFollowUps });
   }, [entries, updateEntry]);
 
+  const marcarSinRespuesta = useCallback(async (entryId: string, followUpCreatedAt?: string) => {
+    const entry = entries.find((e) => e.id === entryId);
+    if (!entry) return;
+    const fu = followUpCreatedAt
+      ? entry.followUps?.find(f => f.createdAt === followUpCreatedAt)
+      : entry.followUps?.[0];
+    if (!fu) return;
+    const { time } = await getServerNow();
+    const newFollowUps = (entry.followUps ?? []).map(f => f === fu ? {
+      ...fu,
+      followUpStatus: "sin-respuesta" as const,
+      completedTime: time,
+      attended: true,
+    } : f);
+    updateEntry(entryId, { ...entry, followUps: newFollowUps });
+  }, [entries, updateEntry]);
+
   const guardarHorasEditadas = useCallback((entryId: string, followUpCreatedAt?: string) => {
     const entry = entries.find((e) => e.id === entryId);
     if (!entry) return;
@@ -947,6 +972,7 @@ export default function AgendaTecnicoPage() {
                   onNoRespondio={marcarNoRespondio}
                   onRegreso={marcarRegreso}
                   onTermineDeAtender={marcarTermineDeAtender}
+                  onSinRespuesta={marcarSinRespuesta}
                   onEditarHora={(id, createdAt) => {
                     const fu = entry.followUps?.find(f => f.createdAt === createdAt);
                     if (fu) setEditHours({ arrival: fu.arrivalTime || "", called: fu.calledTime || "", returned: fu.returnedTime || "", attended: fu.attendedTime || "", completed: fu.completedTime || "" });
