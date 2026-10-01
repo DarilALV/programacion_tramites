@@ -673,17 +673,25 @@ export default function AgendaTecnicoPage() {
     if (!fu) return;
     const { time } = await getServerNow();
 
-    // Incrementar contador de intentos y cambiar a "llamado"
-    const newFollowUps = (entry.followUps ?? []).map(f =>
-      f.createdAt === fu.createdAt ? {
-        ...f,
-        followUpStatus: "llamado" as const,
-        returnedTime: time,
-        calledTime: time,
-        attemptCount: (f.attemptCount ?? 1) + 1
-      } : f
-    );
+    console.log("marcarRegreso - fu.createdAt:", fu.createdAt, "attemptCount actual:", fu.attemptCount);
 
+    // Incrementar contador de intentos y cambiar a "llamado"
+    const newFollowUps = (entry.followUps ?? []).map(f => {
+      if (f.createdAt === fu.createdAt) {
+        const newAttempt = (f.attemptCount ?? 1) + 1;
+        console.log("Incrementando attemptCount:", f.attemptCount, "→", newAttempt);
+        return {
+          ...f,
+          followUpStatus: "llamado" as const,
+          returnedTime: time,
+          calledTime: time,
+          attemptCount: newAttempt
+        };
+      }
+      return f;
+    });
+
+    console.log("newFollowUps:", newFollowUps);
     updateEntry(entryId, { ...entry, followUps: newFollowUps });
   }, [entries, updateEntry]);
 
