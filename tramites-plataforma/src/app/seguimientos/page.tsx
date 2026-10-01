@@ -1618,6 +1618,15 @@ export default function SeguimientosPage() {
                             </div>
                           ) : (
                             <div className="flex flex-col gap-1">
+                              {/* Marcar como "no escuchó" si está en estado "llamado" */}
+                              {st === "llamado" && (
+                                <button onClick={() => {
+                                  const updatedFu = { ...fu, followUpStatus: "no-escucho" as const };
+                                  updateEntry(entry.id, { ...entry, followUps: entry.followUps?.map(f => f.createdAt === fu.createdAt ? updatedFu : f) ?? [] });
+                                }} className="text-xs px-2 py-1 rounded bg-orange-500 text-white hover:bg-orange-600 cursor-pointer whitespace-nowrap">
+                                  ❌ No Escuchó
+                                </button>
+                              )}
                               {/* "Cliente regresó" solo si fue llamado y no escuchó */}
                               {st === "no-escucho" && (
                                 <button onClick={() => handleMarkRegreso(entry, fu)} className="text-xs px-2 py-1 rounded bg-yellow-500 text-white hover:bg-yellow-600 cursor-pointer whitespace-nowrap">
