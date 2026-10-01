@@ -80,10 +80,6 @@ const AgendaRow = memo(function AgendaRow({
   const fu = propsFollowUp ?? entry.followUps?.[0];
   const st = (fu?.followUpStatus ?? (fu ? "esperando" : undefined)) as FollowUpStatus | undefined;
 
-  useEffect(() => {
-    console.log("AgendaRow re-render:", entry.id, "attemptCount:", fu?.attemptCount);
-  }, [entry, fu?.attemptCount, fu?.createdAt]);
-
   // Definir colores base por status - Identidad Mi Casa Segura (Celeste, Morado, Blanco)
   const statusBg =
     st === "completado"   ? "bg-sky-50 border-sky-400" :
@@ -147,14 +143,7 @@ const AgendaRow = memo(function AgendaRow({
         {/* Estado + métricas */}
         <div>
           <p className="text-xs text-gray-500 uppercase mb-1">Estado</p>
-          <div className="flex items-center gap-2">
-            <p className="font-bold">{st ? STATUS_LABEL[st] : "🕐 Sin llegada"}</p>
-            {fu && (
-              <span className="inline-block px-2 py-1 bg-amber-100 text-amber-700 text-xs font-bold rounded-full">
-                📞 {fu.attemptCount ?? 1} intento{(fu.attemptCount ?? 1) !== 1 ? 's' : ''}
-              </span>
-            )}
-          </div>
+          <p className="font-bold">{st ? STATUS_LABEL[st] : "🕐 Sin llegada"}</p>
           {llamadoHaceMin !== null && llamadoHaceMin >= 0 && (
             <p className={`text-xs mt-1 font-semibold ${llamadoHaceMin > 10 ? "text-red-600" : "text-purple-700"}`}>
               Salí hace {fmtMin(llamadoHaceMin)}
@@ -677,13 +666,10 @@ export default function AgendaTecnicoPage() {
     if (!fu) return;
     const { time } = await getServerNow();
 
-    console.log("marcarRegreso - fu.createdAt:", fu.createdAt, "attemptCount actual:", fu.attemptCount);
-
     // Incrementar contador de intentos y cambiar a "llamado"
     const newFollowUps = (entry.followUps ?? []).map(f => {
       if (f.createdAt === fu.createdAt) {
         const newAttempt = (f.attemptCount ?? 1) + 1;
-        console.log("Incrementando attemptCount:", f.attemptCount, "→", newAttempt);
         return {
           ...f,
           followUpStatus: "llamado" as const,
@@ -695,7 +681,6 @@ export default function AgendaTecnicoPage() {
       return f;
     });
 
-    console.log("newFollowUps:", newFollowUps);
     updateEntry(entryId, { ...entry, followUps: newFollowUps });
   }, [entries, updateEntry]);
 
