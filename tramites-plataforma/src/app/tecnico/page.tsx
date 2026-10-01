@@ -143,10 +143,14 @@ const AgendaRow = memo(function AgendaRow({
         {/* Estado + métricas */}
         <div>
           <p className="text-xs text-gray-500 uppercase mb-1">Estado</p>
-          <p className="font-bold">{st ? STATUS_LABEL[st] : "🕐 Sin llegada"}</p>
-          {fu?.attemptCount && fu.attemptCount > 1 && (
-            <p className="text-xs text-amber-600 font-semibold mt-1">🔄 Intento: {fu.attemptCount}</p>
-          )}
+          <div className="flex items-center gap-2">
+            <p className="font-bold">{st ? STATUS_LABEL[st] : "🕐 Sin llegada"}</p>
+            {fu && (fu.attemptCount ?? 0) > 0 && (
+              <span className="inline-block px-2 py-1 bg-amber-100 text-amber-700 text-xs font-bold rounded-full">
+                📞 {fu.attemptCount} intento{fu.attemptCount !== 1 ? 's' : ''}
+              </span>
+            )}
+          </div>
           {llamadoHaceMin !== null && llamadoHaceMin >= 0 && (
             <p className={`text-xs mt-1 font-semibold ${llamadoHaceMin > 10 ? "text-red-600" : "text-purple-700"}`}>
               Salí hace {fmtMin(llamadoHaceMin)}
