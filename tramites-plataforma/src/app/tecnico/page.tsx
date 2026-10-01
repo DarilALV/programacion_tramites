@@ -80,6 +80,10 @@ const AgendaRow = memo(function AgendaRow({
   const fu = propsFollowUp ?? entry.followUps?.[0];
   const st = (fu?.followUpStatus ?? (fu ? "esperando" : undefined)) as FollowUpStatus | undefined;
 
+  useEffect(() => {
+    console.log("AgendaRow re-render:", entry.id, "attemptCount:", fu?.attemptCount);
+  }, [entry, fu?.attemptCount, fu?.createdAt]);
+
   // Definir colores base por status - Identidad Mi Casa Segura (Celeste, Morado, Blanco)
   const statusBg =
     st === "completado"   ? "bg-sky-50 border-sky-400" :
