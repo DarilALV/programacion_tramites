@@ -95,7 +95,7 @@ export type FollowUp = {
   actualTechnicianId?: string;
   actualTechnicianName?: string;
   attended?: boolean;
-  followUpStatus?: "esperando" | "en-revision" | "llamado" | "no-escucho" | "regreso" | "atendiendo" | "completado";
+  followUpStatus?: "esperando" | "en-revision" | "llamado" | "no-escucho" | "regreso" | "atendiendo" | "sin-respuesta" | "completado";
   observations?: string;
   createdAt?: string;
   isUnscheduled?: boolean;

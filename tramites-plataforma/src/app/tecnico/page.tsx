@@ -6,7 +6,7 @@ import { ToastAlert } from "@/components/toast-alert";
 import { technicians, useTramitesStore, type Entry, type FollowUp } from "@/lib/tramites-store";
 import { getServerNow } from "@/lib/server-time";
 
-type FollowUpStatus = "esperando" | "llamado" | "no-escucho" | "regreso" | "completado" | "atendiendo" | "en-revision";
+type FollowUpStatus = "esperando" | "llamado" | "no-escucho" | "regreso" | "completado" | "atendiendo" | "en-revision" | "sin-respuesta";
 
 function minDiff(from: string, to?: string) {
   const [fh, fm] = from.split(":").map(Number);
@@ -43,6 +43,7 @@ const STATUS_LABEL: Record<FollowUpStatus, string> = {
   "esperando":    "⏳ Esperando",
   "llamado":      "📣 Llamado",
   "no-escucho":   "🔇 No escuchó",
+  "sin-respuesta": "📵 Sin respuesta",
   "regreso":      "↩️ Regresó",
   "completado":   "✅ Completado",
   "atendiendo":   "👤 Atendiendo (antiguo)",
@@ -83,6 +84,7 @@ const AgendaRow = memo(function AgendaRow({
     st === "llamado"      ? "bg-purple-50 border-purple-400" :
     st === "regreso"      ? "bg-sky-100 border-sky-400" :
     st === "no-escucho"   ? "bg-purple-50 border-purple-300" :
+    st === "sin-respuesta" ? "bg-gray-50 border-gray-400" :
     st === "esperando"    ? "bg-purple-100 border-purple-400 animate-pulse" :
     "bg-white border-gray-200";
 

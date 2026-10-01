@@ -1541,6 +1541,7 @@ export default function SeguimientosPage() {
                       st === "atendiendo" ? "bg-blue-50" :
                       st === "regreso" ? "bg-yellow-50" :
                       st === "no-escucho" ? "bg-orange-50" :
+                      st === "sin-respuesta" ? "bg-gray-50" :
                       st === "llamado" ? "bg-purple-50" :
                       idx % 2 === 0 ? "bg-pink-50" : "bg-white";
 
@@ -1549,6 +1550,7 @@ export default function SeguimientosPage() {
                       "en-revision": "📋 En revisión",
                       "llamado": "📣 Llamado",
                       "no-escucho": "🔇 No escuchó",
+                      "sin-respuesta": "📵 Sin respuesta",
                       "regreso": "↩️ Regresó",
                       "atendiendo": "👤 Atendiendo",
                       "completado": "✅ Completado",
@@ -1646,12 +1648,22 @@ export default function SeguimientosPage() {
                               <div className="flex flex-col gap-1">
                                 {/* Marcar como "no escuchó" si está en estado "llamado" */}
                                 {st === "llamado" && (
-                                  <button onClick={() => {
-                                    const updatedFu = { ...fu, followUpStatus: "no-escucho" as const };
-                                    updateEntry(entry.id, { ...entry, followUps: entry.followUps?.map(f => f.createdAt === fu.createdAt ? updatedFu : f) ?? [] });
-                                  }} className="text-xs px-2 py-1 rounded bg-orange-500 text-white hover:bg-orange-600 cursor-pointer whitespace-nowrap">
-                                    ❌ No Escuchó
-                                  </button>
+                                  <>
+                                    <button onClick={() => {
+                                      const updatedFu = { ...fu, followUpStatus: "no-escucho" as const };
+                                      updateEntry(entry.id, { ...entry, followUps: entry.followUps?.map(f => f.createdAt === fu.createdAt ? updatedFu : f) ?? [] });
+                                    }} className="text-xs px-2 py-1 rounded bg-orange-500 text-white hover:bg-orange-600 cursor-pointer whitespace-nowrap">
+                                      ❌ No Escuchó
+                                    </button>
+                                    <button onClick={() => {
+                                      const now = new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+                                      const updatedFu = { ...fu, followUpStatus: "sin-respuesta" as const, attended: true, completedTime: now };
+                                      updateEntry(entry.id, { ...entry, followUps: entry.followUps?.map(f => f.createdAt === fu.createdAt ? updatedFu : f) ?? [] });
+                                      showMsg("✅ Registrado sin respuesta (completado)");
+                                    }} className="text-xs px-2 py-1 rounded bg-gray-600 text-white hover:bg-gray-700 cursor-pointer whitespace-nowrap">
+                                      📵 Sin Respuesta
+                                    </button>
+                                  </>
                                 )}
                                 {/* "Cliente regresó" solo si fue llamado y no escuchó */}
                                 {st === "no-escucho" && (
