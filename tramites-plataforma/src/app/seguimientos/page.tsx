@@ -74,6 +74,8 @@ export default function SeguimientosPage() {
   const [derivingToTechId, setDerivingToTechId] = useState("");
   const [editingHourId, setEditingHourId] = useState<{ entryId: string; followUpCreatedAt?: string } | null>(null);
   const [editHours, setEditHours] = useState({ arrival: "", called: "", returned: "", attended: "", completed: "" });
+  const [changingTechnicianEntryId, setChangingTechnicianEntryId] = useState<string | null>(null);
+  const [newTechnicianId, setNewTechnicianId] = useState("");
 
   // Planimetrías
   const [planimetriasName, setPlanimetriasName] = useState("");
@@ -858,6 +860,29 @@ export default function SeguimientosPage() {
     setDerivingToTechId("");
   }
 
+  async function handleChangeTechnician(entryId: string, newTechId: string) {
+    if (!newTechId) return;
+    const entry = entries.find((e) => e.id === entryId);
+    if (!entry) return;
+
+    const newTech = technicians.find((t) => t.id === newTechId);
+    if (!newTech) {
+      showMsg("⚠️ Técnico no encontrado", "error");
+      return;
+    }
+
+    updateEntry(entryId, {
+      ...entry,
+      technicianId: newTechId,
+      technicianName: newTech.name,
+      technicianArea: newTech.areaLabel ?? entry.technicianArea,
+    });
+
+    showMsg(`✓ Técnico actualizado a ${newTech.name}`);
+    setChangingTechnicianEntryId(null);
+    setNewTechnicianId("");
+  }
+
   function guardarHorasEditadas(entryId: string, followUpCreatedAt?: string) {
     const entry = entries.find((e) => e.id === entryId);
     if (!entry) return;
@@ -1564,85 +1589,126 @@ export default function SeguimientosPage() {
                     }
 
                     return (
-                      <tr key={followUpKey} className={`${rowBg} border-b border-gray-100`}>
-                        <td className="px-3 py-3">
-                          {entry.tramiteCode ? (
-                            <>
-                              <p className="font-mono font-semibold">{entry.tramiteCode}</p>
-                              <p className="text-xs text-gray-400">{entry.registrationNumber}</p>
-                              {fu.isUnscheduled && <span className="text-xs bg-amber-100 text-amber-700 px-1 rounded">sin prog.</span>}
-                            </>
-                          ) : (
-                            <>
-                              <p className="font-bold">
-                                {fu.type === "planimetrias" ? "📐 Planimetría" :
-                                 fu.type === "consultas" ? "❓ Consulta" :
-                                 fu.type === "legalización" ? "✍️ Legalización" :
-                                 "📋 Registro"}
+                      <>
+                        <tr key={followUpKey} className={`${rowBg} border-b border-gray-100`}>
+                          <td className="px-3 py-3">
+                            {entry.tramiteCode ? (
+                              <>
+                                <p className="font-mono font-semibold">{entry.tramiteCode}</p>
+                                <p className="text-xs text-gray-400">{entry.registrationNumber}</p>
+                                {fu.isUnscheduled && <span className="text-xs bg-amber-100 text-amber-700 px-1 rounded">sin prog.</span>}
+                              </>
+                            ) : (
+                              <>
+                                <p className="font-bold">
+                                  {fu.type === "planimetrias" ? "📐 Planimetría" :
+                                   fu.type === "consultas" ? "❓ Consulta" :
+                                   fu.type === "legalización" ? "✍️ Legalización" :
+                                   "📋 Registro"}
+                                </p>
+                                <p className="text-xs text-gray-400">{entry.registrationNumber}</p>
+                              </>
+                            )}
+                          </td>
+                          <td className="px-3 py-3">{fu.clientName}</td>
+                          <td className="px-3 py-3 text-sm">
+                            {entry.technicianArea === "Gestión Interna" ? (
+                              <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-bold ${GESTION_COLOR[tech as GestionInterna]?.badge ?? "bg-gray-100 text-gray-700"}`}>
+                                {GESTION_COLOR[tech as GestionInterna]?.dot ?? "📋"} {tech}
+                              </span>
+                            ) : (
+                              <span className="font-semibold">{tech}</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-3 font-semibold text-pink-700">{fu.arrivalTime ?? "—"}</td>
+                          <td className="px-3 py-3">
+                            <span className="text-xs font-semibold">{statusLabel[st] ?? st}</span>
+                            {fu.calledTime && st === "llamado" && (
+                              <p className="text-xs text-purple-700 font-semibold">
+                                📣 Técnico salió a las {fu.calledTime}
+                                {(() => { const m = minutesDiff(fu.calledTime!); return m >= 0 ? ` (hace ${fmtMin(m)})` : ""; })()}
                               </p>
-                              <p className="text-xs text-gray-400">{entry.registrationNumber}</p>
-                            </>
-                          )}
-                        </td>
-                        <td className="px-3 py-3">{fu.clientName}</td>
-                        <td className="px-3 py-3 text-sm">
-                          {entry.technicianArea === "Gestión Interna" ? (
-                            <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-bold ${GESTION_COLOR[tech as GestionInterna]?.badge ?? "bg-gray-100 text-gray-700"}`}>
-                              {GESTION_COLOR[tech as GestionInterna]?.dot ?? "📋"} {tech}
-                            </span>
-                          ) : (
-                            <span className="font-semibold">{tech}</span>
-                          )}
-                        </td>
-                        <td className="px-3 py-3 font-semibold text-pink-700">{fu.arrivalTime ?? "—"}</td>
-                        <td className="px-3 py-3">
-                          <span className="text-xs font-semibold">{statusLabel[st] ?? st}</span>
-                          {fu.calledTime && st === "llamado" && (
-                            <p className="text-xs text-purple-700 font-semibold">
-                              📣 Técnico salió a las {fu.calledTime}
-                              {(() => { const m = minutesDiff(fu.calledTime!); return m >= 0 ? ` (hace ${fmtMin(m)})` : ""; })()}
-                            </p>
-                          )}
-                          {fu.calledTime && st !== "llamado" && <p className="text-xs text-gray-400">Llamado: {fu.calledTime}</p>}
-                          {fu.returnedTime && <p className="text-xs text-yellow-700">↩️ Regresó: {fu.returnedTime}</p>}
-                          {st === "no-escucho" && <p className="text-xs text-orange-600 font-semibold">⏳ Pendiente volver</p>}
-                        </td>
-                        <td className="px-3 py-3 text-xs">
-                          {wait !== null && <span className={wait > 30 ? "text-red-600 font-semibold" : "text-gray-600"}>{fmtMin(wait)}</span>}
-                        </td>
-                        <td className="px-3 py-3">
-                          {confirmDeleteId === followUpKey ? (
-                            <div className="flex gap-1">
-                              <button onClick={() => handleDeleteFollowUp(entry, fu)} className="px-2 py-1 bg-red-600 text-white rounded text-xs cursor-pointer">Sí</button>
-                              <button onClick={() => setConfirmDeleteId(null)} className="px-2 py-1 bg-gray-400 text-white rounded text-xs cursor-pointer">No</button>
-                            </div>
-                          ) : (
-                            <div className="flex flex-col gap-1">
-                              {/* Marcar como "no escuchó" si está en estado "llamado" */}
-                              {st === "llamado" && (
+                            )}
+                            {fu.calledTime && st !== "llamado" && <p className="text-xs text-gray-400">Llamado: {fu.calledTime}</p>}
+                            {fu.returnedTime && <p className="text-xs text-yellow-700">↩️ Regresó: {fu.returnedTime}</p>}
+                            {st === "no-escucho" && <p className="text-xs text-orange-600 font-semibold">⏳ Pendiente volver</p>}
+                          </td>
+                          <td className="px-3 py-3 text-xs">
+                            {wait !== null && <span className={wait > 30 ? "text-red-600 font-semibold" : "text-gray-600"}>{fmtMin(wait)}</span>}
+                          </td>
+                          <td className="px-3 py-3">
+                            {confirmDeleteId === followUpKey ? (
+                              <div className="flex gap-1">
+                                <button onClick={() => handleDeleteFollowUp(entry, fu)} className="px-2 py-1 bg-red-600 text-white rounded text-xs cursor-pointer">Sí</button>
+                                <button onClick={() => setConfirmDeleteId(null)} className="px-2 py-1 bg-gray-400 text-white rounded text-xs cursor-pointer">No</button>
+                              </div>
+                            ) : (
+                              <div className="flex flex-col gap-1">
+                                {/* Marcar como "no escuchó" si está en estado "llamado" */}
+                                {st === "llamado" && (
+                                  <button onClick={() => {
+                                    const updatedFu = { ...fu, followUpStatus: "no-escucho" as const };
+                                    updateEntry(entry.id, { ...entry, followUps: entry.followUps?.map(f => f.createdAt === fu.createdAt ? updatedFu : f) ?? [] });
+                                  }} className="text-xs px-2 py-1 rounded bg-orange-500 text-white hover:bg-orange-600 cursor-pointer whitespace-nowrap">
+                                    ❌ No Escuchó
+                                  </button>
+                                )}
+                                {/* "Cliente regresó" solo si fue llamado y no escuchó */}
+                                {st === "no-escucho" && (
+                                  <button onClick={() => handleMarkRegreso(entry, fu)} className="text-xs px-2 py-1 rounded bg-yellow-500 text-white hover:bg-yellow-600 cursor-pointer whitespace-nowrap">
+                                    ↩️ Regresó
+                                  </button>
+                                )}
+                                <button onClick={() => handleStartEdit(entry, fu)} className="text-xs px-2 py-1 rounded bg-blue-500 text-white hover:bg-blue-600 cursor-pointer">✏️ Editar</button>
                                 <button onClick={() => {
-                                  const updatedFu = { ...fu, followUpStatus: "no-escucho" as const };
-                                  updateEntry(entry.id, { ...entry, followUps: entry.followUps?.map(f => f.createdAt === fu.createdAt ? updatedFu : f) ?? [] });
-                                }} className="text-xs px-2 py-1 rounded bg-orange-500 text-white hover:bg-orange-600 cursor-pointer whitespace-nowrap">
-                                  ❌ No Escuchó
+                                  setEditHours({ arrival: fu.arrivalTime || "", called: fu.calledTime || "", returned: fu.returnedTime || "", attended: fu.attendedTime || "", completed: fu.completedTime || "" });
+                                  setEditingHourId({ entryId: entry.id, followUpCreatedAt: fu.createdAt });
+                                }} className="text-xs px-2 py-1 rounded bg-amber-500 text-white hover:bg-amber-600 cursor-pointer">🕐 Hora</button>
+                                <button onClick={() => setChangingTechnicianEntryId(changingTechnicianEntryId === entry.id ? null : (entry.id as string))} className="text-xs px-2 py-1 rounded bg-purple-500 text-white hover:bg-purple-600 cursor-pointer">👤 Técnico</button>
+                                <button onClick={() => setConfirmDeleteId(followUpKey)} className="text-xs px-2 py-1 rounded bg-gray-300 text-gray-700 hover:bg-red-100 cursor-pointer">🗑️</button>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                        {changingTechnicianEntryId === entry.id && (
+                          <tr className="bg-purple-50 border-b border-purple-200">
+                            <td colSpan={7} className="px-4 py-3">
+                              <div className="flex items-center gap-3">
+                                <span className="text-sm font-semibold text-gray-700">Nuevo técnico:</span>
+                                <select value={newTechnicianId}
+                                  onChange={(e) => setNewTechnicianId(e.target.value)}
+                                  className="rounded-lg border-2 border-purple-300 px-3 py-1.5 text-sm focus:outline-none focus:border-purple-500 bg-white">
+                                  <option value="">— Selecciona técnico —</option>
+                                  {availableAreas.map((area) => {
+                                    const techsInArea = availableTechnicians.filter((t) => t.areaId === area.id);
+                                    return (
+                                      <optgroup key={area.id} label={`── ${area.label.toUpperCase()} ──`}>
+                                        {techsInArea.map((t) => (
+                                          <option key={t.id} value={t.id}>{t.name}</option>
+                                        ))}
+                                      </optgroup>
+                                    );
+                                  })}
+                                </select>
+                                <button onClick={() => {
+                                  handleChangeTechnician(entry.id, newTechnicianId);
+                                }}
+                                  disabled={!newTechnicianId}
+                                  className={`px-3 py-1.5 rounded text-xs font-semibold text-white ${newTechnicianId ? "bg-purple-600 hover:bg-purple-700 cursor-pointer" : "bg-gray-400 cursor-not-allowed"}`}>
+                                  ✓ Confirmar
                                 </button>
-                              )}
-                              {/* "Cliente regresó" solo si fue llamado y no escuchó */}
-                              {st === "no-escucho" && (
-                                <button onClick={() => handleMarkRegreso(entry, fu)} className="text-xs px-2 py-1 rounded bg-yellow-500 text-white hover:bg-yellow-600 cursor-pointer whitespace-nowrap">
-                                  ↩️ Regresó
+                                <button onClick={() => {
+                                  setChangingTechnicianEntryId(null);
+                                  setNewTechnicianId("");
+                                }}
+                                  className="px-3 py-1.5 rounded text-xs font-semibold bg-gray-300 text-gray-700 hover:bg-gray-400 cursor-pointer">
+                                  ✕ Cancelar
                                 </button>
-                              )}
-                              <button onClick={() => handleStartEdit(entry, fu)} className="text-xs px-2 py-1 rounded bg-blue-500 text-white hover:bg-blue-600 cursor-pointer">✏️ Editar</button>
-                              <button onClick={() => {
-                                setEditHours({ arrival: fu.arrivalTime || "", called: fu.calledTime || "", returned: fu.returnedTime || "", attended: fu.attendedTime || "", completed: fu.completedTime || "" });
-                                setEditingHourId({ entryId: entry.id, followUpCreatedAt: fu.createdAt });
-                              }} className="text-xs px-2 py-1 rounded bg-amber-500 text-white hover:bg-amber-600 cursor-pointer">🕐 Hora</button>
-                              <button onClick={() => setConfirmDeleteId(followUpKey)} className="text-xs px-2 py-1 rounded bg-gray-300 text-gray-700 hover:bg-red-100 cursor-pointer">🗑️</button>
-                            </div>
-                          )}
-                        </td>
-                      </tr>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </>
                     );
                   })}
                 </tbody>

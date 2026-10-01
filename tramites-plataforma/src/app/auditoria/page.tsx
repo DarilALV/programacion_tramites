@@ -70,6 +70,18 @@ export default function AuditoriaPage() {
   const deletedEntries = entries.filter((e) => e.deleted === true);
   const today = new Date().toISOString().slice(0, 10);
 
+  // Filtrar eliminados en últimas 24 horas
+  const now = new Date().getTime();
+  const twentyFourHoursAgo = now - (24 * 60 * 60 * 1000);
+  const recentlyDeletedEntries = deletedEntries
+    .map((entry) => {
+      const deleteLog = logs.find((l) => l.operation === "delete" && l.entityId === entry.id);
+      const deleteTime = deleteLog ? new Date(deleteLog.timestamp).getTime() : null;
+      return { entry, deleteLog, deleteTime };
+    })
+    .filter(({ deleteTime }) => deleteTime !== null && deleteTime > twentyFourHoursAgo)
+    .sort((a, b) => (b.deleteTime || 0) - (a.deleteTime || 0));
+
   return (
     <AppShell title="Auditoría" description="Registro de cambios en la BD" eyebrow="AUDITORÍA">
       <div className="space-y-6">
@@ -250,44 +262,54 @@ export default function AuditoriaPage() {
           </table>
         </div>
 
-        {/* TRÁMITES BORRADOS */}
-        <section className="rounded-4xl border-2 border-red-200 p-6">
-          <h2 className="text-2xl font-bold mb-4">🗑️ Trámites Borrados ({deletedEntries.length})</h2>
-          {deletedEntries.length === 0 ? (
-            <p className="text-gray-500">No hay trámites borrados</p>
+        {/* REGISTROS BORRADOS RECIENTEMENTE (últimas 24 horas) */}
+        <section className="rounded-4xl border-2 border-orange-200 p-6">
+          <h2 className="text-2xl font-bold mb-4">♻️ Registros Borrados Recientemente ({recentlyDeletedEntries.length})</h2>
+          <p className="text-sm text-gray-600 mb-4">Restaura registros borrados en las últimas 24 horas</p>
+          {recentlyDeletedEntries.length === 0 ? (
+            <p className="text-gray-500">No hay registros borrados recientemente</p>
           ) : (
-            <div className="rounded-lg border-2 border-red-200 overflow-hidden">
+            <div className="rounded-lg border-2 border-orange-200 overflow-hidden">
               <table className="w-full text-sm">
-                <thead className="bg-red-100 border-b-2 border-red-200">
+                <thead className="bg-orange-100 border-b-2 border-orange-200">
                   <tr>
-                    <th className="px-4 py-3 text-left font-semibold">Hora Borrado</th>
+                    <th className="px-4 py-3 text-left font-semibold">Fecha/Hora Borrado</th>
                     <th className="px-4 py-3 text-left font-semibold">Trámite</th>
                     <th className="px-4 py-3 text-left font-semibold">Cliente</th>
                     <th className="px-4 py-3 text-left font-semibold">Técnico</th>
+                    <th className="px-4 py-3 text-left font-semibold">Borrado por</th>
                     <th className="px-4 py-3 text-left font-semibold">Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {deletedEntries.map((entry) => {
-                    const deleteLog = logs.find(
-                      (l) => l.operation === "delete" && l.entityId === entry.id
-                    );
-                    const deleteTime = deleteLog ? new Date(deleteLog.timestamp).toLocaleTimeString("es-ES") : "—";
+                  {recentlyDeletedEntries.map(({ entry, deleteLog }) => {
+                    const deleteDateTime = deleteLog
+                      ? new Date(deleteLog.timestamp).toLocaleString("es-ES", {
+                          year: "numeric",
+                          month: "2-digit",
+                          day: "2-digit",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          second: "2-digit",
+                        })
+                      : "—";
+                    const deletedByUser = deleteLog?.userName || "—";
 
                     return (
-                      <tr key={entry.id} className="border-b border-red-100 hover:bg-red-50">
-                        <td className="px-4 py-3 text-xs text-gray-600">{deleteTime}</td>
-                        <td className="px-4 py-3 font-mono font-semibold">{entry.tramiteCode}</td>
+                      <tr key={entry.id} className="border-b border-orange-100 hover:bg-orange-50">
+                        <td className="px-4 py-3 text-xs text-gray-600 font-mono">{deleteDateTime}</td>
+                        <td className="px-4 py-3 font-mono font-semibold">{entry.tramiteCode || "(sin código)"}</td>
                         <td className="px-4 py-3 text-sm">
                           {entry.followUps?.[0]?.clientName ?? "—"}
                         </td>
                         <td className="px-4 py-3 text-sm">{entry.technicianName}</td>
+                        <td className="px-4 py-3 text-sm text-gray-700">{deletedByUser}</td>
                         <td className="px-4 py-3">
                           <button
                             onClick={() => handleRecoverEntry(entry.id)}
                             className="px-3 py-1.5 bg-green-600 text-white text-xs font-semibold rounded hover:bg-green-700 cursor-pointer"
                           >
-                            ↩️ Recuperar
+                            ♻️ Restaurar
                           </button>
                         </td>
                       </tr>
@@ -298,6 +320,45 @@ export default function AuditoriaPage() {
             </div>
           )}
         </section>
+
+        {/* TODOS LOS TRÁMITES BORRADOS (histórico completo) */}
+        {deletedEntries.length > recentlyDeletedEntries.length && (
+          <section className="rounded-4xl border-2 border-red-200 p-6">
+            <h2 className="text-2xl font-bold mb-4">🗑️ Trámites Borrados — Histórico Completo ({deletedEntries.length})</h2>
+            <p className="text-sm text-gray-600 mb-4">Todos los trámites eliminados (más de 24 horas atrás no se pueden restaurar automáticamente)</p>
+            <div className="rounded-lg border-2 border-red-200 overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-red-100 border-b-2 border-red-200">
+                  <tr>
+                    <th className="px-4 py-3 text-left font-semibold">Hora Borrado</th>
+                    <th className="px-4 py-3 text-left font-semibold">Trámite</th>
+                    <th className="px-4 py-3 text-left font-semibold">Cliente</th>
+                    <th className="px-4 py-3 text-left font-semibold">Técnico</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {deletedEntries
+                    .filter((entry) => !recentlyDeletedEntries.some((r) => r.entry.id === entry.id))
+                    .map((entry) => {
+                      const deleteLog = logs.find((l) => l.operation === "delete" && l.entityId === entry.id);
+                      const deleteTime = deleteLog ? new Date(deleteLog.timestamp).toLocaleTimeString("es-ES") : "—";
+
+                      return (
+                        <tr key={entry.id} className="border-b border-red-100 hover:bg-red-50">
+                          <td className="px-4 py-3 text-xs text-gray-600">{deleteTime}</td>
+                          <td className="px-4 py-3 font-mono font-semibold">{entry.tramiteCode}</td>
+                          <td className="px-4 py-3 text-sm">
+                            {entry.followUps?.[0]?.clientName ?? "—"}
+                          </td>
+                          <td className="px-4 py-3 text-sm">{entry.technicianName}</td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
 
         {/* INFO */}
         <div className="rounded-lg bg-blue-50 border-2 border-blue-200 p-4">
