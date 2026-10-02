@@ -1470,6 +1470,12 @@ export default function SeguimientosPage() {
             </div>
           </div>
 
+          {/* Info sobre cambiar técnico y compartir fichas */}
+          <div className="px-6 py-3 bg-blue-50 border-b border-blue-200 text-sm text-blue-900">
+            <p className="mb-2">👤 <strong>Cambiar Técnico:</strong> Usa el botón 👤 en cada fila para transferir a otro técnico. Si te equivocaste, puedes volver a cambiar.</p>
+            <p>📋 <strong>Compartir Ficha:</strong> Si ambos técnicos necesitan trabajar en la misma ficha, vuelve a registrar el trámite en la lista.</p>
+          </div>
+
         {/* ── CADUCIDADES DEL DÍA ── */}
         {caducidadesHoy.length > 0 && (
           <section className="rounded-4xl border-2 border-red-200 overflow-hidden">
