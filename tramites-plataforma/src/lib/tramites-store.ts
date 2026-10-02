@@ -1051,6 +1051,8 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
       const { firestore } = await import('@/lib/firebase');
       const { collection, doc, writeBatch } = await import('firebase/firestore');
 
+      console.log(`✅ Phase 3: Guardando ${followUps.length} followUps en subcollection para entry ${entryId}`);
+
       const batch = writeBatch(firestore);
       const entryRef = doc(firestore, 'entries', entryId);
       const followUpsRef = collection(entryRef, 'followUps');
@@ -1062,7 +1064,9 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
       });
 
       await batch.commit();
+      console.log(`✅ Subcollection saved successfully para ${entryId}`);
     } catch (error) {
+      console.error('❌ Error saving followUps to subcollection:', error);
       devLog('Error saving followUps to subcollection:', error);
     }
   }
