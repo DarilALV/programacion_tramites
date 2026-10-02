@@ -131,6 +131,7 @@ export type Entry = {
   followUps?: FollowUp[];
   stages?: Stage[]; // Nueva: etapas del trámite (Plano → RUAT → Legal)
   currentStageIndex?: number; // Índice de la etapa actual
+  currentOwner?: string; // Phase 2: Técnico/usuario actual que posee el trámite (para filtrado)
 };
 
 export type EntryFormValues = {
@@ -1137,6 +1138,7 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
       createdAt: new Date().toISOString(),
       scheduledTime: 'scheduledTime' in form ? (form as any).scheduledTime : undefined,
       scheduledEndTime: 'scheduledEndTime' in form ? (form as any).scheduledEndTime : undefined,
+      currentOwner: technician.id, // Phase 2: Owner es el técnico asignado
     };
 
     persistState([nextEntry, ...entries], currentUserId);
@@ -1376,6 +1378,7 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
         technicianName: newTechnicianName,
         technicianArea: newTech.areaLabel,
         followUps: [...updatedFollowUps, newFollowUp],
+        currentOwner: newTechnicianId, // Phase 2: Nuevo owner
       });
 
       const creator = plannerUsers.find((user) => user.id === currentUserId) ?? plannerUsers[0];
@@ -1435,6 +1438,7 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
         stages: updatedStages,
         currentStageIndex: newStageIndex,
         followUps: [...(entry.followUps ?? []), newFollowUp],
+        currentOwner: newTechnicianId, // Phase 2: Nuevo owner en esta etapa
       });
 
       const creator = plannerUsers.find((user) => user.id === currentUserId) ?? plannerUsers[0];
