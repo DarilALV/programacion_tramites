@@ -839,7 +839,9 @@ useEffect(() => {
   if (savedTechnicianId && technicians.some(t => t.id === savedTechnicianId)) {
     setCurrentTechnicianId(savedTechnicianId);
   }
+}, []);
 
+useEffect(() => {
   let unsubscribe: (() => void) | undefined;
 
   (async () => {
@@ -848,18 +850,25 @@ useEffect(() => {
       const { collection, onSnapshot, query, where } = await import('firebase/firestore');
 
       const thirtyDaysAgo = new Date(new Date().getTime() - 30 * 86400000).toISOString().slice(0, 10);
+
+      // Phase 2: Filtrar por usuario
+      const currentUser = plannerUsers.find(u => u.id === currentUserId);
+      const isSupervisor = currentUser?.role === 'supervisor';
+
+      // Supervisoras ven TODO, técnicos ven solo su trabajo (currentOwner)
+      const queryConstraints = [where('registrationDate', '>=', thirtyDaysAgo)];
+      if (!isSupervisor && currentTechnicianId) {
+        queryConstraints.push(where('currentOwner', '==', currentTechnicianId));
+      }
+
       unsubscribe = onSnapshot(
-        query(
-          collection(firestore, 'entries'),
-          where('registrationDate', '>=', thirtyDaysAgo)
-        ),
+        query(collection(firestore, 'entries'), ...queryConstraints),
         (snapshot) => {
           if (!snapshot.empty) {
             const firestoreEntries = snapshot.docs
               .map((docSnap, i) =>
                 normalizeStoredEntry({ ...docSnap.data(), id: docSnap.id } as Record<string, unknown>, i)
               );
-            // Filtrar para mostrar solo datos recientes en la UI, pero guardar todo para reportes
             setEntries(firestoreEntries);
           } else {
             setEntries(seedEntries);
@@ -880,7 +889,7 @@ useEffect(() => {
   })();
 
   return () => { if (unsubscribe) unsubscribe(); };
-}, []);
+}, [currentUserId, currentTechnicianId]);
 
 useEffect(() => {
   let unsubscribeJuntas: (() => void) | undefined;
