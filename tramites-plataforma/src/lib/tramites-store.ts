@@ -819,21 +819,12 @@ useEffect(() => {
 
       const sevenDaysAgo = new Date(new Date().getTime() - 7 * 86400000).toISOString().slice(0, 10);
 
-      // Phase 2: Filtrar por usuario
-      const currentUser = plannerUsers.find(u => u.id === currentUserId);
-      const isSupervisor = currentUser?.role === 'supervisor';
-
-      // Supervisoras ven TODO, técnicos ven solo su trabajo (currentOwner)
-      const queryConstraints = [where('registrationDate', '>=', sevenDaysAgo)];
-      if (!isSupervisor && currentTechnicianId) {
-        queryConstraints.push(where('currentOwner', '==', currentTechnicianId));
-      }
-
+      // Cargar 7 días SIN filtrar por currentOwner - cada técnico ve TODO lo de 7 días
       unsubscribe = onSnapshot(
-        query(collection(firestore, 'entries'), ...queryConstraints),
+        query(collection(firestore, 'entries'), where('registrationDate', '>=', sevenDaysAgo)),
         (snapshot) => {
           if (!snapshot.empty) {
-            const firestoreEntries = snapshot.docs
+            let firestoreEntries = snapshot.docs
               .map((docSnap, i) =>
                 normalizeStoredEntry({ ...docSnap.data(), id: docSnap.id } as Record<string, unknown>, i)
               );
