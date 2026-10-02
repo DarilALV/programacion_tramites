@@ -231,7 +231,10 @@ export default function SeguimientosPage() {
       return true;
     });
 
-    return filtered.sort((a, b) => {
+    // De-duplicar por ID para evitar múltiples copias del mismo Entry
+    const uniqueEntries = Array.from(new Map(filtered.map(e => [e.id, e])).values());
+
+    return uniqueEntries.sort((a, b) => {
       const aTime = a.followUps?.[0]?.arrivalTime ?? "";
       const bTime = b.followUps?.[0]?.arrivalTime ?? "";
       return bTime.localeCompare(aTime);
@@ -240,9 +243,10 @@ export default function SeguimientosPage() {
 
   const expandedFollowUps = useMemo(() => {
     const expanded = todayFollowUps.map((entry) => {
-      const todayFollowUps = (entry.followUps ?? []).filter((fu) => fu.createdAt?.startsWith(today) && fu.type !== 'caducidades');
-      const latestFollowUp = todayFollowUps[todayFollowUps.length - 1];
-      return latestFollowUp ? { entry, followUp: latestFollowUp } : null;
+      const entryFollowUps = (entry.followUps ?? []).filter((fu) => fu.createdAt?.startsWith(today) && fu.type !== 'caducidades');
+      if (entryFollowUps.length === 0) return null;
+      const latestFollowUp = entryFollowUps[entryFollowUps.length - 1];
+      return { entry, followUp: latestFollowUp };
     }).filter((x) => x !== null);
     return expanded.sort((a, b) => {
       const timeA = a!.followUp.arrivalTime ?? "";
