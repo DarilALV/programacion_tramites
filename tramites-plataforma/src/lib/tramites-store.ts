@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useRef } from "react";
-import { saveToIndexedDB, loadFromIndexedDB, clearIndexedDB } from "./indexeddb";
+import { saveToIndexedDB, clearIndexedDB } from "./indexeddb";
 
 const isDev = () => typeof window !== "undefined" && (new URL(window.location.href).searchParams.get("debug") === "1");
 const devLog = (msg: string, err?: any) => { if (isDev()) console.error(msg, err); };
@@ -747,53 +747,24 @@ export function useTramitesStore() {
   const [entries, setEntries] = useState<Entry[]>(seedEntries);
   const [indexedDBReady, setIndexedDBReady] = useState(false);
 
-  // Cargar desde IndexedDB al inicializar
+  // Limpiar y recargar IndexedDB - solo últimos 7 días
   useEffect(() => {
     if (typeof window === "undefined") return;
 
     (async () => {
       try {
-        const idbData = await loadFromIndexedDB();
-        if (idbData?.entries && idbData.entries.length > 0) {
-          console.log('📂 Cargadas desde IndexedDB:', idbData.entries.length, 'registros');
-          setEntries(idbData.entries);
-          if (idbData.metadata?.currentUserId) {
-            setCurrentUserId(idbData.metadata.currentUserId);
-          }
-          if (idbData.metadata?.currentTechnicianId) {
-            setCurrentTechnicianId(idbData.metadata.currentTechnicianId);
-          }
-
-          // Sincronizar con Firestore (30 días) en background
-          setTimeout(async () => {
-            try {
-              const { firestore } = await import('@/lib/firebase');
-              const { collection, query, where, getDocs } = await import('firebase/firestore');
-              const thirtyDaysAgo = new Date(new Date().getTime() - 30 * 86400000).toISOString().slice(0, 10);
-              const q = query(collection(firestore, 'entries'), where('registrationDate', '>=', thirtyDaysAgo));
-              const snapshot = await getDocs(q);
-              if (!snapshot.empty) {
-                const firestoreEntries = snapshot.docs.map((docSnap, i) =>
-                  normalizeStoredEntry({ ...docSnap.data(), id: docSnap.id } as Record<string, unknown>, i)
-                );
-                console.log('✅ Actualizando IndexedDB con', firestoreEntries.length, 'registros (últimos 30 días)');
-                setEntries(firestoreEntries);
-                await saveToIndexedDB(firestoreEntries, [], idbData.metadata?.currentUserId || plannerUsers[0].id, idbData.metadata?.currentTechnicianId);
-              }
-            } catch (error) {
-              console.warn('Error sincronizando Firebase:', error);
-            }
-          }, 1000);
-        } else {
-          const saved = localStorage.getItem(storageKey);
-          if (saved) {
-            const parsed = JSON.parse(saved) as PersistedState;
-            console.log('📂 Cargadas desde localStorage (fallback):', parsed.entries.length, 'registros');
-            setEntries(parsed.entries);
-          }
+        // Cargar fallback desde localStorage
+        const saved = localStorage.getItem(storageKey);
+        if (saved) {
+          const parsed = JSON.parse(saved) as PersistedState;
+          console.log('📂 Fallback desde localStorage:', parsed.entries.length, 'registros');
+          setEntries(parsed.entries);
         }
+        // Limpiar IndexedDB completamente - empezar fresco
+        await clearIndexedDB();
+        console.log('🗑️ IndexedDB limpiado');
       } catch (error) {
-        console.error('Error cargando datos:', error);
+        console.warn('Error limpiando IndexedDB:', error);
       }
       setIndexedDBReady(true);
     })();
@@ -846,14 +817,14 @@ useEffect(() => {
       const { firestore } = await import('@/lib/firebase');
       const { collection, onSnapshot, query, where } = await import('firebase/firestore');
 
-      const thirtyDaysAgo = new Date(new Date().getTime() - 30 * 86400000).toISOString().slice(0, 10);
+      const sevenDaysAgo = new Date(new Date().getTime() - 7 * 86400000).toISOString().slice(0, 10);
 
       // Phase 2: Filtrar por usuario
       const currentUser = plannerUsers.find(u => u.id === currentUserId);
       const isSupervisor = currentUser?.role === 'supervisor';
 
       // Supervisoras ven TODO, técnicos ven solo su trabajo (currentOwner)
-      const queryConstraints = [where('registrationDate', '>=', thirtyDaysAgo)];
+      const queryConstraints = [where('registrationDate', '>=', sevenDaysAgo)];
       if (!isSupervisor && currentTechnicianId) {
         queryConstraints.push(where('currentOwner', '==', currentTechnicianId));
       }
