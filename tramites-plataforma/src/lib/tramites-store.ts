@@ -1059,7 +1059,7 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
       const { collection, doc, setDoc } = await import('firebase/firestore');
 
       const followUpDoc: FollowUpDocument = {
-        ...followUp,
+        ...(stripUndefined(followUp) as FollowUp),
         id: `fu-${entryId}-${Date.now()}`,
         entryId,
         tramiteCode: entry.tramiteCode,
@@ -1067,7 +1067,7 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
       };
 
       const followUpsRef = collection(firestore, 'followups');
-      await setDoc(doc(followUpsRef, followUpDoc.id), followUpDoc);
+      await setDoc(doc(followUpsRef, followUpDoc.id), stripUndefined(followUpDoc));
 
       return followUpDoc;
     } catch (error) {
