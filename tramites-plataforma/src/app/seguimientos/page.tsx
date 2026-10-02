@@ -94,7 +94,7 @@ export default function SeguimientosPage() {
   const [caducidadesQuantity, setCaducidadesQuantity] = useState("");
   const [selectedCaducidadesTechnicianId, setSelectedCaducidadesTechnicianId] = useState("");
 
-  const { entries, updateEntry, createEntry, removeEntry, technicians, currentUser, getNextRegistrationNumber, juntas, createJunta, updateJunta, deleteJunta, derivarTramite } =
+  const { entries, updateEntry, createEntry, removeEntry, technicians, currentUser, getNextRegistrationNumber, juntas, createJunta, updateJunta, deleteJunta, derivarTramite, createFollowUpDocument } =
     useTramitesStore();
 
   const availableTechnicians = useMemo(
@@ -534,13 +534,20 @@ export default function SeguimientosPage() {
         attemptCount: 1,
       };
 
-      updateEntry(foundEntry.id, {
+      const updatedEntry = {
         ...foundEntry,
         deleted: false, // Restaurar si estaba eliminado
         technicianId: selectedTechnicianId,
         technicianName: effectiveTechnician?.name ?? selectedTechnicianId,
         technicianArea: effectiveTechnician?.areaLabel ?? foundEntry.technicianArea,
         followUps: [...updatedFollowUps, newFollowUp],
+      };
+
+      updateEntry(foundEntry.id, updatedEntry);
+
+      // Guardar followUp como documento independiente (Phase 3)
+      createFollowUpDocument(foundEntry.id, updatedEntry, newFollowUp).catch((error) => {
+        console.error('Error creating followUp document:', error);
       });
     } else {
       const newEntry: Entry = {
@@ -556,6 +563,13 @@ export default function SeguimientosPage() {
         followUps: [{ type: "normal", clientName: clientName.trim(), arrivalTime: arrival, followUpStatus: "esperando", observations: observations.trim() || undefined, createdAt: iso, isUnscheduled: true, attemptCount: 1 }],
       };
       createEntry(newEntry);
+
+      // Guardar followUp como documento independiente (Phase 3)
+      if (newEntry.followUps && newEntry.followUps.length > 0) {
+        createFollowUpDocument(newEntry.id, newEntry, newEntry.followUps[0]).catch((error) => {
+          console.error('Error creating followUp document:', error);
+        });
+      }
     }
     showMsg(`✅ Llegada registrada a las ${arrival} — ${effectiveTechnician?.name}`, "success");
     setTramiteCode(""); setClientName(""); setSelectedTechnicianId(""); setObservations("");
@@ -598,13 +612,20 @@ export default function SeguimientosPage() {
         attemptCount: 1,
       };
 
-      updateEntry(foundEntry.id, {
+      const updatedEntryGestion = {
         ...foundEntry,
         deleted: false, // Restaurar si estaba eliminado
         technicianId: archivosId,
         technicianName: archivosName,
         technicianArea: archivosArea,
         followUps: [...updatedFollowUps, newFollowUp],
+      };
+
+      updateEntry(foundEntry.id, updatedEntryGestion);
+
+      // Guardar followUp como documento independiente (Phase 3)
+      createFollowUpDocument(foundEntry.id, updatedEntryGestion, newFollowUp).catch((error) => {
+        console.error('Error creating followUp document:', error);
       });
     } else {
       const newEntry: Entry = {
