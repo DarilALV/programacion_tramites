@@ -764,29 +764,26 @@ export function useTramitesStore() {
             setCurrentTechnicianId(idbData.metadata.currentTechnicianId);
           }
 
-          // Si IndexedDB tiene pocos datos (< 1500), cargar todo desde Firebase en background
-          if (idbData.entries.length < 1500) {
-            console.log('⏳ IndexedDB incompleto, sincronizando desde Firebase...');
-            setTimeout(async () => {
-              try {
-                const { firestore } = await import('@/lib/firebase');
-                const { collection, getDocs } = await import('firebase/firestore');
-                const snapshot = await getDocs(collection(firestore, 'entries'));
-                if (!snapshot.empty) {
-                  const firestoreEntries = snapshot.docs.map((docSnap, i) =>
-                    normalizeStoredEntry({ ...docSnap.data(), id: docSnap.id } as Record<string, unknown>, i)
-                  );
-                  if (firestoreEntries.length > idbData.entries.length) {
-                    console.log('✅ Actualizando IndexedDB con', firestoreEntries.length, 'registros');
-                    setEntries(firestoreEntries);
-                    await saveToIndexedDB(firestoreEntries, [], idbData.metadata?.currentUserId || plannerUsers[0].id, idbData.metadata?.currentTechnicianId);
-                  }
-                }
-              } catch (error) {
-                console.warn('Error sincronizando Firebase:', error);
+          // Sincronizar con Firestore (30 días) en background
+          setTimeout(async () => {
+            try {
+              const { firestore } = await import('@/lib/firebase');
+              const { collection, query, where, getDocs } = await import('firebase/firestore');
+              const thirtyDaysAgo = new Date(new Date().getTime() - 30 * 86400000).toISOString().slice(0, 10);
+              const q = query(collection(firestore, 'entries'), where('registrationDate', '>=', thirtyDaysAgo));
+              const snapshot = await getDocs(q);
+              if (!snapshot.empty) {
+                const firestoreEntries = snapshot.docs.map((docSnap, i) =>
+                  normalizeStoredEntry({ ...docSnap.data(), id: docSnap.id } as Record<string, unknown>, i)
+                );
+                console.log('✅ Actualizando IndexedDB con', firestoreEntries.length, 'registros (últimos 30 días)');
+                setEntries(firestoreEntries);
+                await saveToIndexedDB(firestoreEntries, [], idbData.metadata?.currentUserId || plannerUsers[0].id, idbData.metadata?.currentTechnicianId);
               }
-            }, 1000);
-          }
+            } catch (error) {
+              console.warn('Error sincronizando Firebase:', error);
+            }
+          }, 1000);
         } else {
           const saved = localStorage.getItem(storageKey);
           if (saved) {
@@ -870,6 +867,7 @@ useEffect(() => {
                 normalizeStoredEntry({ ...docSnap.data(), id: docSnap.id } as Record<string, unknown>, i)
               );
             setEntries(firestoreEntries);
+            saveToIndexedDB(firestoreEntries, juntas, currentUserId, currentTechnicianId).catch(err => devWarn('Error saving to IndexedDB:', err));
           } else {
             setEntries(seedEntries);
           }
@@ -1066,7 +1064,7 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
   async function createFollowUpDocument(entryId: string, entry: Entry, followUp: FollowUp) {
     try {
       const { firestore } = await import('@/lib/firebase');
-      const { collection, doc, setDoc } = await import('firebase/firestore');
+      const { collection, doc, setDoc, updateDoc } = await import('firebase/firestore');
 
       const followUpDoc: FollowUpDocument = {
         ...(stripUndefined(followUp) as FollowUp),
@@ -1076,8 +1074,14 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
         registrationDate: entry.registrationDate,
       };
 
+      // Guardar en colección followups
       const followUpsRef = collection(firestore, 'followups');
       await setDoc(doc(followUpsRef, followUpDoc.id), stripUndefined(followUpDoc));
+
+      // También agregar a Entry.followUps array en Firestore
+      const entryRef = doc(firestore, 'entries', entryId);
+      const updatedFollowUps = [...(entry.followUps || []), followUp];
+      await updateDoc(entryRef, { followUps: stripUndefined(updatedFollowUps) });
 
       return followUpDoc;
     } catch (error) {
