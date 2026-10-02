@@ -1049,11 +1049,10 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
   async function saveFollowUpsToSubcollection(entryId: string, followUps: FollowUp[]) {
     try {
       const { firestore } = await import('@/lib/firebase');
-      const { collection, doc, writeBatch } = await import('firebase/firestore');
+      const { collection, doc, setDoc, writeBatch } = await import('firebase/firestore');
 
       const batch = writeBatch(firestore);
-      const entryRef = doc(firestore, 'entries', entryId);
-      const followUpsRef = collection(entryRef, 'followUps');
+      const followUpsRef = collection(firestore, 'entries', entryId, 'followUps');
 
       followUps.forEach((fu, index) => {
         const docId = fu.createdAt ? `${fu.createdAt.replace(/[:.Z]/g, '')}-${index}` : `fu-${entryId}-${index}-${Date.now()}`;
@@ -1070,10 +1069,9 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
   async function loadFollowUpsFromSubcollection(entryId: string): Promise<FollowUp[]> {
     try {
       const { firestore } = await import('@/lib/firebase');
-      const { collection, doc, getDocs } = await import('firebase/firestore');
+      const { collection, getDocs } = await import('firebase/firestore');
 
-      const entryRef = doc(firestore, 'entries', entryId);
-      const followUpsRef = collection(entryRef, 'followUps');
+      const followUpsRef = collection(firestore, 'entries', entryId, 'followUps');
       const snapshot = await getDocs(followUpsRef);
 
       return snapshot.docs
