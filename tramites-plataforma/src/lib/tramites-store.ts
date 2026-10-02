@@ -1046,47 +1046,6 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
     }
   }
 
-  async function saveFollowUpsToSubcollection(entryId: string, followUps: FollowUp[]) {
-    try {
-      const { firestore } = await import('@/lib/firebase');
-      const { collection, doc, setDoc, writeBatch } = await import('firebase/firestore');
-
-      const batch = writeBatch(firestore);
-      const followUpsRef = collection(firestore, 'entries', entryId, 'followUps');
-
-      followUps.forEach((fu, index) => {
-        const docId = fu.createdAt ? `${fu.createdAt.replace(/[:.Z]/g, '')}-${index}` : `fu-${entryId}-${index}-${Date.now()}`;
-        const docRef = doc(followUpsRef, docId);
-        batch.set(docRef, { ...fu, id: docId }, { merge: true });
-      });
-
-      await batch.commit();
-    } catch (error) {
-      devLog('Error saving followUps to subcollection:', error);
-    }
-  }
-
-  async function loadFollowUpsFromSubcollection(entryId: string): Promise<FollowUp[]> {
-    try {
-      const { firestore } = await import('@/lib/firebase');
-      const { collection, getDocs } = await import('firebase/firestore');
-
-      const followUpsRef = collection(firestore, 'entries', entryId, 'followUps');
-      const snapshot = await getDocs(followUpsRef);
-
-      return snapshot.docs
-        .map((docSnap) => ({ ...docSnap.data() } as FollowUp))
-        .sort((a, b) => {
-          const aTime = new Date(a.createdAt || '').getTime();
-          const bTime = new Date(b.createdAt || '').getTime();
-          return aTime - bTime;
-        });
-    } catch (error) {
-      devLog('Error loading followUps from subcollection:', error);
-      return [];
-    }
-  }
-
   function createEntry(form: EntryFormValues | Partial<Entry>) {
     if ('id' in form && form.id) {
       persistState([form as Entry, ...entries]);
@@ -1139,19 +1098,10 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
 
     const creator = plannerUsers.find((user) => user.id === currentUserId) ?? plannerUsers[0];
     logAudit("update", "entry", entryId, updatedEntry.tramiteCode, creator.id, creator.name, ["localStorage"], "success");
-
-    // Guardar entry en Firestore
     firestoreSet(entryId, updatedEntry).catch((error) => {
       devLog('Error updating entry in Firestore:', error);
       logAudit("update", "entry", entryId, updatedEntry.tramiteCode, creator.id, creator.name, ["localStorage"], "partial", `Firestore error: ${error}`);
     });
-
-    // Guardar followUps en subcollection (Phase 3)
-    if (updatedEntry.followUps && updatedEntry.followUps.length > 0) {
-      saveFollowUpsToSubcollection(entryId, updatedEntry.followUps).catch((error) => {
-        devLog('Error saving followUps to subcollection:', error);
-      });
-    }
   }
 
   function updateEntryStatus(entryId: string, nextStatus: EntryStatus) {
@@ -1316,8 +1266,6 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
     updateEntry,
     removeEntry,
     fetchReportData,
-    saveFollowUpsToSubcollection,
-    loadFollowUpsFromSubcollection,
     resetDemo,
     restoreFromFirebase,
     currentTechnicianId,
