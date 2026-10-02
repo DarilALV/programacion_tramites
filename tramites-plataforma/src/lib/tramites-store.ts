@@ -839,11 +839,12 @@ useEffect(() => {
       const { firestore } = await import('@/lib/firebase');
       const { collection, onSnapshot, query, where } = await import('firebase/firestore');
 
-      const sevenDaysAgo = new Date(new Date().getTime() - 7 * 86400000).toISOString().slice(0, 10);
+      const today = new Date().toISOString().slice(0, 10);
       unsubscribe = onSnapshot(
         query(
           collection(firestore, 'entries'),
-          where('scheduleDate', '>=', sevenDaysAgo)
+          where('registrationDate', '>=', today),
+          where('registrationDate', '<=', today)
         ),
         (snapshot) => {
           if (!snapshot.empty) {
@@ -1022,6 +1023,27 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
     } catch (error) {
       devLog('Error eliminando junta de Firestore:', error);
       throw error;
+    }
+  }
+
+  async function fetchReportData(fromDate: string, toDate: string): Promise<Entry[]> {
+    try {
+      const { firestore } = await import('@/lib/firebase');
+      const { collection, query, where, getDocs } = await import('firebase/firestore');
+
+      const q = query(
+        collection(firestore, 'entries'),
+        where('registrationDate', '>=', fromDate),
+        where('registrationDate', '<=', toDate)
+      );
+
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map((docSnap, i) =>
+        normalizeStoredEntry({ ...docSnap.data(), id: docSnap.id } as Record<string, unknown>, i)
+      );
+    } catch (error) {
+      devLog('Error fetching report data:', error);
+      return [];
     }
   }
 
@@ -1244,6 +1266,7 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
     updateEntryStatus,
     updateEntry,
     removeEntry,
+    fetchReportData,
     resetDemo,
     restoreFromFirebase,
     currentTechnicianId,

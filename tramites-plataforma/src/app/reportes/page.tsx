@@ -1,12 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { AppShell } from "@/components/app-shell";
-import { formatDate, plannerUsers, technicians, useTramitesStore, type FollowUpType } from "@/lib/tramites-store";
+import { formatDate, plannerUsers, technicians, useTramitesStore, type FollowUpType, type Entry } from "@/lib/tramites-store";
 import { Download, Filter, X, TrendingUp } from "lucide-react";
 
 export default function ReportesPage() {
-  const { entries, groupEntriesByCreator, groupEntriesByTechnician, groupEntriesByDateAndCreator, groupEntriesByDateAndTechnician } =
+  const { entries, groupEntriesByCreator, groupEntriesByTechnician, groupEntriesByDateAndCreator, groupEntriesByDateAndTechnician, fetchReportData } =
     useTramitesStore();
 
   const [reportTab, setReportTab] = useState<"programaciones" | "atenciones" | "verificacion" | "consolidado" | "auditoria">("programaciones");
@@ -17,10 +17,53 @@ export default function ReportesPage() {
   const [selectedCreator, setSelectedCreator] = useState<string | null>(null);
   const [selectedTechnician, setSelectedTechnician] = useState<string | null>(null);
   const [selectedFollowUpType, setSelectedFollowUpType] = useState<FollowUpType | null>(null);
+  const [historicalData, setHistoricalData] = useState<Entry[]>([]);
+  const [loadingHistorical, setLoadingHistorical] = useState(false);
+
+  const today = new Date().toISOString().slice(0, 10);
+
+  // Cargar datos históricos si el rango de fechas incluye antes de hoy
+  useEffect(() => {
+    if (!filterFromDate) {
+      setHistoricalData([]);
+      return;
+    }
+
+    if (filterFromDate >= today) {
+      // El rango es después de hoy, no cargar históricos
+      setHistoricalData([]);
+      return;
+    }
+
+    setLoadingHistorical(true);
+    const toDate = filterToDate && filterToDate < today ? filterToDate : today;
+
+    fetchReportData(filterFromDate, toDate)
+      .then((data) => {
+        setHistoricalData(data);
+        setLoadingHistorical(false);
+      })
+      .catch(() => {
+        setHistoricalData([]);
+        setLoadingHistorical(false);
+      });
+  }, [filterFromDate, filterToDate]);
+
+  // Combinar entries de hoy con datos históricos
+  const combinedEntries = useMemo(() => {
+    const allEntries = [...entries, ...historicalData];
+    // Deduplicar por ID
+    const seen = new Set<string>();
+    return allEntries.filter((e) => {
+      if (seen.has(e.id)) return false;
+      seen.add(e.id);
+      return true;
+    });
+  }, [entries, historicalData]);
 
   // Filtrar entries según criterios
   const filteredEntries = useMemo(() => {
-    let filtered = entries.filter((e) => !e.deleted); // Excluir entries deletados
+    let filtered = combinedEntries.filter((e) => !e.deleted); // Excluir entries deletados
 
     if (filterFromDate) {
       filtered = filtered.filter((e) => e.registrationDate >= filterFromDate);
@@ -36,13 +79,13 @@ export default function ReportesPage() {
     }
 
     return filtered;
-  }, [entries, filterFromDate, filterToDate, selectedCreator, selectedTechnician]);
+  }, [combinedEntries, filterFromDate, filterToDate, selectedCreator, selectedTechnician]);
 
   // Filtrar followUps (atenciones) según criterios
   const filteredFollowUps = useMemo(() => {
     const followUps: Array<{ entry: typeof entries[0]; followUp: any; createdAtDate: string }> = [];
 
-    entries.filter(e => !e.deleted).forEach((entry) => {
+    combinedEntries.filter(e => !e.deleted).forEach((entry) => {
       (entry.followUps || []).forEach((fu) => {
         const createdAtDate = fu.createdAt?.split('T')[0] || "";
         let include = true;
@@ -60,7 +103,7 @@ export default function ReportesPage() {
     });
 
     return followUps;
-  }, [entries, filterFromDate, filterToDate, selectedCreator, selectedTechnician, selectedFollowUpType]);
+  }, [combinedEntries, filterFromDate, filterToDate, selectedCreator, selectedTechnician, selectedFollowUpType]);
 
   // Recalcular resúmenes con datos filtrados
   const creatorSummary = useMemo(() => {
@@ -545,6 +588,12 @@ export default function ReportesPage() {
             </div>
           )}
         </div>
+        {loadingHistorical && (
+          <div className="mt-4 flex items-center gap-2 text-sm text-black/60">
+            <div className="animate-spin">⏳</div>
+            <span>Cargando datos históricos...</span>
+          </div>
+        )}
       </section>
 
       {/* MÉTRICAS PRINCIPALES */}
