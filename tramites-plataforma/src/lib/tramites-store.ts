@@ -839,12 +839,11 @@ useEffect(() => {
       const { firestore } = await import('@/lib/firebase');
       const { collection, onSnapshot, query, where } = await import('firebase/firestore');
 
-      const today = new Date().toISOString().slice(0, 10);
+      const thirtyDaysAgo = new Date(new Date().getTime() - 30 * 86400000).toISOString().slice(0, 10);
       unsubscribe = onSnapshot(
         query(
           collection(firestore, 'entries'),
-          where('registrationDate', '>=', today),
-          where('registrationDate', '<=', today)
+          where('registrationDate', '>=', thirtyDaysAgo)
         ),
         (snapshot) => {
           if (!snapshot.empty) {
@@ -852,7 +851,7 @@ useEffect(() => {
               .map((docSnap, i) =>
                 normalizeStoredEntry({ ...docSnap.data(), id: docSnap.id } as Record<string, unknown>, i)
               );
-            // NO filtrar borrados aquí - cada vista decide qué mostrar
+            // Filtrar para mostrar solo datos recientes en la UI, pero guardar todo para reportes
             setEntries(firestoreEntries);
           } else {
             setEntries(seedEntries);
