@@ -1032,66 +1032,6 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
     }
   }
 
-  async function createFollowUpDocument(entryId: string, entry: Entry, followUp: FollowUp) {
-    try {
-      const { firestore } = await import('@/lib/firebase');
-      const { collection, doc, setDoc, updateDoc } = await import('firebase/firestore');
-
-      const followUpDoc: FollowUpDocument = {
-        ...(stripUndefined(followUp) as FollowUp),
-        id: `fu-${entryId}-${Date.now()}`,
-        entryId,
-        tramiteCode: entry.tramiteCode,
-        registrationDate: entry.registrationDate,
-      };
-
-      // Guardar en colección followups
-      const followUpsRef = collection(firestore, 'followups');
-      await setDoc(doc(followUpsRef, followUpDoc.id), stripUndefined(followUpDoc));
-
-      // También agregar a Entry.followUps array en Firestore
-      const entryRef = doc(firestore, 'entries', entryId);
-      const updatedFollowUps = [...(entry.followUps || []), followUp];
-      await updateDoc(entryRef, { followUps: stripUndefined(updatedFollowUps) });
-
-      return followUpDoc;
-    } catch (error) {
-      devLog('Error creating followUp document:', error);
-      throw error;
-    }
-  }
-
-  async function loadFollowUpsForEntry(entryId: string): Promise<FollowUpDocument[]> {
-    try {
-      const { firestore } = await import('@/lib/firebase');
-      const { collection, query, where, getDocs } = await import('firebase/firestore');
-
-      const q = query(
-        collection(firestore, 'followups'),
-        where('entryId', '==', entryId)
-      );
-
-      const snapshot = await getDocs(q);
-      return snapshot.docs
-        .map((docSnap) => ({ ...docSnap.data() } as FollowUpDocument))
-        .sort((a, b) => new Date(a.createdAt || '').getTime() - new Date(b.createdAt || '').getTime());
-    } catch (error) {
-      devLog('Error loading followUps for entry:', error);
-      return [];
-    }
-  }
-
-  async function updateFollowUpDocument(followUpId: string, updates: Partial<FollowUpDocument>) {
-    try {
-      const { firestore } = await import('@/lib/firebase');
-      const { doc, updateDoc } = await import('firebase/firestore');
-
-      await updateDoc(doc(firestore, 'followups', followUpId), updates);
-    } catch (error) {
-      devLog('Error updating followUp document:', error);
-      throw error;
-    }
-  }
 
   function createEntry(form: EntryFormValues | Partial<Entry>) {
     if ('id' in form && form.id) {
@@ -1314,9 +1254,6 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
     updateEntry,
     removeEntry,
     fetchReportData,
-    createFollowUpDocument,
-    loadFollowUpsForEntry,
-    updateFollowUpDocument,
     resetDemo,
     restoreFromFirebase,
     currentTechnicianId,
