@@ -174,7 +174,7 @@ export const areas: Area[] = [
   {
     id: "supervisor",
     label: "Supervisor",
-    people: ["ROLY CH.", "CARLO A.", "OSCAR A."],
+    people: ["ROLY CH.", "CARLO A.", "OSCAR A.", "DEMETRIO"],
   },
   {
     id: "ruat",
@@ -184,7 +184,7 @@ export const areas: Area[] = [
   {
     id: "legal",
     label: "Legal",
-    people: ["HUASCAR A.", "MA.RENEE G.", "DENIZ R.", "MARIANELA S.", "FELIPE M."],
+    people: ["HUASCAR A.", "ALFREDO V.", "DENIZ R.", "MARIANELA S.", "FELIPE M."],
   },
   {
     id: "revision-plano",
@@ -194,7 +194,7 @@ export const areas: Area[] = [
   {
     id: "tunari",
     label: "Tunari",
-    people: ["CHRISTIAN D.", "MARIA RENE F.", "JORGE SOLIZ", "KAREN S.", "ROYER M.", "ALFREDO V.", "KARLA AGUILAR", "PABLO MEDINA", "DEMETRIO", "FREDDY"],
+    people: ["CHRISTIAN D.", "MARIA RENE F.", "JORGE SOLIZ", "KAREN S.", "ROYER M.", "MA.RENEE G.", "KARLA AGUILAR", "PABLO MEDINA", "FREDDY"],
   },
 ];
 
