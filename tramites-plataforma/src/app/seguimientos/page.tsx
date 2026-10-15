@@ -94,7 +94,10 @@ export default function SeguimientosPage() {
   const [caducidadesQuantity, setCaducidadesQuantity] = useState("");
   const [selectedCaducidadesTechnicianId, setSelectedCaducidadesTechnicianId] = useState("");
 
-  const { entries, updateEntry, createEntry, removeEntry, technicians, currentUser, getNextRegistrationNumber, juntas, createJunta, updateJunta, deleteJunta, derivarTramite } =
+  const [changingJuntaId, setChangingJuntaId] = useState<string | null>(null);
+  const [newJuntaTechnicianId, setNewJuntaTechnicianId] = useState("");
+
+  const { entries, updateEntry, updateEntriesBatch, createEntry, removeEntry, technicians, currentUser, getNextRegistrationNumber, juntas, createJunta, updateJunta, deleteJunta, derivarTramite } =
     useTramitesStore();
 
   const availableTechnicians = useMemo(
@@ -429,6 +432,25 @@ export default function SeguimientosPage() {
     }));
     setEditingJuntaId(juntaId);
     setEditingJuntaTramites(tramitesData);
+  }
+
+  function handleChangeJuntaTechnician(juntaId: string) {
+    const junta = juntas.find(j => j.id === juntaId);
+    const tech = technicians.find(t => t.id === newJuntaTechnicianId);
+    if (!junta || !tech) return showMsg("⚠️ Selecciona un técnico", "error");
+
+    const juntaEntries = entriesByJunta.get(juntaId) ?? [];
+    updateJunta(juntaId, { technicianId: tech.id, technicianName: tech.name });
+    updateEntriesBatch(juntaEntries.map(e => ({
+      ...e,
+      technicianId: tech.id,
+      technicianName: tech.name,
+      technicianArea: tech.areaLabel,
+      currentOwner: tech.id,
+    })));
+    setChangingJuntaId(null);
+    setNewJuntaTechnicianId("");
+    showMsg(`✅ Junta asignada a ${tech.name}`, "success");
   }
 
   function handleDeleteJunta(juntaId: string) {
@@ -1422,11 +1444,35 @@ export default function SeguimientosPage() {
                               ✏️ Editar
                             </button>
                           )}
+                          {junta.status !== "completado" && (
+                            <button onClick={() => {
+                                const opening = changingJuntaId !== junta.id;
+                                setChangingJuntaId(opening ? junta.id : null);
+                                setNewJuntaTechnicianId(opening ? junta.technicianId : "");
+                              }}
+                              className="px-3 py-1.5 text-sm bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition font-semibold">
+                              👤 Cambiar técnico
+                            </button>
+                          )}
                           <button onClick={() => handleDeleteJunta(junta.id)}
                             className="px-3 py-1.5 text-sm bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition font-semibold">
                             🗑️ Eliminar
                           </button>
                         </div>
+                        {changingJuntaId === junta.id && (
+                          <div className="flex flex-wrap items-center gap-2 bg-purple-50 p-3 rounded-lg border border-purple-200">
+                            <select value={newJuntaTechnicianId} onChange={(e) => setNewJuntaTechnicianId(e.target.value)}
+                              className="px-3 py-1.5 text-sm rounded-lg border border-purple-300 bg-white">
+                              {technicians.map((t) => (
+                                <option key={t.id} value={t.id}>{t.name} — {t.areaLabel}</option>
+                              ))}
+                            </select>
+                            <button onClick={() => handleChangeJuntaTechnician(junta.id)}
+                              className="px-3 py-1.5 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition font-semibold">
+                              Guardar técnico
+                            </button>
+                          </div>
+                        )}
                         <p className="text-sm font-semibold text-emerald-900">Trámites ingresados:</p>
                         {juntaEntries.length === 0 ? (
                           <p className="text-xs text-gray-500 italic">Sin trámites registrados aún</p>

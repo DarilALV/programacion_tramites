@@ -1211,6 +1211,20 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
     }
   }
 
+  function updateEntriesBatch(updated: Entry[]) {
+    const byId = new Map(updated.map((e) => [e.id, e]));
+    const nextEntries = entries.map((e) => byId.get(e.id) ?? e);
+    persistState(nextEntries);
+    saveToIndexedDB(nextEntries, juntas, currentUserId, currentTechnicianId).catch((error) => {
+      console.error('Error guardando inmediatamente en IndexedDB:', error);
+    });
+    updated.forEach((entry) => {
+      firestoreSet(entry.id, entry).catch((error) => {
+        devLog('Error updating entry in Firestore:', error);
+      });
+    });
+  }
+
   function deleteJunta(juntaId: string) {
     const junta = juntas.find(j => j.id === juntaId);
     const newJuntas = juntas.filter(j => j.id !== juntaId);
@@ -1243,6 +1257,7 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
     createEntry,
     updateEntryStatus,
     updateEntry,
+    updateEntriesBatch,
     removeEntry,
     fetchReportData,
     resetDemo,
