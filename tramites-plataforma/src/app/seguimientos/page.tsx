@@ -139,7 +139,7 @@ export default function SeguimientosPage() {
   const entriesByJunta = useMemo(() => {
     const map = new Map<string, Entry[]>();
     entries.forEach((e) => {
-      if (e.juntaId) {
+      if (e.juntaId && !e.deleted) {
         if (!map.has(e.juntaId)) map.set(e.juntaId, []);
         map.get(e.juntaId)!.push(e);
       }
