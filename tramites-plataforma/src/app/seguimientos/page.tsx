@@ -96,8 +96,10 @@ export default function SeguimientosPage() {
 
   const [changingJuntaId, setChangingJuntaId] = useState<string | null>(null);
   const [newJuntaTechnicianId, setNewJuntaTechnicianId] = useState("");
+  const [changingRegistrarJuntaId, setChangingRegistrarJuntaId] = useState<string | null>(null);
+  const [newRegistrarUserId, setNewRegistrarUserId] = useState("");
 
-  const { entries, updateEntry, updateEntriesBatch, createEntry, removeEntry, technicians, currentUser, getNextRegistrationNumber, juntas, createJunta, updateJunta, deleteJunta, derivarTramite } =
+  const { entries, updateEntry, updateEntriesBatch, createEntry, removeEntry, technicians, plannerUsers, currentUser, getNextRegistrationNumber, juntas, createJunta, updateJunta, deleteJunta, derivarTramite } =
     useTramitesStore();
 
   const availableTechnicians = useMemo(
@@ -451,6 +453,17 @@ export default function SeguimientosPage() {
     setChangingJuntaId(null);
     setNewJuntaTechnicianId("");
     showMsg(`✅ Junta asignada a ${tech.name}`, "success");
+  }
+
+  function handleChangeJuntaRegistrar(juntaId: string) {
+    const user = plannerUsers.find(u => u.id === newRegistrarUserId);
+    if (!user) return showMsg("⚠️ Selecciona un usuario", "error");
+    const juntaEntries = entriesByJunta.get(juntaId) ?? [];
+    updateJunta(juntaId, { registeredBy: user.name });
+    updateEntriesBatch(juntaEntries.map(e => ({ ...e, createdBy: user.id, createdByName: user.name })));
+    setChangingRegistrarJuntaId(null);
+    setNewRegistrarUserId("");
+    showMsg(`✅ Registrador cambiado a ${user.name}`, "success");
   }
 
   function handleDeleteJunta(juntaId: string) {
@@ -1454,6 +1467,14 @@ export default function SeguimientosPage() {
                               👤 Cambiar técnico
                             </button>
                           )}
+                          <button onClick={() => {
+                              const opening = changingRegistrarJuntaId !== junta.id;
+                              setChangingRegistrarJuntaId(opening ? junta.id : null);
+                              setNewRegistrarUserId("");
+                            }}
+                            className="px-3 py-1.5 text-sm bg-amber-100 text-amber-800 rounded-lg hover:bg-amber-200 transition font-semibold">
+                            📝 Cambiar registrador
+                          </button>
                           <button onClick={() => handleDeleteJunta(junta.id)}
                             className="px-3 py-1.5 text-sm bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition font-semibold">
                             🗑️ Eliminar
@@ -1470,6 +1491,21 @@ export default function SeguimientosPage() {
                             <button onClick={() => handleChangeJuntaTechnician(junta.id)}
                               className="px-3 py-1.5 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition font-semibold">
                               Guardar técnico
+                            </button>
+                          </div>
+                        )}
+                        {changingRegistrarJuntaId === junta.id && (
+                          <div className="flex flex-wrap items-center gap-2 bg-amber-50 p-3 rounded-lg border border-amber-200">
+                            <select value={newRegistrarUserId} onChange={(e) => setNewRegistrarUserId(e.target.value)}
+                              className="px-3 py-1.5 text-sm rounded-lg border border-amber-300 bg-white">
+                              <option value="">— Selecciona usuario —</option>
+                              {plannerUsers.map((u) => (
+                                <option key={u.id} value={u.id}>{u.name}</option>
+                              ))}
+                            </select>
+                            <button onClick={() => handleChangeJuntaRegistrar(junta.id)}
+                              className="px-3 py-1.5 text-sm bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition font-semibold">
+                              Guardar registrador
                             </button>
                           </div>
                         )}
