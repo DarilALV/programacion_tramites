@@ -1211,6 +1211,22 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
     }
   }
 
+  function replaceJuntaEntries(removeIds: string[], added: Entry[]) {
+    const removeSet = new Set(removeIds);
+    const softDeleted = entries.filter((e) => removeSet.has(e.id)).map((e) => ({ ...e, deleted: true }));
+    const byId = new Map(softDeleted.map((e) => [e.id, e]));
+    const nextEntries = [...added, ...entries.map((e) => byId.get(e.id) ?? e)];
+    persistState(nextEntries);
+    saveToIndexedDB(nextEntries, juntas, currentUserId, currentTechnicianId).catch((error) => {
+      console.error('Error guardando inmediatamente en IndexedDB:', error);
+    });
+    [...softDeleted, ...added].forEach((entry) => {
+      firestoreSet(entry.id, entry).catch((error) => {
+        devLog('Error replacing junta entry in Firestore:', error);
+      });
+    });
+  }
+
   function updateEntriesBatch(updated: Entry[]) {
     const byId = new Map(updated.map((e) => [e.id, e]));
     const nextEntries = entries.map((e) => byId.get(e.id) ?? e);
@@ -1258,6 +1274,7 @@ function persistState(nextEntries: Entry[], nextUserId?: string) {
     updateEntryStatus,
     updateEntry,
     updateEntriesBatch,
+    replaceJuntaEntries,
     removeEntry,
     fetchReportData,
     resetDemo,

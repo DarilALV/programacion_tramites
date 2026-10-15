@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { AppShell } from "@/components/app-shell";
-import { useTramitesStore, areas, type Entry, type FollowUp } from "@/lib/tramites-store";
+import { useTramitesStore, areas, type Entry, type FollowUp, type Junta } from "@/lib/tramites-store";
 import { getServerNow } from "@/lib/server-time";
 import { Search, Plus, Trash2 } from "lucide-react";
 
@@ -98,8 +98,11 @@ export default function SeguimientosPage() {
   const [newJuntaTechnicianId, setNewJuntaTechnicianId] = useState("");
   const [changingRegistrarJuntaId, setChangingRegistrarJuntaId] = useState<string | null>(null);
   const [newRegistrarUserId, setNewRegistrarUserId] = useState("");
+  const [editJuntaError, setEditJuntaError] = useState("");
+  const [duplicatingJuntaId, setDuplicatingJuntaId] = useState<string | null>(null);
+  const [duplicateTechnicianId, setDuplicateTechnicianId] = useState("");
 
-  const { entries, updateEntry, updateEntriesBatch, createEntry, removeEntry, technicians, plannerUsers, currentUser, getNextRegistrationNumber, juntas, createJunta, updateJunta, deleteJunta, derivarTramite } =
+  const { entries, updateEntry, updateEntriesBatch, replaceJuntaEntries, createEntry, removeEntry, technicians, plannerUsers, currentUser, getNextRegistrationNumber, juntas, createJunta, updateJunta, deleteJunta, derivarTramite } =
     useTramitesStore();
 
   const availableTechnicians = useMemo(
@@ -376,6 +379,34 @@ export default function SeguimientosPage() {
     setMessage(text); setMessageType(type); setTimeout(() => setMessage(""), 4000);
   }
 
+  function buildJuntaEntries(junta: Junta, tramites: { code: string; clientName: string }[], iso: string): Entry[] {
+    const tech = technicians.find(t => t.id === junta.technicianId);
+    return tramites.map((tramite) => ({
+      id: `junta-${junta.id}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      createdBy: currentUser.id,
+      createdByName: currentUser.name,
+      registrationNumber: getNextRegistrationNumber(),
+      tramiteCode: tramite.code.trim(),
+      technicianId: junta.technicianId,
+      technicianName: tech?.name ?? junta.technicianName,
+      technicianArea: tech?.areaLabel ?? "",
+      scheduleDate: junta.date,
+      registrationDate: iso.slice(0, 10),
+      observations: `Junta: ${junta.observations || "sin observaciones"}`,
+      status: "Registrado",
+      createdAt: iso,
+      juntaId: junta.id,
+      currentOwner: junta.technicianId,
+      followUps: [{
+        type: "junta_ingreso",
+        juntaId: junta.id,
+        clientName: tramite.clientName.trim(),
+        followUpStatus: "esperando",
+        createdAt: iso,
+      }],
+    }));
+  }
+
   async function handleCreateJunta() {
     if (!juntaTechnicianId) return showMsg("⚠️ Selecciona un técnico", "error");
     if (juntaTramites.length === 0) return showMsg("⚠️ Agrega al menos un trámite", "error");
@@ -384,37 +415,9 @@ export default function SeguimientosPage() {
     const invalid = juntaTramites.find(t => !t.code.trim());
     if (invalid) return showMsg("⚠️ Todos los trámites deben tener código", "error");
 
-    // Crear la junta primero
     const junta = createJunta(juntaTechnicianId, juntaName.trim(), juntaTramites.length, juntaObservations.trim() || undefined);
-
-    // Crear Entry para cada trámite
     const { iso } = await getServerNow();
-    juntaTramites.forEach((tramite) => {
-      const newEntry: Entry = {
-        id: `junta-${junta.id}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-        createdBy: currentUser.id,
-        createdByName: currentUser.name,
-        registrationNumber: getNextRegistrationNumber(),
-        tramiteCode: tramite.code.trim(),
-        technicianId: juntaTechnicianId,
-        technicianName: technicians.find(t => t.id === juntaTechnicianId)?.name ?? juntaTechnicianId,
-        technicianArea: technicians.find(t => t.id === juntaTechnicianId)?.areaLabel ?? "",
-        scheduleDate: today,
-        registrationDate: today,
-        observations: `Junta: ${juntaObservations || "sin observaciones"}`,
-        status: "Registrado",
-        createdAt: iso,
-        juntaId: junta.id,
-        followUps: [{
-          type: "junta_ingreso",
-          juntaId: junta.id,
-          clientName: tramite.clientName.trim(),
-          followUpStatus: "esperando",
-          createdAt: iso,
-        }],
-      };
-      createEntry(newEntry);
-    });
+    replaceJuntaEntries([], buildJuntaEntries(junta, juntaTramites, iso));
 
     showMsg(`✅ Junta "${juntaName}" registrada: ${juntaTramites.length} trámites para ${technicians.find(t => t.id === juntaTechnicianId)?.name}`, "success");
     setShowJuntaModal(false);
@@ -434,6 +437,7 @@ export default function SeguimientosPage() {
     }));
     setEditingJuntaId(juntaId);
     setEditingJuntaTramites(tramitesData);
+    setEditJuntaError("");
   }
 
   function handleChangeJuntaTechnician(juntaId: string) {
@@ -453,6 +457,26 @@ export default function SeguimientosPage() {
     setChangingJuntaId(null);
     setNewJuntaTechnicianId("");
     showMsg(`✅ Junta asignada a ${tech.name}`, "success");
+  }
+
+  async function handleDuplicateJunta(juntaId: string) {
+    const source = juntas.find(j => j.id === juntaId);
+    const target = technicians.find(t => t.id === duplicateTechnicianId);
+    if (!source || !target) return showMsg("⚠️ Selecciona un técnico", "error");
+    if (target.id === source.technicianId) return showMsg("⚠️ Ese técnico ya tiene esta junta", "error");
+
+    const tramites = (entriesByJunta.get(juntaId) ?? []).map(e => ({
+      code: e.tramiteCode,
+      clientName: e.followUps?.[0]?.clientName ?? "",
+    }));
+    if (tramites.length === 0) return showMsg("⚠️ La junta no tiene trámites para copiar", "error");
+
+    const newJunta = createJunta(target.id, source.name, tramites.length, source.observations);
+    const { iso } = await getServerNow();
+    replaceJuntaEntries([], buildJuntaEntries(newJunta, tramites, iso));
+    setDuplicatingJuntaId(null);
+    setDuplicateTechnicianId("");
+    showMsg(`✅ Junta copiada a ${target.name}: ${tramites.length} trámites`, "success");
   }
 
   function handleChangeJuntaRegistrar(juntaId: string) {
@@ -475,49 +499,20 @@ export default function SeguimientosPage() {
   }
 
   async function handleSaveJuntaEdit(juntaId: string) {
-    if (editingJuntaTramites.length === 0) return showMsg("⚠️ Debe haber al menos un trámite", "error");
-    const invalid = editingJuntaTramites.find(t => !t.code.trim() || !t.clientName.trim());
-    if (invalid) return showMsg("⚠️ Todos los trámites deben tener código y cliente", "error");
+    if (editingJuntaTramites.length === 0) return setEditJuntaError("⚠️ Debe haber al menos un trámite");
+    const invalid = editingJuntaTramites.find(t => !t.code.trim());
+    if (invalid) return setEditJuntaError("⚠️ Todos los trámites deben tener código");
 
     const junta = juntas.find(j => j.id === juntaId);
     if (!junta) return;
 
     const juntaEntries = entriesByJunta.get(juntaId) ?? [];
     const { iso } = await getServerNow();
-    const technicianObj = technicians.find(t => t.id === junta.technicianId);
-
-    juntaEntries.forEach(e => removeEntry(e.id));
-
-    editingJuntaTramites.forEach((tramite) => {
-      const newEntry: Entry = {
-        id: `entry-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        createdBy: currentUser.id,
-        createdByName: currentUser.name,
-        registrationNumber: getNextRegistrationNumber(),
-        tramiteCode: tramite.code,
-        technicianId: junta.technicianId,
-        technicianName: technicianObj?.name || "—",
-        technicianArea: technicianObj?.areaLabel || "Supervisor",
-        scheduleDate: junta.date,
-        registrationDate: iso.slice(0, 10),
-        observations: "",
-        status: "Registrado",
-        createdAt: iso,
-        juntaId: junta.id,
-        followUps: [{
-          type: "junta_ingreso",
-          juntaId: junta.id,
-          clientName: tramite.clientName.trim(),
-          followUpStatus: "esperando",
-          createdAt: iso,
-        }],
-      };
-      createEntry(newEntry);
-    });
-
+    replaceJuntaEntries(juntaEntries.map(e => e.id), buildJuntaEntries(junta, editingJuntaTramites, iso));
     updateJunta(juntaId, { tramiteCount: editingJuntaTramites.length });
     setEditingJuntaId(null);
     setEditingJuntaTramites([]);
+    setEditJuntaError("");
     showMsg("✅ Junta actualizada", "success");
   }
 
@@ -1467,6 +1462,16 @@ export default function SeguimientosPage() {
                               👤 Cambiar técnico
                             </button>
                           )}
+                          {junta.status !== "completado" && (
+                            <button onClick={() => {
+                                const opening = duplicatingJuntaId !== junta.id;
+                                setDuplicatingJuntaId(opening ? junta.id : null);
+                                setDuplicateTechnicianId("");
+                              }}
+                              className="px-3 py-1.5 text-sm bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 transition font-semibold">
+                              👥 Copiar a otro técnico
+                            </button>
+                          )}
                           <button onClick={() => {
                               const opening = changingRegistrarJuntaId !== junta.id;
                               setChangingRegistrarJuntaId(opening ? junta.id : null);
@@ -1491,6 +1496,22 @@ export default function SeguimientosPage() {
                             <button onClick={() => handleChangeJuntaTechnician(junta.id)}
                               className="px-3 py-1.5 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition font-semibold">
                               Guardar técnico
+                            </button>
+                          </div>
+                        )}
+                        {duplicatingJuntaId === junta.id && (
+                          <div className="flex flex-wrap items-center gap-2 bg-indigo-50 p-3 rounded-lg border border-indigo-200">
+                            <p className="w-full text-xs text-indigo-800">Crea una junta igual para otro técnico, con los mismos trámites. La junta actual no cambia.</p>
+                            <select value={duplicateTechnicianId} onChange={(e) => setDuplicateTechnicianId(e.target.value)}
+                              className="px-3 py-1.5 text-sm rounded-lg border border-indigo-300 bg-white">
+                              <option value="">— Selecciona técnico —</option>
+                              {technicians.filter(t => t.id !== junta.technicianId).map((t) => (
+                                <option key={t.id} value={t.id}>{t.name} — {t.areaLabel}</option>
+                              ))}
+                            </select>
+                            <button onClick={() => handleDuplicateJunta(junta.id)}
+                              className="px-3 py-1.5 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition font-semibold">
+                              Crear copia
                             </button>
                           </div>
                         )}
@@ -2149,6 +2170,10 @@ export default function SeguimientosPage() {
                 </div>
               )}
             </div>
+
+            {editJuntaError && (
+              <div className="p-3 rounded-lg text-sm font-medium bg-red-100 text-red-800 border border-red-300">{editJuntaError}</div>
+            )}
 
             {/* Botones */}
             <div className="flex gap-2 pt-2">
